@@ -1,0 +1,11 @@
+# 운영용. 값은 전부 환경변수로 넣는다. 깃허브에 비밀값을 올리지 않는다.
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  flyway:
+    locations: classpath:db/migration
+
+app:
+  cookie-secure: true

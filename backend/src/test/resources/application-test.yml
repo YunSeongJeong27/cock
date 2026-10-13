@@ -1,0 +1,14 @@
+# mvn test 용. H2 메모리 모드.
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  flyway:
+    locations: classpath:db/migration
+
+app:
+  jwt-secret: test-secret-0123456789abcdef0123456789abcdef
+  admin-email: admin@test.local
+  admin-password: admin1234
+  public-rate-limit-per-minute: 10000

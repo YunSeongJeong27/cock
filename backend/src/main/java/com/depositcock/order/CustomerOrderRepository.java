@@ -1,0 +1,29 @@
+package com.depositcock.order;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Long> {
+
+    List<CustomerOrder> findByGroupBuyIdOrderByOrderNoAsc(Long groupBuyId);
+
+    List<CustomerOrder> findByGroupBuyIdAndCustomerKeyOrderByOrderNoAsc(Long groupBuyId, String customerKey);
+
+    List<CustomerOrder> findByGroupBuyIdAndSource(Long groupBuyId, OrderSource source);
+
+    Optional<CustomerOrder> findByIdAndGroupBuyId(Long id, Long groupBuyId);
+
+    boolean existsByGroupBuyIdAndCustomerKeyAndStatus(Long groupBuyId, String customerKey, OrderStatus status);
+
+    boolean existsByGroupBuyIdAndDepositorNameAndStatusAndCustomerKeyNot(Long groupBuyId, String depositorName,
+                                                                         OrderStatus status, String customerKey);
+
+    @Query("select coalesce(max(o.orderNo), 0) from CustomerOrder o where o.groupBuy.id = :groupBuyId")
+    int maxOrderNo(@Param("groupBuyId") Long groupBuyId);
+
+    boolean existsByItemsProductId(Long productId);
+}
