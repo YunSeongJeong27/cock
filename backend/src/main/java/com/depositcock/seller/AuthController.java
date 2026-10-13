@@ -54,6 +54,15 @@ public class AuthController {
         return MeResponse.of(sellerService.get(CurrentSeller.id()), LocalDateTime.now(clock));
     }
 
+    public record WithdrawRequest(String password) {
+    }
+
+    @PostMapping("/api/seller/withdraw")
+    public void withdraw(@RequestBody WithdrawRequest request, HttpServletResponse response) {
+        sellerService.withdraw(CurrentSeller.id(), request.password());
+        tokenService.clearCookie(response);
+    }
+
     @PutMapping("/api/seller/profile")
     public MeResponse updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         return MeResponse.of(sellerService.updateProfile(CurrentSeller.id(), request), LocalDateTime.now(clock));

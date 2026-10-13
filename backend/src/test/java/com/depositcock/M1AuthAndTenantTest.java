@@ -115,4 +115,18 @@ class M1AuthAndTenantTest extends IntegrationTest {
         mvc.perform(withJson(post("/api/seller/group-buys").cookie(seller),
                 groupBuyBody("다시 됨", List.of(product("사과", 1000, null))))).andExpect(status().isOk());
     }
+
+    @Test
+    void sellerWithdrawDeletesData() throws Exception {
+        String email = uniqueEmail();
+        Cookie seller = signup(email);
+        mvc.perform(withJson(post("/api/seller/group-buys").cookie(seller),
+                groupBuyBody("탈퇴 전 공구", List.of(product("사과", 1000, null))))).andExpect(status().isOk());
+        mvc.perform(withJson(post("/api/seller/withdraw").cookie(seller), Map.of("password", "wrong-password")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(withJson(post("/api/seller/withdraw").cookie(seller), Map.of("password", "password123")))
+                .andExpect(status().isOk());
+        mvc.perform(withJson(post("/api/auth/login"), Map.of("email", email, "password", "password123")))
+                .andExpect(status().isUnauthorized());
+    }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, errorMessage } from '../../api'
 import { useAuth } from '../../auth'
 import { ErrorBox } from '../../components/Ui'
@@ -9,6 +10,19 @@ export default function Profile() {
   const [form, setForm] = useState({ displayName: '', defaultBankName: '', defaultAccountNumber: '', defaultAccountHolder: '' })
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const navigate = useNavigate()
+
+  async function withdraw() {
+    const password = prompt('탈퇴하면 모든 공구·주문·입금 정보가 삭제되고 되돌릴 수 없습니다. 필요한 주문 정리표는 먼저 내려받으세요.\n계속하려면 비밀번호를 입력하세요.')
+    if (!password) return
+    try {
+      await api.post('/api/seller/withdraw', { password })
+      setMe(null)
+      navigate('/')
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
 
   useEffect(() => {
     if (me) {
@@ -53,6 +67,13 @@ export default function Profile() {
         {saved && <div className="success-box">저장했습니다.</div>}
         <button className="btn primary mt">저장</button>
       </form>
+      {me.role !== 'ADMIN' && (
+        <div className="card">
+          <h3>탈퇴</h3>
+          <p className="muted small">탈퇴하면 판매자 정보와 받은 주문자·입금 정보가 모두 파기됩니다.</p>
+          <button className="btn danger" onClick={withdraw}>탈퇴하기</button>
+        </div>
+      )}
     </div>
   )
 }

@@ -104,6 +104,19 @@ public class SellerService {
         sellerRepository.delete(seller);
     }
 
+    /** 판매자 본인 탈퇴: 비밀번호 확인 후 판매자·공구·주문·입금 정보를 모두 파기한다. */
+    @Transactional
+    public void withdraw(Long sellerId, String rawPassword) {
+        Seller seller = get(sellerId);
+        if (seller.getRole() == Role.ADMIN) {
+            throw ApiException.badRequest("관리자 계정은 탈퇴할 수 없습니다.");
+        }
+        if (rawPassword == null || !passwordEncoder.matches(rawPassword, seller.getPasswordHash())) {
+            throw ApiException.badRequest("비밀번호가 맞지 않습니다.");
+        }
+        sellerRepository.delete(seller);
+    }
+
     @Transactional
     public void ensureAdmin(String email, String rawPassword) {
         String normalized = normalizeEmail(email);
