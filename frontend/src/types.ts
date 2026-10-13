@@ -184,6 +184,8 @@ export interface MatchRow {
   evidence: string | null
   amountDiff: number
   candidates: { order: OrderBrief; evidence: string; amountDiff: number }[]
+  /** 관련 없는 입금의 확인 안내 (중복 입금·환불 가능성) */
+  note: string | null
 }
 
 export interface MatchResponse {

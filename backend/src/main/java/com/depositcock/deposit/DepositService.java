@@ -28,8 +28,10 @@ import com.depositcock.deposit.DepositDtos.UploadResponse;
 import com.depositcock.deposit.DepositDtos.UploadSummary;
 import com.depositcock.deposit.DepositDtos.UsedRow;
 import com.depositcock.deposit.DepositMatcher.Deposit;
+import com.depositcock.deposit.DepositMatcher.Known;
 import com.depositcock.deposit.DepositMatcher.Outcome;
 import com.depositcock.deposit.DepositMatcher.Payee;
+import com.depositcock.deposit.DepositMatcher.Relation;
 import com.depositcock.deposit.DepositMatcher.Result;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.GroupBuyService;
@@ -54,19 +56,21 @@ public class DepositService {
     private final DepositUploadRepository uploadRepository;
     private final DepositRowRepository rowRepository;
     private final DepositorAliasRepository aliasRepository;
+    private final AliasBook aliasBook;
     private final BankColumnPresetRepository presetRepository;
     private final BankStatementReader reader;
     private final Clock clock;
 
     public DepositService(GroupBuyService groupBuyService, CustomerOrderRepository orderRepository,
                           DepositUploadRepository uploadRepository, DepositRowRepository rowRepository,
-                          DepositorAliasRepository aliasRepository, BankColumnPresetRepository presetRepository,
+                          DepositorAliasRepository aliasRepository, AliasBook aliasBook, BankColumnPresetRepository presetRepository,
                           BankStatementReader reader, Clock clock) {
         this.groupBuyService = groupBuyService;
         this.orderRepository = orderRepository;
         this.uploadRepository = uploadRepository;
         this.rowRepository = rowRepository;
         this.aliasRepository = aliasRepository;
+        this.aliasBook = aliasBook;
         this.presetRepository = presetRepository;
         this.reader = reader;
         this.clock = clock;
@@ -177,7 +181,13 @@ public class DepositService {
         List<DepositRow> unused = rows.stream().filter(r -> r.getUsedOrderId() == null).toList();
         List<Deposit> deposits = unused.stream().map(r -> new Deposit(r.getId(), r.getDepositorName(), r.getAmount())).toList();
 
-        Outcome outcome = DepositMatcher.match(payees, deposits, aliasMap(sellerId));
+        // 대조 대상은 아니지만, 입금자가 이미 입금 확인된 주문·취소된 주문의 입금자인지 알려주는 데 쓴다
+        List<Known> known = orders.stream()
+                .filter(o -> o.isPrepaid() && (o.isPaid() || !o.isActive()))
+                .map(o -> new Known(new Payee(o.getId(), o.getCustomerKey(), o.getDepositorName(), o.getNickname(),
+                        o.getExpectedAmount(), o.getOrderedAt()), o.isActive() ? Relation.PAID : Relation.CANCELLED))
+                .toList();
+        Outcome outcome = DepositMatcher.match(payees, known, deposits, aliasMap(sellerId));
 
         Map<Long, DepositRow> rowById = unused.stream().collect(Collectors.toMap(DepositRow::getId, Function.identity()));
         List<MatchRow> matchRows = new ArrayList<>();
@@ -198,7 +208,8 @@ public class DepositService {
                     .toList();
             matchRows.add(new MatchRow(row.getId(), row.getRowNo(), row.getDepositorName(), row.getAmount(),
                     row.getDatetimeText(), r.status(), statusLabel(r), r.orderId() == null ? null : brief(orderById.get(r.orderId())),
-                    r.evidence() == null ? null : r.evidence().getLabel(), r.amountDiff(), candidates));
+                    r.evidence() == null ? null : r.evidence().getLabel(), r.amountDiff(), candidates,
+                    note(r.related(), orderById)));
         }
         List<UsedRow> used = rows.stream().filter(r -> r.getUsedOrderId() != null)
                 .map(r -> {
@@ -210,6 +221,20 @@ public class DepositService {
         // 판매자가 직접 고를 수 있는 주문: 다른 입금에 추천된 주문까지 포함한 모든 미입금 선입금 주문
         List<OrderBrief> openOrders = payees.stream().map(p -> brief(orderById.get(p.orderId()))).toList();
         return new MatchResponse(matchRows, unpaid, openOrders, used, matched, suggested, ambiguous, unrelated);
+    }
+
+    /** 관련 없는 입금의 확인 안내 (중복 입금·환불 가능성) */
+    private static String note(DepositMatcher.Related related, Map<Long, CustomerOrder> orderById) {
+        if (related == null) {
+            return null;
+        }
+        CustomerOrder o = orderById.get(related.orderId());
+        String no = o == null ? "" : o.getOrderNo() + "번 ";
+        return switch (related.relation()) {
+            case LINKED -> no + "주문에 같은 입금자의 입금이 이미 연결됐습니다. 중복 입금인지 확인하세요.";
+            case PAID -> no + "주문(입금 확인됨)의 입금자와 같습니다. 중복 입금인지 확인하세요.";
+            case CANCELLED -> "취소된 " + no + "주문의 입금자와 같습니다. 환불이 필요한지 확인하세요.";
+        };
     }
 
     private static String statusLabel(Result r) {
@@ -246,7 +271,7 @@ public class DepositService {
             }
             order.confirmPaid(row.getDepositorName(), row.getAmount(), row.getId(), now);
             row.use(order.getId());
-            saveAlias(sellerId, order, row.getDepositorName(), now);
+            aliasBook.record(sellerId, order, row.getDepositorName(), now);
             confirmed++;
         }
         return new ConfirmResponse(confirmed, errors);
@@ -261,7 +286,7 @@ public class DepositService {
         if (!order.isPaid()) {
             throw ApiException.badRequest("입금 확정된 주문이 아닙니다.");
         }
-        undoAlias(sellerId, order);
+        aliasBook.undo(sellerId, order, Set.of(order.getId()));
         rowRepository.findByUsedOrderId(order.getId()).ifPresent(DepositRow::release);
         // 취소된 주문이면 "입금 확정"이 잘못이었다는 뜻이므로 "환불 필요"도 함께 거둔다
         order.cancelPaid(LocalDateTime.now(clock));
@@ -278,52 +303,7 @@ public class DepositService {
         }
         LocalDateTime now = LocalDateTime.now(clock);
         order.confirmPaid(depositorName.trim(), amount, null, now);
-        saveAlias(sellerId, order, depositorName, now);
-    }
-
-    /** 입금자명 → 고객 별칭을 저장하고, 새로 만들었는지·바꿨는지를 주문에 기록한다 (확정 취소 때 되돌리려고) */
-    private void saveAlias(Long sellerId, CustomerOrder order, String depositorName, LocalDateTime now) {
-        String name = DepositMatcher.squash(depositorName);
-        if (name.isEmpty()) {
-            return;
-        }
-        String customerKey = order.getCustomerKey();
-        DepositorAlias alias = aliasRepository.findBySellerIdAndDepositorName(sellerId, name).orElse(null);
-        if (alias == null) {
-            aliasRepository.save(new DepositorAlias(sellerId, name, customerKey, now));
-            order.recordAliasChange(PaidAliasChange.CREATED, null);
-        } else if (!alias.getCustomerKey().equals(customerKey)) {
-            order.recordAliasChange(PaidAliasChange.CHANGED, alias.getCustomerKey());
-            alias.changeCustomerKey(customerKey);
-        }
-    }
-
-    /**
-     * 이 확정이 만든 별칭은 지우고, 바꾼 별칭은 원래 고객으로 되돌린다. 다음 경우에는 그대로 둔다.
-     * - 이 확정이 별칭을 건드리지 않았다 (다른 공구 등에서 이미 같은 고객으로 저장돼 있었음)
-     * - 그 뒤에 별칭이 지워졌거나 다른 고객으로 바뀌었다
-     * - 같은 입금자명으로 이 고객에게 확정된 다른 주문이 아직 있다 (그 확정이 이 별칭의 근거)
-     */
-    private void undoAlias(Long sellerId, CustomerOrder order) {
-        if (order.getPaidAliasChange() == null || order.getPaidDepositorName() == null) {
-            return;
-        }
-        String name = DepositMatcher.squash(order.getPaidDepositorName());
-        DepositorAlias alias = aliasRepository.findBySellerIdAndDepositorName(sellerId, name).orElse(null);
-        if (alias == null || !alias.getCustomerKey().equals(order.getCustomerKey())) {
-            return;
-        }
-        boolean stillBacked = orderRepository.findOtherPaidOfCustomer(sellerId, order.getCustomerKey(), order.getId())
-                .stream()
-                .anyMatch(o -> o.getPaidDepositorName() != null && DepositMatcher.squash(o.getPaidDepositorName()).equals(name));
-        if (stillBacked) {
-            return;
-        }
-        if (order.getPaidAliasChange() == PaidAliasChange.CHANGED && order.getPaidAliasPreviousKey() != null) {
-            alias.changeCustomerKey(order.getPaidAliasPreviousKey());
-        } else {
-            aliasRepository.delete(alias);
-        }
+        aliasBook.record(sellerId, order, depositorName, now);
     }
 
     private Map<String, String> aliasMap(Long sellerId) {

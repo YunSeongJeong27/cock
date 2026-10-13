@@ -8,6 +8,7 @@ import java.util.Map;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.Tokens;
+import com.depositcock.deposit.AliasBook;
 import com.depositcock.groupbuy.GroupBuyDtos.Dashboard;
 import com.depositcock.groupbuy.GroupBuyDtos.GroupBuyRequest;
 import com.depositcock.groupbuy.GroupBuyDtos.GroupBuyResponse;
@@ -32,10 +33,13 @@ public class GroupBuyService {
     private final SellerRepository sellerRepository;
     private final CustomerOrderRepository orderRepository;
     private final EntityManager entityManager;
+    private final AliasBook aliasBook;
     private final Clock clock;
 
     public GroupBuyService(GroupBuyRepository groupBuyRepository, SellerRepository sellerRepository,
-                           CustomerOrderRepository orderRepository, EntityManager entityManager, Clock clock) {
+                           CustomerOrderRepository orderRepository, EntityManager entityManager, AliasBook aliasBook,
+                           Clock clock) {
+        this.aliasBook = aliasBook;
         this.groupBuyRepository = groupBuyRepository;
         this.sellerRepository = sellerRepository;
         this.orderRepository = orderRepository;
@@ -133,10 +137,20 @@ public class GroupBuyService {
         return GroupBuyResponse.of(groupBuy, now);
     }
 
-    /** 공구 삭제: 그 공구의 주문자·입금 정보도 함께 파기한다 (개발 전 인터뷰 결과 8번). */
+    /**
+     * 공구 삭제: 그 공구의 주문자·입금 정보도 함께 파기한다 (개발 전 인터뷰 결과 8번).
+     * 주문·입금은 DB 에서 함께 지워지고(ON DELETE CASCADE), 판매자 단위로 남는 입금자 별칭은 이 공구의 확정이
+     * 만든·바꾼 것만 되돌린다 (다른 공구 확정으로도 쓰는 별칭은 남김).
+     */
     @Transactional
     public void delete(Long sellerId, Long groupBuyId) {
-        groupBuyRepository.delete(getOwned(sellerId, groupBuyId));
+        GroupBuy groupBuy = lockOwned(sellerId, groupBuyId);
+        List<CustomerOrder> orders = orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId());
+        aliasBook.undoAll(sellerId, orders);
+        entityManager.flush();
+        // 불러온 주문이 지울 공구를 가리키고 있으므로 떼어 낸다 (주문·입금 줄은 DB 의 ON DELETE CASCADE 로 지워짐)
+        orders.forEach(entityManager::detach);
+        groupBuyRepository.delete(groupBuy);
     }
 
     private void apply(GroupBuy groupBuy, GroupBuyRequest r, LocalDateTime now) {

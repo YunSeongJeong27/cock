@@ -3,9 +3,11 @@ package com.depositcock.deposit;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -15,18 +17,20 @@ import java.util.regex.Pattern;
  * 입금 대조 규칙 (정리본 6-2장). 결과는 저장하지 않고, 판매자가 "확정"을 눌러야 저장한다.
  *
  * <pre>
- * 근거 판정 순서
+ * 근거 판정 순서 (이름 비교는 띄어쓰기·영문 대소문자 무시)
  *   0) 입금자명이 주문서의 입금자명과 정확히 일치 (최우선)
  *   a) 저장된 별칭 (입금자명 → 고객 키)
  *   b) 입금자명의 한글/영문(2자 이상)이 닉네임에 포함
  *   c) 입금자명의 숫자(3자리 이상, 이어붙인 값 포함)가 닉네임 숫자와 일치. 예: "217-1505" → {217, 1505, 2171505}
  * 결과
- *   MATCHED   : 금액 일치 + 근거 있음 + 후보 1명
- *   SUGGESTED : 근거 있음 + 금액 다름 (후보 1명) → "금액 차이 ±N원"
- *   SUGGESTED : 근거 없음 + 금액만 일치 + 그 금액의 미입금 주문이 1건뿐 (그리고 그 금액의 연결 안 된 입금도 1건뿐)
+ *   MATCHED   : 금액 일치 + 근거 있음 + 후보 1명 (0)·a) 근거가 한 고객에게만 있으면 b)·c) 근거의 다른 고객보다 우선)
+ *   SUGGESTED : 근거 있음 + 후보 1명 + 금액 다름 → "금액 차이 ±N원"
+ *   SUGGESTED : 근거 없음 + 금액만 일치 + 그 금액의 미입금 주문이 1건뿐 (그 금액의 연결 안 된 입금도 1건뿐,
+ *               그 주문에 이름 근거로 추천된 다른 입금이 없음, 이 입금이 이미 연결·확인·취소된 주문의 입금자와 같지 않음)
  *   AMBIGUOUS : 후보가 2명 이상 → 자동 확정 금지, 판매자가 고른다 (목록의 첫 번째에 임의로 붙이지 않는다)
  *   UNRELATED : 관련 없는 입금
- * 입금 1건은 주문 1건에만 쓴다.
+ * 입금 1건은 주문 1건에만 쓴다. "후보 몇 명"은 고객(customerKey) 수로 센다 (한 고객의 주문 여러 건은 1명).
+ * 1차(자동 매칭)는 입금마다 다른 입금과 상관없이 판단해서, 거래내역의 줄 순서에 따라 결과가 달라지지 않게 한다.
  * </pre>
  */
 public final class DepositMatcher {
@@ -54,11 +58,29 @@ public final class DepositMatcher {
         public String getLabel() {
             return label;
         }
+
+        boolean strong() {
+            return this == DEPOSITOR_NAME || this == ALIAS;
+        }
+    }
+
+    /** 관련 없는 입금에 붙이는 확인 안내: 이 입금자가 어떤 주문과 이미 관련 있는지 */
+    public enum Relation {
+        /** 이번 대조에서 같은 입금자의 다른 입금이 이 주문에 연결됨 → 중복 입금? */
+        LINKED,
+        /** 이미 입금 확인된 주문의 입금자 → 중복 입금? */
+        PAID,
+        /** 취소된 주문의 입금자 → 환불 필요? */
+        CANCELLED
     }
 
     /** 대조 대상 주문 (선입금, 취소 안 됨, 입금 확정 안 됨, 금액 > 0) */
     public record Payee(Long orderId, String customerKey, String depositorName, String nickname, int expectedAmount,
                         LocalDateTime orderedAt) {
+    }
+
+    /** 대조 대상은 아니지만 입금자 확인에 쓰는 주문 (이미 입금 확인됨 / 취소됨) */
+    public record Known(Payee order, Relation relation) {
     }
 
     /** 입금 1건 */
@@ -68,8 +90,11 @@ public final class DepositMatcher {
     public record Candidate(Long orderId, Evidence evidence, int amountDiff) {
     }
 
+    public record Related(Long orderId, Relation relation) {
+    }
+
     public record Result(Deposit deposit, Status status, Long orderId, Evidence evidence, int amountDiff,
-                         List<Candidate> candidates) {
+                         List<Candidate> candidates, Related related) {
     }
 
     public record Outcome(List<Result> results, List<Payee> unpaid) {
@@ -81,87 +106,146 @@ public final class DepositMatcher {
     }
 
     public static Outcome match(List<Payee> payees, List<Deposit> deposits, Map<String, String> aliasToCustomerKey) {
-        List<Payee> targets = payees.stream().filter(p -> p.expectedAmount() > 0)
-                .sorted(Comparator.comparing(Payee::orderedAt, Comparator.nullsLast(Comparator.naturalOrder())))
-                .toList();
-        Set<Long> reserved = new HashSet<>();
-        Result[] results = new Result[deposits.size()];
+        return match(payees, List.of(), deposits, aliasToCustomerKey);
+    }
 
-        // 1차: 확실한 것(MATCHED)부터 주문을 잡는다
+    public static Outcome match(List<Payee> payees, List<Known> known, List<Deposit> deposits,
+                                Map<String, String> aliasToCustomerKey) {
+        Map<String, String> aliases = new HashMap<>();
+        aliasToCustomerKey.forEach((name, key) -> aliases.put(normalize(name), key));
+        List<Payee> targets = payees.stream().filter(p -> p.expectedAmount() > 0)
+                .sorted(Comparator.comparing(Payee::orderedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(Payee::orderId))
+                .toList();
+        Map<Long, Payee> byId = new HashMap<>();
+        targets.forEach(p -> byId.put(p.orderId(), p));
+        Result[] results = new Result[deposits.size()];
+        Set<Long> reserved = new HashSet<>();
+
+        // 1차: 입금마다 "확실한 고객"을 다른 입금과 상관없이 정한다. 같은 고객으로 정해진 입금들은
+        // 그 고객의 금액이 맞는 주문에 (주문 시각 순으로) 하나씩 붙인다. 주문보다 입금이 많으면 남는 입금은 2차로.
         for (int i = 0; i < deposits.size(); i++) {
             Deposit d = deposits.get(i);
-            List<Candidate> exact = candidatesWithEvidence(d, targets, aliasToCustomerKey, reserved).stream()
-                    .filter(c -> c.amountDiff() == 0).toList();
-            List<Candidate> strongest = strongest(exact);
-            if (strongest.size() == 1) {
-                Candidate c = strongest.get(0);
-                reserved.add(c.orderId());
-                results[i] = new Result(d, Status.MATCHED, c.orderId(), c.evidence(), 0, List.of(c));
+            List<Candidate> certain = certainOrders(d, candidates(d, targets, aliases, Set.of()), byId);
+            for (Candidate c : certain) {
+                if (reserved.add(c.orderId())) {
+                    results[i] = new Result(d, Status.MATCHED, c.orderId(), c.evidence(), 0, List.of(c), null);
+                    break;
+                }
             }
         }
 
         // 1차에서 연결 안 된 입금의 금액별 건수 (금액만 일치 추천은 그 금액의 입금이 1건일 때만)
-        java.util.Map<Integer, Integer> unmatchedByAmount = new java.util.HashMap<>();
+        Map<Integer, Integer> unmatchedByAmount = new HashMap<>();
         for (int i = 0; i < deposits.size(); i++) {
             if (results[i] == null) {
                 unmatchedByAmount.merge(deposits.get(i).amount(), 1, Integer::sum);
             }
         }
 
-        // 2차: 나머지는 추천 / 후보 여러 명 / 관련 없음
+        // 2차: 근거 있는 입금 → 추천(후보 1명) / 후보 여러 명
+        Set<Long> suggestedByEvidence = new HashSet<>();
         for (int i = 0; i < deposits.size(); i++) {
             if (results[i] != null) {
                 continue;
             }
             Deposit d = deposits.get(i);
-            List<Candidate> withEvidence = candidatesWithEvidence(d, targets, aliasToCustomerKey, reserved);
-            if (!withEvidence.isEmpty()) {
-                List<Candidate> exact = withEvidence.stream().filter(c -> c.amountDiff() == 0).toList();
-                List<Candidate> pool = exact.isEmpty() ? withEvidence : exact;
-                if (pool.size() == 1) {
-                    Candidate c = pool.get(0);
-                    results[i] = new Result(d, Status.SUGGESTED, c.orderId(), c.evidence(), c.amountDiff(), List.of(c));
-                } else {
-                    results[i] = new Result(d, Status.AMBIGUOUS, null, null, 0, pool);
-                }
+            List<Candidate> withEvidence = sorted(candidates(d, targets, aliases, reserved), byId);
+            if (withEvidence.isEmpty()) {
                 continue;
             }
-            List<Payee> sameAmount = targets.stream()
-                    .filter(p -> !reserved.contains(p.orderId()) && p.expectedAmount() == d.amount()).toList();
-            // 같은 금액의 연결 안 된 입금이 여러 건이면 어느 입금이 그 주문의 것인지 알 수 없으므로 추천하지 않는다
-            if (sameAmount.size() == 1 && unmatchedByAmount.getOrDefault(d.amount(), 0) == 1) {
-                Candidate c = new Candidate(sameAmount.get(0).orderId(), Evidence.AMOUNT_ONLY, 0);
-                results[i] = new Result(d, Status.SUGGESTED, c.orderId(), c.evidence(), 0, List.of(c));
+            long customers = withEvidence.stream().map(c -> byId.get(c.orderId()).customerKey()).distinct().count();
+            if (customers == 1) {
+                Candidate c = withEvidence.get(0); // 같은 고객의 주문 중 금액이 맞는(가까운) 것
+                suggestedByEvidence.add(c.orderId());
+                results[i] = new Result(d, Status.SUGGESTED, c.orderId(), c.evidence(), c.amountDiff(), List.of(c), null);
             } else {
-                results[i] = new Result(d, Status.UNRELATED, null, null, 0, List.of());
+                withEvidence.forEach(c -> suggestedByEvidence.add(c.orderId()));
+                results[i] = new Result(d, Status.AMBIGUOUS, null, null, 0, withEvidence, null);
             }
         }
 
+        // 3차: 근거 없는 입금 → 금액만 일치 추천 / 관련 없음
+        for (int i = 0; i < deposits.size(); i++) {
+            if (results[i] != null) {
+                continue;
+            }
+            Deposit d = deposits.get(i);
+            Related related = related(d, targets, reserved, known, aliases);
+            List<Payee> sameAmount = targets.stream()
+                    .filter(p -> !reserved.contains(p.orderId()) && p.expectedAmount() == d.amount()).toList();
+            // 같은 금액의 연결 안 된 입금이 여러 건이면 어느 입금이 그 주문의 것인지 알 수 없으므로 추천하지 않는다.
+            // 이 입금자가 이미 다른 주문(연결·입금 확인·취소)의 입금자이면 중복 입금·환불일 수 있으므로 남의 주문에 붙이지 않는다.
+            if (related == null && sameAmount.size() == 1 && unmatchedByAmount.getOrDefault(d.amount(), 0) == 1
+                    && !suggestedByEvidence.contains(sameAmount.get(0).orderId())) {
+                Candidate c = new Candidate(sameAmount.get(0).orderId(), Evidence.AMOUNT_ONLY, 0);
+                results[i] = new Result(d, Status.SUGGESTED, c.orderId(), c.evidence(), 0, List.of(c), null);
+            } else {
+                results[i] = new Result(d, Status.UNRELATED, null, null, 0, List.of(), related);
+            }
+        }
+
+        // 입금이 안 보이는 주문: 자동 매칭·추천·후보 어디에도 안 나온 주문
         Set<Long> mentioned = new HashSet<>(reserved);
         for (Result r : results) {
-            if (r.status() == Status.SUGGESTED) {
+            if (r.orderId() != null) {
                 mentioned.add(r.orderId());
+            }
+            if (r.status() == Status.AMBIGUOUS) {
+                r.candidates().forEach(c -> mentioned.add(c.orderId()));
             }
         }
         List<Payee> unpaid = targets.stream().filter(p -> !mentioned.contains(p.orderId())).toList();
         return new Outcome(List.of(results), unpaid);
     }
 
-    /** 근거가 가장 강한 후보들만 남긴다 (입금자명 일치 > 별칭 > 닉네임). */
-    private static List<Candidate> strongest(List<Candidate> candidates) {
-        if (candidates.isEmpty()) {
-            return candidates;
+    /**
+     * 이 입금 하나만 보고 확실히 고를 수 있는 주문들 (같은 고객의 금액 맞는 주문, 주문 시각 순). 없으면 빈 목록.
+     * - 가장 강한 근거 등급의 후보가 한 고객뿐이어야 한다. 0)·a) 는 그 근거끼리, b)·c) 는 같은 등급으로 본다.
+     * - b)·c) 근거만 있으면 근거 있는 고객 전체가 1명이어야 한다.
+     */
+    private static List<Candidate> certainOrders(Deposit d, List<Candidate> all, Map<Long, Payee> byId) {
+        if (all.isEmpty()) {
+            return List.of();
         }
-        Evidence best = candidates.stream().map(Candidate::evidence).min(Comparator.naturalOrder()).orElseThrow();
-        // 입금자명 일치나 별칭이면 그 근거끼리만 비교한다. 닉네임 근거는 b·c 를 같은 등급으로 본다.
-        if (best == Evidence.DEPOSITOR_NAME || best == Evidence.ALIAS) {
-            return candidates.stream().filter(c -> c.evidence() == best).toList();
+        Evidence best = all.stream().map(Candidate::evidence).min(Comparator.naturalOrder()).orElseThrow();
+        List<Candidate> top = best.strong() ? all.stream().filter(c -> c.evidence() == best).toList() : all;
+        if (top.stream().map(c -> byId.get(c.orderId()).customerKey()).distinct().count() != 1) {
+            return List.of();
         }
-        return candidates;
+        return sorted(top.stream().filter(c -> c.amountDiff() == 0).toList(), byId);
     }
 
-    private static List<Candidate> candidatesWithEvidence(Deposit d, List<Payee> targets, Map<String, String> aliases,
-                                                          Set<Long> reserved) {
+    /** 근거가 강한 순 → 금액 차이가 작은 순 → 주문 시각 순 */
+    private static List<Candidate> sorted(List<Candidate> candidates, Map<Long, Payee> byId) {
+        return candidates.stream()
+                .sorted(Comparator.comparing(Candidate::evidence)
+                        .thenComparingInt(c -> Math.abs(c.amountDiff()))
+                        .thenComparing(c -> byId.get(c.orderId()).orderedAt(), Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(Candidate::orderId))
+                .toList();
+    }
+
+    /** 근거 없는 입금이 이미 다른 주문(이번에 연결됨 / 입금 확인됨 / 취소됨)의 입금자인지 */
+    private static Related related(Deposit d, List<Payee> targets, Set<Long> reserved, List<Known> known,
+                                   Map<String, String> aliases) {
+        for (Payee p : targets) {
+            if (reserved.contains(p.orderId()) && evidence(d.name(), p, aliases) != null) {
+                return new Related(p.orderId(), Relation.LINKED);
+            }
+        }
+        for (Relation relation : List.of(Relation.PAID, Relation.CANCELLED)) {
+            for (Known k : known) {
+                if (k.relation() == relation && evidence(d.name(), k.order(), aliases) != null) {
+                    return new Related(k.order().orderId(), relation);
+                }
+            }
+        }
+        return null;
+    }
+
+    private static List<Candidate> candidates(Deposit d, List<Payee> targets, Map<String, String> aliases,
+                                              Set<Long> reserved) {
         List<Candidate> list = new ArrayList<>();
         for (Payee p : targets) {
             if (reserved.contains(p.orderId())) {
@@ -175,9 +259,10 @@ public final class DepositMatcher {
         return list;
     }
 
+    /** aliases 의 키는 normalize 한 입금자명이어야 한다 */
     static Evidence evidence(String depositName, Payee p, Map<String, String> aliases) {
-        String name = squash(depositName);
-        if (p.depositorName() != null && !name.isEmpty() && name.equals(squash(p.depositorName()))) {
+        String name = normalize(depositName);
+        if (p.depositorName() != null && !name.isEmpty() && name.equals(normalize(p.depositorName()))) {
             return Evidence.DEPOSITOR_NAME;
         }
         String aliasKey = aliases.get(name);
@@ -202,13 +287,19 @@ public final class DepositMatcher {
         return null;
     }
 
+    /** 저장용: 공백만 지운다 (별칭은 이 값으로 저장) */
     static String squash(String value) {
         return value == null ? "" : value.replaceAll("\\s+", "");
     }
 
+    /** 비교용: 공백을 지우고 영문은 소문자로 ("Kim Jiyoung" = "KIMJIYOUNG") */
+    static String normalize(String value) {
+        return squash(value).toLowerCase(Locale.ROOT);
+    }
+
     /** 한글·영문만 남긴다 (소문자) */
     static String lettersOnly(String value) {
-        return value == null ? "" : value.replaceAll("[^가-힣a-zA-Z]", "").toLowerCase();
+        return value == null ? "" : value.replaceAll("[^가-힣a-zA-Z]", "").toLowerCase(Locale.ROOT);
     }
 
     /** 3자리 이상 숫자 묶음 + 전부 이어붙인 값. "217-1505" → {217, 1505, 2171505} */

@@ -121,16 +121,16 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
       {drafts && (
         <div className="card">
           <h3>검수 ({drafts.length}개)</h3>
-          <p className="muted small">작성자·내용을 고치거나 지울 수 있습니다. 노란 줄은 캡처가 겹쳐서 생긴 중복으로 의심되는 댓글입니다.</p>
+          <p className="muted small">작성자·내용을 고치거나 지울 수 있습니다. 노란 줄은 캡처가 겹쳐서 생긴 중복으로 의심되는 댓글입니다. 읽지 못한 글자([?])는 고친 뒤 저장할 수 있습니다.</p>
           <div className="table-wrap">
-            <table>
+            <table className="stack">
               <thead><tr><th>작성자</th><th>내용</th><th></th></tr></thead>
               <tbody>
                 {drafts.map((d, i) => (
                   <tr key={i} style={{ background: d.duplicateSuspected ? 'var(--warn-weak)' : undefined }}>
-                    <td><input type="text" value={d.author} onChange={(e) => setDrafts(drafts.map((x, j) => (j === i ? { ...x, author: e.target.value } : x)))} /></td>
-                    <td><input type="text" value={d.content} onChange={(e) => setDrafts(drafts.map((x, j) => (j === i ? { ...x, content: e.target.value } : x)))} /></td>
-                    <td><button className="btn small danger" onClick={() => setDrafts(drafts.filter((_, j) => j !== i))}>삭제</button></td>
+                    <td data-label="작성자"><input type="text" value={d.author} style={{ borderColor: d.author.includes('[?]') ? 'var(--danger)' : undefined }} onChange={(e) => setDrafts(drafts.map((x, j) => (j === i ? { ...x, author: e.target.value } : x)))} /></td>
+                    <td data-label="내용"><input type="text" value={d.content} style={{ borderColor: d.content.includes('[?]') ? 'var(--danger)' : undefined }} onChange={(e) => setDrafts(drafts.map((x, j) => (j === i ? { ...x, content: e.target.value } : x)))} /></td>
+                    <td className="stack-action"><button className="btn small danger" onClick={() => setDrafts(drafts.filter((_, j) => j !== i))}>삭제</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -138,7 +138,7 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
           </div>
           <div className="row mt">
             <button className="btn small" onClick={() => setDrafts([...drafts, { author: '', content: '', duplicateSuspected: false }])}>+ 줄 추가</button>
-            <button className="btn primary" disabled={busy} onClick={() => saveDrafts(files ? 'SCREENSHOT' : 'TEXT')}>검수 완료, 댓글 저장</button>
+            <button className="btn primary" disabled={busy || drafts.some((d) => d.author.includes('[?]') || d.content.includes('[?]'))} onClick={() => saveDrafts(files ? 'SCREENSHOT' : 'TEXT')}>검수 완료, 댓글 저장</button>
             <button className="btn" onClick={() => setDrafts(null)}>취소</button>
           </div>
         </div>

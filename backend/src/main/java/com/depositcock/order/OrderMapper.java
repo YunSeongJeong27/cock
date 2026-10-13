@@ -23,7 +23,7 @@ final class OrderMapper {
                 o.getPickupPoint() == null ? null : o.getPickupPoint().getName(), o.getPaymentMethod(),
                 o.getDepositorName(), status, status.getLabel(),
                 status == DisplayStatus.AWAITING_DEPOSIT,
-                o.isActive() && acceptingOrders,
+                o.isActive() && acceptingOrders && !o.isPickedUp(), // 수령한 주문은 서버도 취소를 거절한다
                 o.isRefundRequired() && o.getRefundedAt() == null,
                 o.getOrderedAt());
     }

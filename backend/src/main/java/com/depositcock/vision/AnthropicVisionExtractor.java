@@ -44,7 +44,8 @@ public class AnthropicVisionExtractor implements VisionExtractor {
             - type: 입금이면 "입금", 출금·결제·이체 보냄이면 "출금", 이자면 "이자"
             - order: 화면 위에서부터 0, 1, 2 ...
             읽을 수 없는 글자는 추측하지 말고 그 자리에 [?] 를 쓰세요.
-            잔액, 광고, 메뉴 버튼은 거래가 아니므로 넣지 마세요.
+            금액이 있는 줄은 거래인지 애매해도(안내·광고처럼 보여도) 빼지 말고 넣고, type 에 화면 글자를 그대로 쓰세요 (제외는 프로그램이 합니다).
+            잔액 숫자와 메뉴 버튼은 거래가 아니므로 넣지 마세요.
             """;
 
     static final String COMMENT_PROMPT = """

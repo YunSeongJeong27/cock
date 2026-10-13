@@ -97,7 +97,7 @@ class M2OrderFormTest extends IntegrationTest {
         mvc.perform(post("/api/public/g/" + token + "/orders/1/report-deposit").cookie(device))
                 .andExpect(status().isOk());
         mvc.perform(get("/api/public/g/" + token).cookie(device))
-                .andExpect(jsonPath("$.myOrders[1].statusLabel").value("입금 확인 중"));
+                .andExpect(jsonPath("$.myOrders[1].statusLabel").value("입금 신고됨 (확인 대기)"));
         // 쿠키 없이 입금 신고 불가
         mvc.perform(post("/api/public/g/" + token + "/orders/2/report-deposit")).andExpect(status().isForbidden());
 

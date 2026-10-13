@@ -110,7 +110,8 @@ export default function DepositTab({ groupBuy, reload }: Props) {
   }
 
   async function confirmItems(items: { rowId: number; orderId: number }[]) {
-    if (items.length === 0) return
+    if (items.length === 0 || busy) return
+    setBusy(true) // 확정 버튼을 빠르게 두 번 눌러도 한 번만 보낸다
     setError(null)
     try {
       const res = await api.post<{ confirmedCount: number; errors: string[] }>(`${base}/confirm`, { items })
@@ -120,6 +121,8 @@ export default function DepositTab({ groupBuy, reload }: Props) {
       reload()
     } catch (e) {
       setError(errorMessage(e))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -133,7 +136,8 @@ export default function DepositTab({ groupBuy, reload }: Props) {
     }
   }
 
-  const matched = match?.rows.filter((r) => r.status === 'MATCHED') ?? []
+  // "자동 매칭 모두 확정"은 화면에서 지금 고른 주문으로 확정한다 (판매자가 비우면 빼고, 바꾸면 바꾼 주문으로)
+  const matched = match?.rows.filter((r) => r.status === 'MATCHED' && choice[r.rowId]) ?? []
 
   return (
     <div>
@@ -221,7 +225,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
           <div className="row between">
             <h3>② 대조 결과</h3>
             {matched.length > 0 && (
-              <button className="btn ok" onClick={() => confirmItems(matched.map((r) => ({ rowId: r.rowId, orderId: r.order!.orderId })))}>
+              <button className="btn ok" disabled={busy} onClick={() => confirmItems(matched.map((r) => ({ rowId: r.rowId, orderId: Number(choice[r.rowId]) })))}>
                 자동 매칭 {matched.length}건 모두 확정
               </button>
             )}
@@ -235,7 +239,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
           </div>
           {match.rows.length === 0 && <p className="muted">대조할 입금이 없습니다. 거래내역을 올려주세요.</p>}
           {match.rows.map((r) => (
-            <MatchItem key={r.rowId} row={r} openOrders={match.openOrders} value={choice[r.rowId] ?? ''}
+            <MatchItem key={r.rowId} row={r} openOrders={match.openOrders} value={choice[r.rowId] ?? ''} busy={busy}
               onChange={(v) => setChoice({ ...choice, [r.rowId]: v })}
               onConfirm={() => choice[r.rowId] && confirmItems([{ rowId: r.rowId, orderId: Number(choice[r.rowId]) }])} />
           ))}
@@ -264,8 +268,8 @@ export default function DepositTab({ groupBuy, reload }: Props) {
   )
 }
 
-function MatchItem({ row, openOrders, value, onChange, onConfirm }: {
-  row: MatchRow; openOrders: OrderBrief[]; value: string; onChange: (v: string) => void; onConfirm: () => void
+function MatchItem({ row, openOrders, value, busy, onChange, onConfirm }: {
+  row: MatchRow; openOrders: OrderBrief[]; value: string; busy: boolean; onChange: (v: string) => void; onConfirm: () => void
 }) {
   // 후보가 있으면 후보를 먼저, 그 외 모든 미입금 주문(다른 입금에 추천된 주문 포함)도 고를 수 있게 한다
   const candidateIds = new Set(row.candidates.map((c) => c.order.orderId))
@@ -279,6 +283,7 @@ function MatchItem({ row, openOrders, value, onChange, onConfirm }: {
         <StatusBadge status={row.status} label={row.statusLabel} />
       </div>
       {row.evidence && <div className="small muted">근거: {row.evidence}</div>}
+      {row.note && <div className="small" style={{ color: 'var(--warn)' }}>⚠ {row.note}</div>}
       <div className="row mt">
         <select value={value} onChange={(e) => onChange(e.target.value)} style={{ flex: 1, minWidth: 220 }}>
           <option value="">{row.status === 'AMBIGUOUS' ? '후보 중에서 고르세요' : '주문 선택 (확정하지 않으려면 비워두기)'}</option>
@@ -297,7 +302,7 @@ function MatchItem({ row, openOrders, value, onChange, onConfirm }: {
             </optgroup>
           )}
         </select>
-        <button className="btn small primary" disabled={!value} onClick={onConfirm}>확정</button>
+        <button className="btn small primary" disabled={!value || busy} onClick={onConfirm}>확정</button>
       </div>
     </div>
   )

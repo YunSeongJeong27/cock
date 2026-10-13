@@ -152,6 +152,8 @@ export default function PublicOrder() {
 
   async function doCancel(e: FormEvent | null, orderNo?: number) {
     e?.preventDefault()
+    if (busy) return // 두 번 눌러도 한 번만 보낸다
+    setBusy(true)
     try {
       // 인터뷰 결과 4번: 휴대폰 번호 + 입금자명으로 취소. 주문이 여러 건이면 서버가 목록을 주고 고르게 한다.
       const v = await api.post<View>(`${base}/cancel`, {
@@ -167,6 +169,8 @@ export default function PublicOrder() {
       } else {
         setCancel({ ...cancel, error: errorMessage(err), choices: [] })
       }
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -396,12 +400,12 @@ export default function PublicOrder() {
                 {cancel.choices.map((o) => (
                   <div key={o.orderNo} className="row between" style={{ borderTop: '1px solid var(--line)', padding: '8px 0' }}>
                     <span className="small">{o.orderNo}번 · {o.items.map((i) => `${i.productName} ${i.quantity}개`).join(', ')} · {won(o.expectedAmount)} · {o.statusLabel}</span>
-                    <button type="button" className="btn small danger" onClick={() => doCancel(null, o.orderNo)}>이 주문 취소</button>
+                    <button type="button" className="btn small danger" disabled={busy} onClick={() => doCancel(null, o.orderNo)}>이 주문 취소</button>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="row"><button className="btn danger">취소하기</button><button type="button" className="btn" onClick={() => setCancel({ ...cancel, open: false })}>닫기</button></div>
+              <div className="row"><button className="btn danger" disabled={busy}>취소하기</button><button type="button" className="btn" onClick={() => setCancel({ ...cancel, open: false })}>닫기</button></div>
             )}
           </form>
         )}

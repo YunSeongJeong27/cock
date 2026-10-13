@@ -66,10 +66,10 @@ public class OrderSheetExcelWriter {
                             CellStyle headerStyle, CellStyle moneyStyle) {
         List<String> headers = new ArrayList<>(List.of("주문번호", "닉네임"));
         products.forEach(p -> headers.add(p.getName()));
-        headers.addAll(List.of("금액", "결제 방식", "입금 여부", "입금자명", "수령", "확인필요", "주문 상태"));
+        // 수령 방법·픽업 지점은 연락처가 아니므로 기본 정리표에도 넣는다 (픽업 지점별로 나눠 챙길 때 필요)
+        headers.addAll(List.of("금액", "결제 방식", "입금 여부", "입금자명", "수령 방법", "픽업 지점", "수령", "확인필요", "주문 상태"));
         if (includeContact) {
-            headers.addAll(List.of("휴대폰", "동·호수", "수령 방법", "픽업 지점", "받는 분", "받는 분 연락처", "우편번호", "주소",
-                    "상세주소"));
+            headers.addAll(List.of("휴대폰", "동·호수", "받는 분", "받는 분 연락처", "우편번호", "주소", "상세주소"));
         }
         headers.add("주문 시각");
 
@@ -105,14 +105,14 @@ public class OrderSheetExcelWriter {
             row.createCell(c++).setCellValue(o.getPaymentMethod() == PaymentMethod.PREPAID ? "선입금" : "현장결제");
             row.createCell(c++).setCellValue(paidText(o));
             row.createCell(c++).setCellValue(nullToEmpty(o.getDepositorName()));
+            row.createCell(c++).setCellValue(o.getReceiveMethod() == ReceiveMethod.DELIVERY ? "배송" : "픽업");
+            row.createCell(c++).setCellValue(o.getPickupPoint() == null ? "" : o.getPickupPoint().getName());
             row.createCell(c++).setCellValue(o.isPickedUp() ? "수령" : "");
             row.createCell(c++).setCellValue(String.join(", ", checks(o)));
             row.createCell(c++).setCellValue(o.displayStatus().getLabel());
             if (includeContact) {
                 row.createCell(c++).setCellValue(nullToEmpty(PhoneNumbers.format(o.getPhone())));
                 row.createCell(c++).setCellValue(nullToEmpty(o.getUnitAddress()));
-                row.createCell(c++).setCellValue(o.getReceiveMethod() == ReceiveMethod.DELIVERY ? "배송" : "픽업");
-                row.createCell(c++).setCellValue(o.getPickupPoint() == null ? "" : o.getPickupPoint().getName());
                 row.createCell(c++).setCellValue(nullToEmpty(o.getRecipientName()));
                 row.createCell(c++).setCellValue(nullToEmpty(PhoneNumbers.format(o.getRecipientPhone())));
                 row.createCell(c++).setCellValue(nullToEmpty(o.getZipcode()));

@@ -104,4 +104,25 @@ class AliasUndoTest extends IntegrationTest {
         unconfirm(seller, first);
         assertThat(aliases(seller)).containsEntry("박마바", "01074000002");
     }
+
+    /** 공구를 지우면 그 공구의 확정이 만든 별칭도 파기한다 (다른 공구의 확정이 근거인 별칭은 남김) */
+    @Test
+    void deletingGroupBuyRemovesItsAliases() throws Exception {
+        Cookie seller = signup(uniqueEmail());
+        long first = openGroupBuy(seller, "1차");
+        orderAndConfirm(seller, first, "010-7500-0001", "정사아");
+        long second = openGroupBuy(seller, "2차");
+        orderAndConfirm(seller, second, "010-7500-0002", "최자차");
+        orderAndConfirm(seller, second, "010-7500-0001", "정사아"); // 1차가 만든 별칭과 같은 고객 → 건드리지 않음
+        assertThat(aliases(seller)).containsKeys("정사아", "최자차");
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .delete("/api/seller/group-buys/" + second).cookie(seller)).andExpect(status().isOk());
+        // 2차가 만든 "최자차"는 파기, 1차 확정이 근거인 "정사아"는 남김
+        assertThat(aliases(seller)).containsKey("정사아").doesNotContainKey("최자차");
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .delete("/api/seller/group-buys/" + first).cookie(seller)).andExpect(status().isOk());
+        assertThat(aliases(seller)).isEmpty();
+    }
 }

@@ -108,8 +108,8 @@ public class ScreenshotService {
             if (r.name() == null || r.name().isBlank() || r.amount() <= 0) {
                 continue;
             }
-            if (r.name().contains("[?]")) {
-                throw ApiException.badRequest("읽지 못한 글자([?])가 남아 있습니다: " + r.name());
+            if (r.name().contains("[?]") || (r.datetimeText() != null && r.datetimeText().contains("[?]"))) {
+                throw ApiException.badRequest("읽지 못한 글자([?])가 남아 있습니다: " + no + "번째 줄");
             }
             // DB 열 길이(deposit_row.depositor_name 200, datetime_text 100)를 넘으면 409 "이미 같은 데이터" 로 잘못 안내되므로 먼저 막는다
             if (r.name().trim().length() > 200) {

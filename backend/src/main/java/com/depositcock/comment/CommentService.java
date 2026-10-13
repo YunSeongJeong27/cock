@@ -114,6 +114,10 @@ public class CommentService {
             if (author.isEmpty()) {
                 throw ApiException.badRequest("작성자가 비어 있는 댓글이 있습니다: " + content);
             }
+            if (author.contains("[?]") || content.contains("[?]")) {
+                // 읽지 못한 글자가 남은 채로 저장하면 그 닉네임이 고객 키가 되어 주문으로 만들어진다
+                throw ApiException.badRequest("읽지 못한 글자([?])가 남아 있습니다: " + author + " " + content);
+            }
             commentRepository.save(new ImportedComment(groupBuy.getId(), source, ++seq, truncate(author, 200),
                     truncate(content, 2000), in.duplicateSuspected(), now));
             saved++;
@@ -129,6 +133,9 @@ public class CommentService {
                 .orElseThrow(() -> ApiException.notFound("댓글을 찾을 수 없습니다."));
         if (manualQuantity != null && (manualQuantity < 0 || manualQuantity > 999)) {
             throw ApiException.badRequest("수량을 확인해 주세요.");
+        }
+        if (authorName.contains("[?]") || content.contains("[?]")) {
+            throw ApiException.badRequest("읽지 못한 글자([?])를 고친 뒤 저장해 주세요.");
         }
         comment.update(authorName.trim(), content.trim(), manualQuantity);
     }
@@ -157,7 +164,7 @@ public class CommentService {
         List<CustomerOrder> existing = orderRepository.findByGroupBuyIdAndSource(groupBuy.getId(), OrderSource.COMMENT);
         if (existing.stream().anyMatch(o -> o.isPaid() || o.isPickedUp() || o.isRefundRequired())) {
             throw ApiException.badRequest("입금 확정·수령 처리한 댓글 주문이 있어 다시 반영할 수 없습니다. "
-                    + "바뀐 내용은 주문 목록에서 직접 고쳐 주세요.");
+                    + "바뀐 내용이 있으면 주문 목록에서 해당 주문을 취소하는 등 직접 처리해 주세요.");
         }
         for (CustomerOrder o : existing) {
             if (o.isActive()) {
@@ -172,7 +179,12 @@ public class CommentService {
         List<CustomerTotal> totals = aggregate(groupBuy, commentRepository.findByGroupBuyIdOrderBySeqAsc(groupBuy.getId()));
         LocalDateTime now = LocalDateTime.now(clock);
         int orderNo = orderRepository.maxOrderNo(groupBuy.getId());
-        PaymentMethod payment = groupBuy.usesPrepay() ? PaymentMethod.PREPAID : PaymentMethod.ONSITE;
+        // 댓글 주문은 픽업 예약으로 만든다 (정리본 5장). 결제 방식은 이 공구의 픽업 결제 설정을 따른다:
+        // 픽업 선입금을 받으면 선입금(입금 대조 대상), 현장결제만 받으면 현장결제.
+        // 픽업을 끈 공구(배송만)는 배송·선입금으로 만들고, 주소는 판매자가 따로 받는다 [제안].
+        ReceiveMethod receive = groupBuy.isPickupEnabled() ? ReceiveMethod.PICKUP : ReceiveMethod.DELIVERY;
+        PaymentMethod payment = receive == ReceiveMethod.DELIVERY || groupBuy.isPickupPrepayEnabled()
+                ? PaymentMethod.PREPAID : PaymentMethod.ONSITE;
         int created = 0;
         for (CustomerTotal t : totals) {
             if (t.quantity() <= 0) {
@@ -181,7 +193,7 @@ public class CommentService {
             CustomerOrder order = new CustomerOrder(groupBuy, ++orderNo, OrderSource.COMMENT, t.customerKey(),
                     Tokens.random(16), now);
             order.fillCustomer(null, null, t.authorName(), null);
-            order.fillReceive(ReceiveMethod.PICKUP, null, payment);
+            order.fillReceive(receive, null, payment);
             order.addItem(new OrderItem(order, product, t.quantity()));
             order.fillAmounts(product.getUnitPrice() * t.quantity(), 0);
             orderRepository.save(order);

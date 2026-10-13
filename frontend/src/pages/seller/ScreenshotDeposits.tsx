@@ -11,6 +11,9 @@ interface ExtractResponse { deposits: Extracted[]; skippedWithdrawals: number; p
  * 은행앱 거래내역 스크린샷 → 비전 AI 추출 → 검수(수정·삭제·추가) → 저장 (정리본 7장, M4)
  * 원본 이미지는 서버에 저장하지 않고 추출 직후 버린다.
  */
+/** 읽지 못한 글자([?])가 남은 줄은 저장할 수 없다 */
+const hasUnread = (r: { name: string; datetime: string | null }) => r.name.includes('[?]') || (r.datetime ?? '').includes('[?]')
+
 export default function ScreenshotDeposits({ groupBuy, onSaved }: { groupBuy: GroupBuy; onSaved: () => void }) {
   const [files, setFiles] = useState<FileList | null>(null)
   const [rows, setRows] = useState<Extracted[] | null>(null)
@@ -91,7 +94,7 @@ export default function ScreenshotDeposits({ groupBuy, onSaved }: { groupBuy: Gr
                         <td className="small" data-label="캡처">{r.imageIndex + 1}번째{r.duplicateSuspected && <div style={{ color: 'var(--warn)' }}>중복 의심</div>}</td>
                         <td data-label="입금자명"><input type="text" value={r.name} onChange={(e) => update(i, { name: e.target.value })} style={{ borderColor: r.name.includes('[?]') ? 'var(--danger)' : undefined }} /></td>
                         <td data-label="금액"><input type="number" value={r.amount} onChange={(e) => update(i, { amount: Number(e.target.value) })} style={{ width: 110 }} /></td>
-                        <td data-label="일시"><input type="text" value={r.datetime ?? ''} onChange={(e) => update(i, { datetime: e.target.value })} style={{ width: 140 }} /></td>
+                        <td data-label="일시"><input type="text" value={r.datetime ?? ''} onChange={(e) => update(i, { datetime: e.target.value })} style={{ width: 140, borderColor: (r.datetime ?? '').includes('[?]') ? 'var(--danger)' : undefined }} /></td>
                         <td className="stack-action"><button className="btn small danger" onClick={() => setRows(rows.filter((_, j) => j !== i))}>삭제</button></td>
                       </tr>
                     ))}
@@ -101,9 +104,9 @@ export default function ScreenshotDeposits({ groupBuy, onSaved }: { groupBuy: Gr
               <div className="row mt">
                 <button className="btn small" onClick={() => setRows([...rows, { name: '', amount: 0, datetime: null, type: '입금', duplicateSuspected: false, imageIndex: 0 }])}>+ 줄 추가</button>
                 <span className="grow muted small">합계 {won(rows.reduce((s, r) => s + (r.amount || 0), 0))} / {rows.length}건</span>
-                <button className="btn primary" disabled={busy || rows.some((r) => r.name.includes('[?]'))} onClick={save}>검수 완료, 저장</button>
+                <button className="btn primary" disabled={busy || rows.some(hasUnread)} onClick={save}>검수 완료, 저장</button>
               </div>
-              {rows.some((r) => r.name.includes('[?]')) && <div className="small" style={{ color: 'var(--danger)' }}>[?] 표시를 고친 뒤 저장할 수 있습니다.</div>}
+              {rows.some(hasUnread) && <div className="small" style={{ color: 'var(--danger)' }}>[?] 표시를 고친 뒤 저장할 수 있습니다.</div>}
             </div>
           )}
         </>

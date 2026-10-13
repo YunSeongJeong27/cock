@@ -7,7 +7,7 @@ package com.depositcock.order;
  */
 public enum DisplayStatus {
     AWAITING_DEPOSIT("입금 대기 중"),
-    DEPOSIT_REPORTED("입금 확인 중"),
+    DEPOSIT_REPORTED("입금 신고됨 (확인 대기)"), // "입금 확인됨"과 헷갈리지 않게 (2026-10-14)
     PAID("입금 확인됨"),
     RESERVED("예약됨 (현장결제)"),
     PICKED_UP("수령 완료"),
