@@ -64,9 +64,13 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
   const extract = () => run(async () => {
     const fd = new FormData()
     Array.from(files!).forEach((f) => fd.append('files', f))
-    return api.post<{ comments: Draft[]; notice: string | null; limitExceeded: boolean }>(`${base}/extract`, fd)
+    try {
+      return await api.post<{ comments: Draft[]; notice: string | null; limitExceeded: boolean }>(`${base}/extract`, fd)
+    } finally {
+      // 실패해도 서버는 AI 호출 전에 장수를 차감하므로 남은 장수를 항상 다시 읽는다
+      setUsageKey((k) => k + 1)
+    }
   }, (r) => {
-    setUsageKey((k) => k + 1)
     setDrafts(r.comments.length ? r.comments : [{ author: '', content: '', duplicateSuspected: false }])
     if (r.limitExceeded) setError(r.notice)
     else if (r.notice) setNotice(r.notice)

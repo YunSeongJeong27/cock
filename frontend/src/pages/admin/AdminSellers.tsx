@@ -99,7 +99,10 @@ export default function AdminSellers() {
                       <option value="PAID">유료</option>
                     </select>
                   </td>
-                  <td><input type="date" value={r.trialEndsAt.substring(0, 10)} onChange={(e) => update({ trialEndsAt: e.target.value + 'T23:59:59' })} disabled={row.role === 'ADMIN'} /></td>
+                  <td><input type="date" value={r.trialEndsAt.substring(0, 10)} onChange={(e) => {
+                    // 날짜를 지우면 'T23:59:59' 만 보내져 저장이 400 으로 실패하므로 무시한다 (무료 체험 종료일은 필수)
+                    if (e.target.value) update({ trialEndsAt: e.target.value + 'T23:59:59' })
+                  }} disabled={row.role === 'ADMIN'} /></td>
                   <td><input type="date" value={r.paidUntil ?? ''} onChange={(e) => update({ paidUntil: e.target.value })} disabled={row.role === 'ADMIN'} /></td>
                   <td>
                     {row.expired && <div className="badge badge-CLOSED">만료</div>}

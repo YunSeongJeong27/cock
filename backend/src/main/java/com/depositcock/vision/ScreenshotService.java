@@ -70,6 +70,7 @@ public class ScreenshotService {
             return new DepositExtractResponse(List.of(), 0, extractor.provider(), notConfigured(), false, null);
         }
         checked(files);
+        rejectUnusable(files);
         CaptureUsageService.Reservation reservation = usageService.reserve(sellerId, files.size());
         if (!reservation.allowed()) {
             return new DepositExtractResponse(List.of(), 0, extractor.provider(),
@@ -77,9 +78,9 @@ public class ScreenshotService {
         }
         int remainingAfter = reservation.remainingBefore() - files.size();
         List<Integer> failed = new ArrayList<>();
-        List<List<ExtractedDeposit>> perImage = readAll(files, failed, extractor::extractDeposits,
+        List<List<Item<ExtractedDeposit>>> perImage = readAll(files, failed, extractor::extractDeposits,
                 extractor::extractDepositsFromPiece, ExtractedDeposit::order, ScreenshotService::depositKey);
-        List<Item<ExtractedDeposit>> items = OverlapDeduplicator.dedupe(perImage, ScreenshotService::depositKey);
+        List<Item<ExtractedDeposit>> items = OverlapDeduplicator.dedupeItems(perImage, ScreenshotService::depositKey);
         List<DepositDraft> drafts = new ArrayList<>();
         int skipped = 0;
         for (Item<ExtractedDeposit> item : items) {
@@ -110,6 +111,13 @@ public class ScreenshotService {
             if (r.name().contains("[?]")) {
                 throw ApiException.badRequest("읽지 못한 글자([?])가 남아 있습니다: " + r.name());
             }
+            // DB 열 길이(deposit_row.depositor_name 200, datetime_text 100)를 넘으면 409 "이미 같은 데이터" 로 잘못 안내되므로 먼저 막는다
+            if (r.name().trim().length() > 200) {
+                throw ApiException.badRequest("입금자명이 너무 깁니다 (200자까지): " + no + "번째 줄");
+            }
+            if (r.datetimeText() != null && r.datetimeText().trim().length() > 100) {
+                throw ApiException.badRequest("일시가 너무 깁니다 (100자까지): " + no + "번째 줄");
+            }
             lines.add(new DepositLine(no, r.name().trim(), r.amount(), blankToNull(r.datetimeText()),
                     BankStatementReader.parseDateTimeText(r.datetimeText())));
         }
@@ -125,6 +133,7 @@ public class ScreenshotService {
             return new CommentExtractResponse(List.of(), extractor.provider(), notConfigured(), false, null);
         }
         checked(files);
+        rejectUnusable(files);
         CaptureUsageService.Reservation reservation = usageService.reserve(sellerId, files.size());
         if (!reservation.allowed()) {
             return new CommentExtractResponse(List.of(), extractor.provider(), limitNotice(reservation, files.size()),
@@ -132,9 +141,9 @@ public class ScreenshotService {
         }
         int remainingAfter = reservation.remainingBefore() - files.size();
         List<Integer> failed = new ArrayList<>();
-        List<List<ExtractedComment>> perImage = readAll(files, failed, extractor::extractComments,
+        List<List<Item<ExtractedComment>>> perImage = readAll(files, failed, extractor::extractComments,
                 extractor::extractCommentsFromPiece, ExtractedComment::order, ScreenshotService::commentKey);
-        List<CommentDraft> drafts = OverlapDeduplicator.dedupe(perImage, ScreenshotService::commentKey).stream()
+        List<CommentDraft> drafts = OverlapDeduplicator.dedupeItems(perImage, ScreenshotService::commentKey).stream()
                 .map(i -> new CommentDraft(nullToEmpty(i.value().author()).trim(), nullToEmpty(i.value().content()).trim(),
                         i.duplicateSuspected(), i.imageIndex()))
                 .toList();
@@ -145,20 +154,21 @@ public class ScreenshotService {
 
     /**
      * 올린 이미지를 한 장씩 읽는다.
-     * - 긴 캡처는 ImageSlicer 로 잘라서 조각마다 읽고, 조각 사이 겹침을 합쳐 한 장의 결과로 만든다
-     *   (우리가 자른 겹침이므로 "중복 의심" 표시는 하지 않는다).
+     * - 긴 캡처는 ImageSlicer 로 잘라서 조각마다 읽고, 조각 사이 겹침을 합쳐 한 장의 결과로 만든다.
+     *   조각 경계에서 확인이 필요한 줄에 붙은 "중복 의심" 표시는 이미지 사이 겹침 제거까지 그대로 넘긴다.
+     * - API 제한을 넘는 이미지·조각은 ImageSlicer 가 줄여서 보낸다.
      * - 한 장이 실패해도 나머지는 계속 읽고, 실패한 장 번호를 failed 에 담는다. 전부 실패하면 첫 오류를 던진다.
      */
-    private <T> List<List<T>> readAll(List<MultipartFile> files, List<Integer> failed,
-                                      BiFunction<byte[], String, List<T>> readWhole,
-                                      BiFunction<byte[], String, List<T>> readPiece,
-                                      ToIntFunction<T> order, Function<T, String> key) {
-        List<List<T>> perImage = new ArrayList<>();
-        ExternalApiException firstError = null;
+    private <T> List<List<Item<T>>> readAll(List<MultipartFile> files, List<Integer> failed,
+                                            BiFunction<byte[], String, List<T>> readWhole,
+                                            BiFunction<byte[], String, List<T>> readPiece,
+                                            ToIntFunction<T> order, Function<T, String> key) {
+        List<List<Item<T>>> perImage = new ArrayList<>();
+        RuntimeException firstError = null;
         for (int i = 0; i < files.size(); i++) {
             MultipartFile file = files.get(i);
             try {
-                List<ImageSlicer.Piece> pieces = ImageSlicer.slice(bytes(file), mediaType(file));
+                List<ImageSlicer.Piece> pieces = ImageSlicer.prepare(bytes(file), mediaType(file));
                 List<List<T>> perPiece = new ArrayList<>();
                 for (ImageSlicer.Piece piece : pieces) {
                     List<T> list = new ArrayList<>(pieces.size() == 1
@@ -167,8 +177,8 @@ public class ScreenshotService {
                     list.sort(Comparator.comparingInt(order));
                     perPiece.add(list);
                 }
-                perImage.add(OverlapDeduplicator.dedupe(perPiece, key).stream().map(Item::value).toList());
-            } catch (ExternalApiException e) {
+                perImage.add(OverlapDeduplicator.mergePieces(perPiece, key));
+            } catch (ExternalApiException | ImageSlicer.UnusableImageException e) {
                 failed.add(i + 1);
                 if (firstError == null) {
                     firstError = e;
@@ -177,9 +187,22 @@ public class ScreenshotService {
             }
         }
         if (firstError != null && failed.size() == files.size()) {
+            if (firstError instanceof ImageSlicer.UnusableImageException) {
+                throw ApiException.badRequest(firstError.getMessage());
+            }
             throw firstError;
         }
         return perImage;
+    }
+
+    /** 보내지도 못할 이미지는 사용량을 잡기 전에 요청 전체를 막는다 (헤더만 읽음) */
+    private static void rejectUnusable(List<MultipartFile> files) {
+        for (int i = 0; i < files.size(); i++) {
+            String reason = ImageSlicer.rejectReason(bytes(files.get(i)));
+            if (reason != null) {
+                throw ApiException.badRequest((i + 1) + "번째 이미지: " + reason);
+            }
+        }
     }
 
     private static String failedNote(List<Integer> failed) {

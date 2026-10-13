@@ -80,6 +80,39 @@ class AnthropicVisionExtractorTest {
         assertThat(user.getMedia().get(0).getMimeType().toString()).isEqualTo("image/png");
     }
 
+    /** thinking 블록만 오고 텍스트가 없는 응답 (thinking 도중 max_tokens 등) */
+    static ChatModel thinkingOnly(String stopReason) {
+        return new ChatModel() {
+            @Override
+            public ChatResponse call(Prompt prompt) {
+                Generation thinking = new Generation(AssistantMessage.builder().content("")
+                        .properties(Map.of("signature", "sig")).build(),
+                        ChatGenerationMetadata.builder().finishReason(stopReason).build());
+                return new ChatResponse(List.of(thinking));
+            }
+
+            @Override
+            public ChatOptions getDefaultOptions() {
+                return AnthropicVisionExtractor.defaultOptions("claude-haiku-5-5");
+            }
+        };
+    }
+
+    @Test
+    void thinkingOnlyResponseIsAnErrorNotAnEmptyResult() {
+        AnthropicVisionExtractor maxTokens = new AnthropicVisionExtractor(thinkingOnly("max_tokens"), "claude-haiku-5-5");
+        assertThatThrownBy(() -> maxTokens.extractDeposits(new byte[]{1}, "image/png"))
+                .isInstanceOf(ExternalApiException.class).hasMessageContaining("글자가 너무 많습니다");
+
+        AnthropicVisionExtractor refusal = new AnthropicVisionExtractor(thinkingOnly("refusal"), "claude-haiku-5-5");
+        assertThatThrownBy(() -> refusal.extractDeposits(new byte[]{1}, "image/png"))
+                .isInstanceOf(ExternalApiException.class).hasMessageContaining("거절");
+
+        AnthropicVisionExtractor noText = new AnthropicVisionExtractor(thinkingOnly("end_turn"), "claude-haiku-5-5");
+        assertThatThrownBy(() -> noText.extractDeposits(new byte[]{1}, "image/png"))
+                .isInstanceOf(ExternalApiException.class);
+    }
+
     @Test
     void refusalBecomesFriendlyError() {
         FakeChatModel model = new FakeChatModel("", "refusal");

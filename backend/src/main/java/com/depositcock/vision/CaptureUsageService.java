@@ -3,9 +3,11 @@ package com.depositcock.vision;
 import java.time.Clock;
 import java.time.LocalDate;
 
+import com.depositcock.common.ApiException;
 import com.depositcock.common.AppProperties;
 import com.depositcock.seller.Seller;
 import com.depositcock.seller.SellerRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,8 +39,9 @@ public class CaptureUsageService {
     public record Reservation(boolean allowed, int remainingBefore, int dailyLimit) {
     }
 
+    /** 설정 기본값. 0 이면 (판매자별 제한 0 과 같이) 모두 막는다. 음수·설정 없음이면 30. */
     public int defaultLimit() {
-        return properties.vision() == null || properties.vision().dailyCaptureLimit() <= 0
+        return properties.vision() == null || properties.vision().dailyCaptureLimit() < 0
                 ? 30 : properties.vision().dailyCaptureLimit();
     }
 
@@ -48,7 +51,15 @@ public class CaptureUsageService {
 
     @Transactional(readOnly = true)
     public Usage usage(Long sellerId) {
-        Seller seller = sellerRepository.findById(sellerId).orElseThrow();
+        Seller seller = sellerRepository.findById(sellerId)
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."));
+        return usage(seller);
+    }
+
+    /** 이미 읽은 판매자로 사용량을 계산한다 (관리자 목록에서 판매자를 다시 읽지 않게) */
+    @Transactional(readOnly = true)
+    public Usage usage(Seller seller) {
+        Long sellerId = seller.getId();
         LocalDate today = LocalDate.now(clock);
         int usedToday = usageRepository.findBySellerIdAndUsageDate(sellerId, today).map(CaptureUsage::getImageCount).orElse(0);
         int usedMonth = usageRepository.sumBetween(sellerId, today.withDayOfMonth(1), today);

@@ -26,4 +26,11 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     int maxOrderNo(@Param("groupBuyId") Long groupBuyId);
 
     boolean existsByItemsProductId(Long productId);
+
+    /** 이 판매자의 모든 공구에서 이 고객의 입금 확정 주문 (별칭을 되돌려도 되는지 볼 때) */
+    @Query("select o from CustomerOrder o where o.groupBuy.seller.id = :sellerId and o.customerKey = :customerKey"
+            + " and o.paid = true and o.id <> :excludeId")
+    List<CustomerOrder> findOtherPaidOfCustomer(@Param("sellerId") Long sellerId,
+                                                @Param("customerKey") String customerKey,
+                                                @Param("excludeId") Long excludeId);
 }

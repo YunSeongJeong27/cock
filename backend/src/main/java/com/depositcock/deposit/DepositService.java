@@ -36,6 +36,7 @@ import com.depositcock.groupbuy.GroupBuyService;
 import com.depositcock.order.CustomerOrder;
 import com.depositcock.order.CustomerOrderRepository;
 import com.depositcock.order.DisplayStatus;
+import com.depositcock.order.PaidAliasChange;
 import com.depositcock.order.PhoneNumbers;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -244,13 +245,13 @@ public class DepositService {
             }
             order.confirmPaid(row.getDepositorName(), row.getAmount(), row.getId(), now);
             row.use(order.getId());
-            saveAlias(sellerId, row.getDepositorName(), order.getCustomerKey(), now);
+            saveAlias(sellerId, order, row.getDepositorName(), now);
             confirmed++;
         }
         return new ConfirmResponse(confirmed, errors);
     }
 
-    /** 입금 확정 취소: 입금 줄을 다시 쓸 수 있게 풀고, 이번 확정으로 생긴 별칭도 지운다. */
+    /** 입금 확정 취소: 입금 줄을 다시 쓸 수 있게 풀고, 이 확정이 만든·바꾼 별칭을 되돌린다. */
     @Transactional
     public void unconfirm(Long sellerId, Long groupBuyId, Long orderId) {
         GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
@@ -259,11 +260,7 @@ public class DepositService {
         if (!order.isPaid()) {
             throw ApiException.badRequest("입금 확정된 주문이 아닙니다.");
         }
-        if (order.getPaidDepositorName() != null) {
-            aliasRepository.findBySellerIdAndDepositorName(sellerId, DepositMatcher.squash(order.getPaidDepositorName()))
-                    .filter(a -> a.getCustomerKey().equals(order.getCustomerKey()))
-                    .ifPresent(aliasRepository::delete);
-        }
+        undoAlias(sellerId, order);
         rowRepository.findByUsedOrderId(order.getId()).ifPresent(DepositRow::release);
         // 취소된 주문이면 "입금 확정"이 잘못이었다는 뜻이므로 "환불 필요"도 함께 거둔다
         order.cancelPaid(LocalDateTime.now(clock));
@@ -280,17 +277,52 @@ public class DepositService {
         }
         LocalDateTime now = LocalDateTime.now(clock);
         order.confirmPaid(depositorName.trim(), amount, null, now);
-        saveAlias(sellerId, depositorName, order.getCustomerKey(), now);
+        saveAlias(sellerId, order, depositorName, now);
     }
 
-    private void saveAlias(Long sellerId, String depositorName, String customerKey, LocalDateTime now) {
-        String key = DepositMatcher.squash(depositorName);
-        if (key.isEmpty()) {
+    /** 입금자명 → 고객 별칭을 저장하고, 새로 만들었는지·바꿨는지를 주문에 기록한다 (확정 취소 때 되돌리려고) */
+    private void saveAlias(Long sellerId, CustomerOrder order, String depositorName, LocalDateTime now) {
+        String name = DepositMatcher.squash(depositorName);
+        if (name.isEmpty()) {
             return;
         }
-        aliasRepository.findBySellerIdAndDepositorName(sellerId, key).ifPresentOrElse(
-                a -> a.changeCustomerKey(customerKey),
-                () -> aliasRepository.save(new DepositorAlias(sellerId, key, customerKey, now)));
+        String customerKey = order.getCustomerKey();
+        DepositorAlias alias = aliasRepository.findBySellerIdAndDepositorName(sellerId, name).orElse(null);
+        if (alias == null) {
+            aliasRepository.save(new DepositorAlias(sellerId, name, customerKey, now));
+            order.recordAliasChange(PaidAliasChange.CREATED, null);
+        } else if (!alias.getCustomerKey().equals(customerKey)) {
+            order.recordAliasChange(PaidAliasChange.CHANGED, alias.getCustomerKey());
+            alias.changeCustomerKey(customerKey);
+        }
+    }
+
+    /**
+     * 이 확정이 만든 별칭은 지우고, 바꾼 별칭은 원래 고객으로 되돌린다. 다음 경우에는 그대로 둔다.
+     * - 이 확정이 별칭을 건드리지 않았다 (다른 공구 등에서 이미 같은 고객으로 저장돼 있었음)
+     * - 그 뒤에 별칭이 지워졌거나 다른 고객으로 바뀌었다
+     * - 같은 입금자명으로 이 고객에게 확정된 다른 주문이 아직 있다 (그 확정이 이 별칭의 근거)
+     */
+    private void undoAlias(Long sellerId, CustomerOrder order) {
+        if (order.getPaidAliasChange() == null || order.getPaidDepositorName() == null) {
+            return;
+        }
+        String name = DepositMatcher.squash(order.getPaidDepositorName());
+        DepositorAlias alias = aliasRepository.findBySellerIdAndDepositorName(sellerId, name).orElse(null);
+        if (alias == null || !alias.getCustomerKey().equals(order.getCustomerKey())) {
+            return;
+        }
+        boolean stillBacked = orderRepository.findOtherPaidOfCustomer(sellerId, order.getCustomerKey(), order.getId())
+                .stream()
+                .anyMatch(o -> o.getPaidDepositorName() != null && DepositMatcher.squash(o.getPaidDepositorName()).equals(name));
+        if (stillBacked) {
+            return;
+        }
+        if (order.getPaidAliasChange() == PaidAliasChange.CHANGED && order.getPaidAliasPreviousKey() != null) {
+            alias.changeCustomerKey(order.getPaidAliasPreviousKey());
+        } else {
+            aliasRepository.delete(alias);
+        }
     }
 
     private Map<String, String> aliasMap(Long sellerId) {

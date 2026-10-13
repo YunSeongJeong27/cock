@@ -94,6 +94,11 @@ public class CustomerOrder {
     private String paidDepositorName;
     private Integer paidAmount;
     private Long depositRowId;
+    /** 이 확정이 별칭을 새로 만들었는지·바꿨는지. 확정 취소 때 이것만 되돌린다 (null 이면 건드리지 않음) */
+    @Enumerated(EnumType.STRING)
+    private PaidAliasChange paidAliasChange;
+    /** paidAliasChange 가 CHANGED 일 때 바꾸기 전 고객 키 */
+    private String paidAliasPreviousKey;
 
     @Column(nullable = false)
     private boolean onsitePaid;
@@ -209,7 +214,15 @@ public class CustomerOrder {
         this.paidDepositorName = depositorName;
         this.paidAmount = amount;
         this.depositRowId = depositRowId;
+        this.paidAliasChange = null;
+        this.paidAliasPreviousKey = null;
         this.updatedAt = now;
+    }
+
+    /** 입금 확정 때 별칭을 만들었거나 바꿨으면 기록한다 */
+    public void recordAliasChange(PaidAliasChange change, String previousKey) {
+        this.paidAliasChange = change;
+        this.paidAliasPreviousKey = previousKey;
     }
 
     /** 입금 확정 취소. 취소된 주문이면 "환불 필요"도 거둔다 (확정이 잘못이었으므로). */
@@ -223,6 +236,8 @@ public class CustomerOrder {
         this.paidDepositorName = null;
         this.paidAmount = null;
         this.depositRowId = null;
+        this.paidAliasChange = null;
+        this.paidAliasPreviousKey = null;
         this.updatedAt = now;
     }
 
@@ -352,6 +367,14 @@ public class CustomerOrder {
 
     public String getPaidDepositorName() {
         return paidDepositorName;
+    }
+
+    public PaidAliasChange getPaidAliasChange() {
+        return paidAliasChange;
+    }
+
+    public String getPaidAliasPreviousKey() {
+        return paidAliasPreviousKey;
     }
 
     public Integer getPaidAmount() {

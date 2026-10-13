@@ -78,7 +78,7 @@ public class SellerService {
         LocalDateTime now = LocalDateTime.now(clock);
         return sellerRepository.findAllByOrderByIdDesc().stream()
                 .map(s -> {
-                    CaptureUsageService.Usage usage = captureUsageService.usage(s.getId());
+                    CaptureUsageService.Usage usage = captureUsageService.usage(s);
                     return new AdminSellerRow(s.getId(), s.getEmail(), s.getDisplayName(), s.getRole(), s.getPlan(),
                             s.getTrialEndsAt(), s.getPaidUntil(), s.isExpired(now), s.isSuspended(), s.getAdminMemo(),
                             s.getCreatedAt(), groupBuyRepository.countBySellerId(s.getId()), usage.usedToday(),

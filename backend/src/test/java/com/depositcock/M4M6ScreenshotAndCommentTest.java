@@ -206,8 +206,11 @@ class M4M6ScreenshotAndCommentTest extends IntegrationTest {
                 assertThat(s.get("customCaptureLimit").asBoolean()).isTrue();
             }
         }
-        // AI 가 꺼져 있으면 사용량을 세지 않는다
+        // AI 가 꺼져 있으면 사용량을 세지 않는다 (올려도 차감 안 됨)
         when(visionExtractor.available()).thenReturn(false);
+        mvc.perform(multipart(url).file(image("1.png")).cookie(seller))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.limitExceeded").value(false));
         mvc.perform(get("/api/seller/capture-usage").cookie(seller))
                 .andExpect(jsonPath("$.usage.usedToday").value(3));
     }
@@ -232,5 +235,51 @@ class M4M6ScreenshotAndCommentTest extends IntegrationTest {
         when(visionExtractor.extractDeposits(any(), anyString()))
                 .thenThrow(new com.depositcock.common.ExternalApiException("비전 AI 호출 실패"));
         mvc.perform(multipart(url).file(image("1.png")).cookie(seller)).andExpect(status().isBadGateway());
+    }
+
+    /** 서버에서 줄일 수 없는 큰 이미지(webp 7MB 초과)는 사용량을 쓰기 전에 400 으로 막는다 */
+    @Test
+    void oversizedUndecodableImageIsRejectedBeforeUsage() throws Exception {
+        when(visionExtractor.available()).thenReturn(true);
+        when(visionExtractor.provider()).thenReturn("test");
+        Cookie seller = signup(uniqueEmail());
+        long id = openGroupBuy(seller, groupBuyBody("큰 이미지", List.of(product("x", 1000, null))));
+        String url = "/api/seller/group-buys/" + id + "/deposits/screenshots/extract";
+        MockMultipartFile big = new MockMultipartFile("files", "big.webp", "image/webp",
+                new byte[7_000_001]);
+        mvc.perform(multipart(url).file(image("1.png")).file(big).cookie(seller))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("2번째 이미지")));
+        mvc.perform(get("/api/seller/capture-usage").cookie(seller))
+                .andExpect(jsonPath("$.usage.usedToday").value(0));
+    }
+
+    /** 긴 캡처를 자른 조각 경계에서 같은 줄을 못 찾으면, 경계 앞뒤 줄이 "중복 의심"으로 화면까지 간다 */
+    @Test
+    void pieceBoundaryFlagsReachDrafts() throws Exception {
+        when(visionExtractor.available()).thenReturn(true);
+        when(visionExtractor.provider()).thenReturn("test");
+        // 100x500 → 조각 3개 (높이 200, 겹침 40)
+        when(visionExtractor.extractDepositsFromPiece(any(), anyString()))
+                .thenReturn(List.of(new ExtractedDeposit("가", 1000, "", "입금", 0)))
+                .thenReturn(List.of(new ExtractedDeposit("가 ", 1000, "", "입금", 0), new ExtractedDeposit("나", 2000, "", "입금", 1)))
+                .thenReturn(List.of(new ExtractedDeposit("나", 2000, "", "입금", 0), new ExtractedDeposit("다", 3000, "", "입금", 1)));
+        Cookie seller = signup(uniqueEmail());
+        long id = openGroupBuy(seller, groupBuyBody("긴 캡처", List.of(product("x", 1000, null))));
+        java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(100, 500, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(img, "png", out);
+        MockMultipartFile tall = new MockMultipartFile("files", "tall.png", "image/png", out.toByteArray());
+        JsonNode res = read(mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/screenshots/extract")
+                .file(tall).cookie(seller)).andExpect(status().isOk()).andReturn());
+        JsonNode deposits = res.get("deposits");
+        assertThat(deposits.size()).isEqualTo(4); // 가, 가(다르게 읽힘), 나, 다
+        // 조각 1·2 경계: 같은 구간 없음 → 가 / 가·나 표시. 조각 2·3 경계: 나 가 정확히 겹침 → 합침
+        assertThat(deposits.get(0).get("duplicateSuspected").asBoolean()).isTrue();
+        assertThat(deposits.get(1).get("duplicateSuspected").asBoolean()).isTrue();
+        assertThat(deposits.get(2).get("duplicateSuspected").asBoolean()).isTrue();
+        assertThat(deposits.get(3).get("duplicateSuspected").asBoolean()).isFalse();
+        // 사용량은 조각 수가 아니라 이미지 장수로 센다
+        assertThat(res.get("remainingToday").asInt()).isEqualTo(29);
     }
 }

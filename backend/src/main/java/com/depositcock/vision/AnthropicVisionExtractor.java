@@ -1,5 +1,7 @@
 package com.depositcock.vision;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.List;
 
 import com.depositcock.common.ExternalApiException;
@@ -9,9 +11,13 @@ import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.client.AdvisorParams;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.retry.TransientAiException;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.util.MimeTypeUtils;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
 
 /**
  * Spring AI(ChatClient)로 Claude 에 스크린샷 글자 읽기를 요청한다.
@@ -59,6 +65,9 @@ public class AnthropicVisionExtractor implements VisionExtractor {
             맨 위·맨 아래 가장자리에서 잘려 일부만 보이는 줄은 넣지 마세요. (다른 조각에 온전히 들어 있습니다)
             """;
 
+    static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    static final Duration READ_TIMEOUT = Duration.ofSeconds(120);
+
     private final ChatClient chatClient;
     private final String model;
 
@@ -78,7 +87,12 @@ public class AnthropicVisionExtractor implements VisionExtractor {
 
     /** baseUrl 은 테스트용 (null 이면 Anthropic 기본 주소) */
     static ChatModel createChatModel(String apiKey, String model, String baseUrl) {
-        AnthropicApi.Builder apiBuilder = AnthropicApi.builder().apiKey(apiKey);
+        // RestClient 기본값에는 시간 제한이 없어 응답이 멈추면 요청 스레드가 무한히 기다린다
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
+        requestFactory.setReadTimeout(READ_TIMEOUT);
+        AnthropicApi.Builder apiBuilder = AnthropicApi.builder().apiKey(apiKey)
+                .restClientBuilder(RestClient.builder().requestFactory(requestFactory));
         if (baseUrl != null) {
             apiBuilder.baseUrl(baseUrl);
         }
@@ -86,8 +100,12 @@ public class AnthropicVisionExtractor implements VisionExtractor {
         return AnthropicChatModel.builder()
                 .anthropicApi(api)
                 .defaultOptions(defaultOptions(model))
-                // Spring AI 기본 재시도(최대 10회, 긴 대기)는 웹 요청에 너무 길어서 2회로 줄인다
-                .retryTemplate(RetryTemplate.builder().maxAttempts(2).fixedBackoff(1000).build())
+                // Spring AI 기본 재시도(최대 10회, 긴 대기)는 웹 요청에 너무 길어서 2회로 줄인다.
+                // 재시도 대상은 Spring AI 기본과 같게 일시 오류(5xx)·연결 오류만. 4xx(잘못된 요청·키 오류)는 다시 보내도 같다.
+                .retryTemplate(RetryTemplate.builder().maxAttempts(2).fixedBackoff(1000)
+                        .retryOn(TransientAiException.class)
+                        .retryOn(ResourceAccessException.class)
+                        .build())
                 .build();
     }
 
@@ -143,7 +161,8 @@ public class AnthropicVisionExtractor implements VisionExtractor {
         } catch (ExternalApiException e) {
             throw e;
         } catch (RuntimeException e) {
-            throw new ExternalApiException("비전 AI 호출에 실패했습니다. 직접 입력해 주세요. (" + e.getMessage() + ")", e);
+            // 원인 메시지(API 응답 원문, 모델 출력 원문 등)는 화면에 넣지 않는다. ApiExceptionHandler 가 cause 를 로그에 남긴다.
+            throw new ExternalApiException("비전 AI 호출에 실패했습니다. 직접 입력해 주세요.", e);
         }
     }
 }
