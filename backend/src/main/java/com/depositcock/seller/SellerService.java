@@ -126,15 +126,21 @@ public class SellerService {
         sellerRepository.delete(seller);
     }
 
+    /**
+     * 관리자 계정이 없으면 만든다. 같은 이메일로 일반 판매자가 먼저 가입해 있으면 관리자로 바꾸지 않고 false 를 돌려준다
+     * (가입 시 이메일 인증이 없어서, 남이 관리자 이메일로 먼저 가입했을 수 있기 때문).
+     */
     @Transactional
-    public void ensureAdmin(String email, String rawPassword) {
+    public boolean ensureAdmin(String email, String rawPassword) {
         String normalized = normalizeEmail(email);
-        if (sellerRepository.existsByEmail(normalized)) {
-            return;
+        Seller existing = sellerRepository.findByEmail(normalized).orElse(null);
+        if (existing != null) {
+            return existing.getRole() == Role.ADMIN;
         }
         LocalDateTime now = LocalDateTime.now(clock);
         sellerRepository.save(new Seller(normalized, passwordEncoder.encode(rawPassword), "관리자", Role.ADMIN,
                 now, now.plusYears(100)));
+        return true;
     }
 
     private static String normalizeEmail(String email) {

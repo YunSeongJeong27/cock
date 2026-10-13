@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, errorMessage } from '../api'
 import { useAuth } from '../auth'
 import { ErrorBox } from '../components/Ui'
@@ -12,6 +12,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [params] = useSearchParams()
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -31,6 +32,7 @@ export default function Login() {
   return (
     <div className="container narrow">
       <h1 className="mt"><Link to="/" style={{ color: 'inherit' }}>📌 입금콕</Link> 로그인</h1>
+      {params.get('expired') && <div className="warn-box">로그인이 만료되었습니다. 다시 로그인해 주세요.</div>}
       <form className="card" onSubmit={submit}>
         <label className="field"><span>이메일</span>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />

@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
  * 결과
  *   MATCHED   : 금액 일치 + 근거 있음 + 후보 1명
  *   SUGGESTED : 근거 있음 + 금액 다름 (후보 1명) → "금액 차이 ±N원"
- *   SUGGESTED : 근거 없음 + 금액만 일치 + 그 금액의 미입금 주문이 1건뿐
+ *   SUGGESTED : 근거 없음 + 금액만 일치 + 그 금액의 미입금 주문이 1건뿐 (그리고 그 금액의 연결 안 된 입금도 1건뿐)
  *   AMBIGUOUS : 후보가 2명 이상 → 자동 확정 금지, 판매자가 고른다 (목록의 첫 번째에 임의로 붙이지 않는다)
  *   UNRELATED : 관련 없는 입금
  * 입금 1건은 주문 1건에만 쓴다.
@@ -100,6 +100,14 @@ public final class DepositMatcher {
             }
         }
 
+        // 1차에서 연결 안 된 입금의 금액별 건수 (금액만 일치 추천은 그 금액의 입금이 1건일 때만)
+        java.util.Map<Integer, Integer> unmatchedByAmount = new java.util.HashMap<>();
+        for (int i = 0; i < deposits.size(); i++) {
+            if (results[i] == null) {
+                unmatchedByAmount.merge(deposits.get(i).amount(), 1, Integer::sum);
+            }
+        }
+
         // 2차: 나머지는 추천 / 후보 여러 명 / 관련 없음
         for (int i = 0; i < deposits.size(); i++) {
             if (results[i] != null) {
@@ -120,7 +128,8 @@ public final class DepositMatcher {
             }
             List<Payee> sameAmount = targets.stream()
                     .filter(p -> !reserved.contains(p.orderId()) && p.expectedAmount() == d.amount()).toList();
-            if (sameAmount.size() == 1) {
+            // 같은 금액의 연결 안 된 입금이 여러 건이면 어느 입금이 그 주문의 것인지 알 수 없으므로 추천하지 않는다
+            if (sameAmount.size() == 1 && unmatchedByAmount.getOrDefault(d.amount(), 0) == 1) {
                 Candidate c = new Candidate(sameAmount.get(0).orderId(), Evidence.AMOUNT_ONLY, 0);
                 results[i] = new Result(d, Status.SUGGESTED, c.orderId(), c.evidence(), 0, List.of(c));
             } else {

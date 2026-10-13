@@ -8,6 +8,7 @@ import java.util.List;
 
 import com.depositcock.seller.Seller;
 import jakarta.persistence.CascadeType;
+import org.hibernate.annotations.DynamicUpdate;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -22,6 +23,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
+@DynamicUpdate
 @Table(name = "group_buy")
 public class GroupBuy {
 

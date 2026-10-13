@@ -15,6 +15,7 @@ public record AppProperties(
         String adminEmail,
         String adminPassword,
         int publicRateLimitPerMinute,
+        int sensitiveRateLimitPer10Minutes,
         Vision vision
 ) {
     public record Vision(String provider, String anthropicApiKey, String anthropicModel, int dailyCaptureLimit) {

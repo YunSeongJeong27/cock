@@ -109,4 +109,22 @@ class DepositMatcherTest {
                 List.of(new Deposit(10L, "쏠", 1900)), Map.of());
         assertThat(single.results().get(0).status()).isEqualTo(Status.UNRELATED);
     }
+
+    /** 같은 금액의 연결 안 된 입금이 2건이면 금액만으로는 추천하지 않는다 (어느 입금인지 모름) */
+    @Test
+    void amountOnlyNeedsUniqueDeposit() {
+        Outcome o = DepositMatcher.match(List.of(payee(1, "k1", "김지영", null, 8900)),
+                List.of(new Deposit(10L, "모르는1", 8900), new Deposit(11L, "모르는2", 8900)), Map.of());
+        assertThat(o.results()).extracting(DepositMatcher.Result::status)
+                .containsExactly(Status.UNRELATED, Status.UNRELATED);
+        assertThat(o.unpaid()).hasSize(1);
+
+        // 같은 금액이 2건이어도 하나가 1차에서 다른 주문에 확정되면, 남은 1건은 금액만으로 추천된다
+        Outcome o2 = DepositMatcher.match(
+                List.of(payee(1, "k1", "김지영", null, 8900), payee(2, "k2", "박서준", null, 8900)),
+                List.of(new Deposit(10L, "김지영", 8900), new Deposit(11L, "모르는", 8900)), Map.of());
+        assertThat(o2.results().get(0).status()).isEqualTo(Status.MATCHED);
+        assertThat(o2.results().get(1).status()).isEqualTo(Status.SUGGESTED);
+        assertThat(o2.results().get(1).orderId()).isEqualTo(2L);
+    }
 }

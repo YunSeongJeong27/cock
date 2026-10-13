@@ -85,19 +85,26 @@ export default function GroupBuyForm() {
       })),
       pickupPoints: form.pickupPoints.filter((p) => p.name.trim()).map((p) => ({ id: p.id ?? null, name: p.name, info: p.info })),
     }
+    let saved: GroupBuy
     try {
-      const saved = editing
+      saved = editing
         ? await api.put<GroupBuy>(`/api/seller/group-buys/${id}`, body)
         : await api.post<GroupBuy>('/api/seller/group-buys', body)
-      if (openAfter && saved.status !== 'OPEN') {
-        await api.post(`/api/seller/group-buys/${saved.id}/open`)
-      }
-      navigate(`/seller/group-buys/${saved.id}`)
     } catch (err) {
       setError(errorMessage(err))
-    } finally {
       setBusy(false)
+      return
     }
+    if (openAfter && saved.status !== 'OPEN') {
+      try {
+        await api.post(`/api/seller/group-buys/${saved.id}/open`)
+      } catch (err) {
+        // 저장은 됐는데 열기만 실패: 폼에 남으면 다시 저장할 때 공구가 하나 더 생기므로 상세 화면으로 보낸다
+        alert(`저장은 했지만 주문 받기를 시작하지 못했습니다.\n${errorMessage(err)}\n공구 화면에서 내용을 고친 뒤 "주문 받기 시작"을 눌러주세요.`)
+      }
+    }
+    setBusy(false)
+    navigate(`/seller/group-buys/${saved.id}`)
   }
 
   return (
@@ -190,7 +197,7 @@ export default function GroupBuyForm() {
         <h3>고객 입력 항목·기타</h3>
         <label className="check"><input type="checkbox" checked={form.nicknameFieldEnabled} onChange={(e) => set('nicknameFieldEnabled', e.target.checked)} /> 닉네임 받기 (밴드·카톡 닉네임)</label>
         <label className="check"><input type="checkbox" checked={form.unitAddressFieldEnabled} onChange={(e) => set('unitAddressFieldEnabled', e.target.checked)} /> 동·호수 받기 (아파트 공구)</label>
-        <label className="field mt"><span>카톡 문의 링크 (선택)</span>
+        <label className="field mt"><span>카톡 문의 링크 (선택, https:// 로 시작)</span>
           <input type="text" value={form.kakaoInquiryUrl} onChange={(e) => set('kakaoInquiryUrl', e.target.value)} placeholder="https://pf.kakao.com/..." />
         </label>
         <label className="field"><span>관리자 닉네임 (댓글 집계에서 제외, 쉼표로 구분)</span>

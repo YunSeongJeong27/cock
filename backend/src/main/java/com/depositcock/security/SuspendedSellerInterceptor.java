@@ -11,7 +11,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
  * 관리자가 "사용 제한"을 켠 판매자는 조회만 되고 쓰기(POST/PUT/PATCH/DELETE)가 막힌다.
- * 이미 열려 있는 공구의 고객 주문(/api/public)은 막지 않는다.
+ * 이미 열려 있는 공구의 고객 주문(/api/public)은 막지 않는다. 탈퇴는 허용한다.
  */
 @Component
 public class SuspendedSellerInterceptor implements HandlerInterceptor {
@@ -25,6 +25,10 @@ public class SuspendedSellerInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         if ("GET".equalsIgnoreCase(request.getMethod()) || "HEAD".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+        // 사용 제한 중에도 탈퇴(개인정보 파기)는 할 수 있어야 한다
+        if (request.getRequestURI().equals("/api/seller/withdraw")) {
             return true;
         }
         Seller seller = sellerRepository.findById(CurrentSeller.id()).orElse(null);

@@ -7,6 +7,7 @@ import java.util.List;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.PickupPoint;
 import jakarta.persistence.CascadeType;
+import org.hibernate.annotations.DynamicUpdate;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -24,6 +25,7 @@ import jakarta.persistence.Table;
  * 주문 1건. 입금·수령 상태는 주문 단위로 관리한다 (개발 전 인터뷰 결과 3번).
  */
 @Entity
+@DynamicUpdate
 @Table(name = "customer_order")
 public class CustomerOrder {
 
@@ -210,7 +212,12 @@ public class CustomerOrder {
         this.updatedAt = now;
     }
 
+    /** 입금 확정 취소. 취소된 주문이면 "환불 필요"도 거둔다 (확정이 잘못이었으므로). */
     public void cancelPaid(LocalDateTime now) {
+        if (status == OrderStatus.CANCELLED) {
+            this.refundRequired = false;
+            this.refundedAt = null;
+        }
         this.paid = false;
         this.paidAt = null;
         this.paidDepositorName = null;

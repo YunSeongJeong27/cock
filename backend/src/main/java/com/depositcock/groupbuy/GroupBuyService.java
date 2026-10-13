@@ -118,7 +118,12 @@ public class GroupBuyService {
         if (r.pickupEnabled() && !r.pickupPrepayEnabled() && !r.pickupOnsiteEnabled()) {
             throw ApiException.badRequest("픽업 결제 방식(선입금, 현장결제) 중 하나 이상은 켜야 합니다.");
         }
-        if (r.shippingFeeType() == ShippingFeeType.FIXED && r.shippingFee() <= 0) {
+        String kakaoUrl = blankToNull(r.kakaoInquiryUrl());
+        if (kakaoUrl != null && !kakaoUrl.matches("(?i)^https?://\\S+$")) {
+            // javascript: 같은 주소가 고객 화면 링크로 들어가지 않게 한다
+            throw ApiException.badRequest("카톡 문의 링크는 http:// 또는 https:// 로 시작하는 주소만 넣을 수 있습니다.");
+        }
+        if (r.deliveryEnabled() && r.shippingFeeType() == ShippingFeeType.FIXED && r.shippingFee() <= 0) {
             throw ApiException.badRequest("고정 배송비 금액을 입력해 주세요.");
         }
         groupBuy.updateSettings(new GroupBuySettings(

@@ -235,7 +235,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
           </div>
           {match.rows.length === 0 && <p className="muted">대조할 입금이 없습니다. 거래내역을 올려주세요.</p>}
           {match.rows.map((r) => (
-            <MatchItem key={r.rowId} row={r} unpaid={match.unpaid} value={choice[r.rowId] ?? ''}
+            <MatchItem key={r.rowId} row={r} openOrders={match.openOrders} value={choice[r.rowId] ?? ''}
               onChange={(v) => setChoice({ ...choice, [r.rowId]: v })}
               onConfirm={() => choice[r.rowId] && confirmItems([{ rowId: r.rowId, orderId: Number(choice[r.rowId]) }])} />
           ))}
@@ -264,12 +264,12 @@ export default function DepositTab({ groupBuy, reload }: Props) {
   )
 }
 
-function MatchItem({ row, unpaid, value, onChange, onConfirm }: {
-  row: MatchRow; unpaid: OrderBrief[]; value: string; onChange: (v: string) => void; onConfirm: () => void
+function MatchItem({ row, openOrders, value, onChange, onConfirm }: {
+  row: MatchRow; openOrders: OrderBrief[]; value: string; onChange: (v: string) => void; onConfirm: () => void
 }) {
-  // 후보가 있으면 후보를 먼저, 그 외 미입금 주문도 고를 수 있게 한다
+  // 후보가 있으면 후보를 먼저, 그 외 모든 미입금 주문(다른 입금에 추천된 주문 포함)도 고를 수 있게 한다
   const candidateIds = new Set(row.candidates.map((c) => c.order.orderId))
-  const others = unpaid.filter((o) => !candidateIds.has(o.orderId))
+  const others = openOrders.filter((o) => !candidateIds.has(o.orderId))
   return (
     <div style={{ borderTop: '1px solid var(--line)', padding: '10px 0' }}>
       <div className="row between">

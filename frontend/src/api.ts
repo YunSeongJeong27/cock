@@ -10,15 +10,24 @@ export class ApiError extends Error {
   }
 }
 
+// 쓰기 요청에 항상 붙이는 헤더. 서버(CsrfHeaderFilter)는 이 헤더가 없는 /api 쓰기 요청을 거부한다 (CSRF 방어).
+const CSRF_HEADER = { 'X-Requested-With': 'depositcock' }
+
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
-  const init: RequestInit = { method, credentials: 'include', headers: {} }
+  const headers: Record<string, string> = { ...CSRF_HEADER }
+  const init: RequestInit = { method, credentials: 'include', headers }
   if (body instanceof FormData) {
     init.body = body
   } else if (body !== undefined) {
-    init.headers = { 'Content-Type': 'application/json' }
+    headers['Content-Type'] = 'application/json'
     init.body = JSON.stringify(body)
   }
   const res = await fetch(url, init)
+  // 판매자·관리자 화면에서 로그인이 만료되면 로그인 화면으로 보낸다 (/api/me 는 로그인 확인용이라 제외)
+  if (res.status === 401 && (url.startsWith('/api/seller') || url.startsWith('/api/admin'))
+      && !window.location.pathname.startsWith('/login')) {
+    window.location.href = '/login?expired=1'
+  }
   const text = await res.text()
   let data: any = null
   if (text) {

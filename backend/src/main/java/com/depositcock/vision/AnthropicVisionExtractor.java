@@ -52,6 +52,13 @@ public class AnthropicVisionExtractor implements VisionExtractor {
             읽을 수 없는 글자는 추측하지 말고 그 자리에 [?] 를 쓰세요.
             """;
 
+    /** 긴 캡처를 자른 조각일 때 덧붙이는 안내 */
+    static final String PIECE_NOTE = """
+
+            참고: 이 이미지는 긴 캡처를 위아래로 겹치게 나눈 조각 중 하나입니다.
+            맨 위·맨 아래 가장자리에서 잘려 일부만 보이는 줄은 넣지 마세요. (다른 조각에 온전히 들어 있습니다)
+            """;
+
     private final ChatClient chatClient;
     private final String model;
 
@@ -111,6 +118,18 @@ public class AnthropicVisionExtractor implements VisionExtractor {
     @Override
     public List<ExtractedComment> extractComments(byte[] image, String mediaType) {
         CommentList result = call(image, mediaType, COMMENT_PROMPT, CommentList.class);
+        return result == null || result.comments() == null ? List.of() : result.comments();
+    }
+
+    @Override
+    public List<ExtractedDeposit> extractDepositsFromPiece(byte[] image, String mediaType) {
+        DepositList result = call(image, mediaType, DEPOSIT_PROMPT + PIECE_NOTE, DepositList.class);
+        return result == null || result.deposits() == null ? List.of() : result.deposits();
+    }
+
+    @Override
+    public List<ExtractedComment> extractCommentsFromPiece(byte[] image, String mediaType) {
+        CommentList result = call(image, mediaType, COMMENT_PROMPT + PIECE_NOTE, CommentList.class);
         return result == null || result.comments() == null ? List.of() : result.comments();
     }
 

@@ -6,8 +6,13 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.ToIntFunction;
+import java.util.stream.Collectors;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ExternalApiException;
 import com.depositcock.deposit.BankStatementReader;
 import com.depositcock.deposit.DepositLine;
 import com.depositcock.deposit.DepositService;
@@ -71,14 +76,10 @@ public class ScreenshotService {
                     limitNotice(reservation, files.size()), true, reservation.remainingBefore());
         }
         int remainingAfter = reservation.remainingBefore() - files.size();
-        List<List<ExtractedDeposit>> perImage = new ArrayList<>();
-        for (MultipartFile file : files) {
-            List<ExtractedDeposit> list = new ArrayList<>(extractor.extractDeposits(bytes(file), mediaType(file)));
-            list.sort(Comparator.comparingInt(ExtractedDeposit::order));
-            perImage.add(list);
-        }
-        List<Item<ExtractedDeposit>> items = OverlapDeduplicator.dedupe(perImage,
-                d -> d.name() + "|" + d.amount() + "|" + d.datetime() + "|" + d.type());
+        List<Integer> failed = new ArrayList<>();
+        List<List<ExtractedDeposit>> perImage = readAll(files, failed, extractor::extractDeposits,
+                extractor::extractDepositsFromPiece, ExtractedDeposit::order, ScreenshotService::depositKey);
+        List<Item<ExtractedDeposit>> items = OverlapDeduplicator.dedupe(perImage, ScreenshotService::depositKey);
         List<DepositDraft> drafts = new ArrayList<>();
         int skipped = 0;
         for (Item<ExtractedDeposit> item : items) {
@@ -92,7 +93,8 @@ public class ScreenshotService {
                     type, item.duplicateSuspected(), item.imageIndex()));
         }
         return new DepositExtractResponse(drafts, skipped, extractor.provider(),
-                "AI가 읽은 결과입니다. 화면과 비교해 이름·금액을 꼭 확인하세요. (오늘 남은 캡처 " + remainingAfter + "장)",
+                "AI가 읽은 결과입니다. 화면과 비교해 이름·금액을 꼭 확인하세요." + failedNote(failed)
+                        + " (오늘 남은 캡처 " + remainingAfter + "장)",
                 false, remainingAfter);
     }
 
@@ -129,18 +131,71 @@ public class ScreenshotService {
                     true, reservation.remainingBefore());
         }
         int remainingAfter = reservation.remainingBefore() - files.size();
-        List<List<ExtractedComment>> perImage = new ArrayList<>();
-        for (MultipartFile file : files) {
-            List<ExtractedComment> list = new ArrayList<>(extractor.extractComments(bytes(file), mediaType(file)));
-            list.sort(Comparator.comparingInt(ExtractedComment::order));
-            perImage.add(list);
-        }
-        List<CommentDraft> drafts = OverlapDeduplicator.dedupe(perImage, c -> c.author() + "|" + c.content()).stream()
+        List<Integer> failed = new ArrayList<>();
+        List<List<ExtractedComment>> perImage = readAll(files, failed, extractor::extractComments,
+                extractor::extractCommentsFromPiece, ExtractedComment::order, ScreenshotService::commentKey);
+        List<CommentDraft> drafts = OverlapDeduplicator.dedupe(perImage, ScreenshotService::commentKey).stream()
                 .map(i -> new CommentDraft(nullToEmpty(i.value().author()).trim(), nullToEmpty(i.value().content()).trim(),
                         i.duplicateSuspected(), i.imageIndex()))
                 .toList();
         return new CommentExtractResponse(drafts, extractor.provider(),
-                "AI가 읽은 결과입니다. 작성자·내용을 확인하세요. (오늘 남은 캡처 " + remainingAfter + "장)", false, remainingAfter);
+                "AI가 읽은 결과입니다. 작성자·내용을 확인하세요." + failedNote(failed)
+                        + " (오늘 남은 캡처 " + remainingAfter + "장)", false, remainingAfter);
+    }
+
+    /**
+     * 올린 이미지를 한 장씩 읽는다.
+     * - 긴 캡처는 ImageSlicer 로 잘라서 조각마다 읽고, 조각 사이 겹침을 합쳐 한 장의 결과로 만든다
+     *   (우리가 자른 겹침이므로 "중복 의심" 표시는 하지 않는다).
+     * - 한 장이 실패해도 나머지는 계속 읽고, 실패한 장 번호를 failed 에 담는다. 전부 실패하면 첫 오류를 던진다.
+     */
+    private <T> List<List<T>> readAll(List<MultipartFile> files, List<Integer> failed,
+                                      BiFunction<byte[], String, List<T>> readWhole,
+                                      BiFunction<byte[], String, List<T>> readPiece,
+                                      ToIntFunction<T> order, Function<T, String> key) {
+        List<List<T>> perImage = new ArrayList<>();
+        ExternalApiException firstError = null;
+        for (int i = 0; i < files.size(); i++) {
+            MultipartFile file = files.get(i);
+            try {
+                List<ImageSlicer.Piece> pieces = ImageSlicer.slice(bytes(file), mediaType(file));
+                List<List<T>> perPiece = new ArrayList<>();
+                for (ImageSlicer.Piece piece : pieces) {
+                    List<T> list = new ArrayList<>(pieces.size() == 1
+                            ? readWhole.apply(piece.data(), piece.mediaType())
+                            : readPiece.apply(piece.data(), piece.mediaType()));
+                    list.sort(Comparator.comparingInt(order));
+                    perPiece.add(list);
+                }
+                perImage.add(OverlapDeduplicator.dedupe(perPiece, key).stream().map(Item::value).toList());
+            } catch (ExternalApiException e) {
+                failed.add(i + 1);
+                if (firstError == null) {
+                    firstError = e;
+                }
+                perImage.add(List.of());
+            }
+        }
+        if (firstError != null && failed.size() == files.size()) {
+            throw firstError;
+        }
+        return perImage;
+    }
+
+    private static String failedNote(List<Integer> failed) {
+        if (failed.isEmpty()) {
+            return "";
+        }
+        return " " + failed.stream().map(String::valueOf).collect(Collectors.joining(", "))
+                + "번째 캡처는 읽지 못했습니다. 그 부분은 직접 입력해 주세요.";
+    }
+
+    static String depositKey(ExtractedDeposit d) {
+        return d.name() + "|" + d.amount() + "|" + d.datetime() + "|" + d.type();
+    }
+
+    static String commentKey(ExtractedComment c) {
+        return c.author() + "|" + c.content();
     }
 
     private static String limitNotice(CaptureUsageService.Reservation r, int requested) {

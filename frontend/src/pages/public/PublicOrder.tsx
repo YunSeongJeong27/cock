@@ -27,6 +27,8 @@ interface Prefill {
   phone: string; depositorName: string; nickname: string | null; unitAddress: string | null; receiveMethod: ReceiveMethod
   pickupPointId: number | null; paymentMethod: PaymentMethod; recipientName: string | null; recipientPhone: string | null
   zipcode: string | null; address: string | null; addressDetail: string | null
+  /** true: 입금자명 + 뒷4자리로만 확인한 기기라 휴대폰·동호수·배송지는 비어 있음 */
+  limited: boolean
 }
 interface View {
   title: string; description: string | null; sellerName: string; acceptingOrders: boolean; closedReason: string | null; closeAt: string | null
@@ -70,7 +72,8 @@ export default function PublicOrder() {
   const [placed, setPlaced] = useState<Placed | null>(null)
   const [busy, setBusy] = useState(false)
   const [identify, setIdentify] = useState({ open: false, depositorName: '', phone: '', error: '' })
-  const [cancel, setCancel] = useState({ orderNo: '', phone: '', depositorName: '', open: false, error: '' })
+  const [cancel, setCancel] = useState<{ orderNo: string; phone: string; depositorName: string; open: boolean; error: string; choices: MyOrder[] }>(
+    { orderNo: '', phone: '', depositorName: '', open: false, error: '', choices: [] })
 
   const applyView = useCallback((v: View) => {
     setView(v)
@@ -147,22 +150,39 @@ export default function PublicOrder() {
     }
   }
 
-  async function doCancel(e: FormEvent) {
-    e.preventDefault()
+  async function doCancel(e: FormEvent | null, orderNo?: number) {
+    e?.preventDefault()
     try {
-      const v = await api.post<View>(`${base}/cancel`, { orderNo: Number(cancel.orderNo), phone: cancel.phone, depositorName: cancel.depositorName })
+      // 인터뷰 결과 4번: 휴대폰 번호 + 입금자명으로 취소. 주문이 여러 건이면 서버가 목록을 주고 고르게 한다.
+      const v = await api.post<View>(`${base}/cancel`, {
+        orderNo: orderNo ?? (cancel.orderNo ? Number(cancel.orderNo) : null), phone: cancel.phone, depositorName: cancel.depositorName,
+      })
       applyView(v)
-      setCancel({ orderNo: '', phone: '', depositorName: '', open: false, error: '' })
+      setCancel({ orderNo: '', phone: '', depositorName: '', open: false, error: '', choices: [] })
       setPlaced(null)
       alert('주문을 취소했습니다.')
     } catch (err) {
-      setCancel({ ...cancel, error: errorMessage(err) })
+      if (err instanceof ApiError && err.status === 409 && Array.isArray(err.body?.orders)) {
+        setCancel({ ...cancel, error: '', choices: err.body.orders })
+      } else {
+        setCancel({ ...cancel, error: errorMessage(err), choices: [] })
+      }
     }
   }
 
   function openCancel(orderNo?: number) {
-    setCancel({ orderNo: orderNo ? String(orderNo) : '', phone: form.phone, depositorName: form.depositorName, open: true, error: '' })
+    setCancel({ orderNo: orderNo ? String(orderNo) : '', phone: form.phone, depositorName: form.depositorName, open: true, error: '', choices: [] })
     setTimeout(() => document.getElementById('cancel-form')?.scrollIntoView({ behavior: 'smooth' }), 50)
+  }
+
+  /** 수량 상한: 남은 재고와 1인 최대 수량 중 작은 값 (1인 최대는 이미 주문한 수량을 서버가 합쳐서 다시 확인) */
+  function maxQty(p: PublicProduct): number {
+    const limits = [p.remaining, p.perOrderLimit].filter((n): n is number => n !== null && n !== undefined)
+    return limits.length ? Math.min(...limits) : 999
+  }
+
+  function setQtyFor(p: PublicProduct, value: number) {
+    setQty({ ...qty, [p.id]: Math.max(0, Math.min(maxQty(p), Number.isFinite(value) ? value : 0)) })
   }
 
   async function searchAddress() {
@@ -203,6 +223,10 @@ export default function PublicOrder() {
               <div>아래 계좌로 <b>{won(placed.expectedAmount)}</b>을 보내주세요.</div>
               <div className="row mt"><b>{placed.account.bankName} {placed.account.accountNumber}</b> ({placed.account.accountHolder}) <CopyButton text={placed.account.accountNumber} label="계좌 복사" /></div>
               <div className="warn-box">받는 분 통장 표시(입금자명)를 꼭 <b>{placed.depositorName}</b>(으)로 해주세요. 입금 확인이 빨라집니다.</div>
+              <div className="row mt">
+                <span className="small grow">입금하셨나요? 입금 후 눌러주세요. (판매자가 입금내역을 확인하면 "입금 확인됨"으로 바뀝니다)</span>
+                <button className="btn small primary" onClick={() => reportDeposit(placed.orderNo)}>입금했어요</button>
+              </div>
             </div>
           ) : <div className="mt">현장에서 결제해 주세요.</div>}
           <p className="small muted">이 화면 위쪽 "내 주문"에서 언제든 상태를 확인할 수 있습니다. 이 링크를 다시 열면 됩니다.</p>
@@ -254,6 +278,7 @@ export default function PublicOrder() {
       {view.acceptingOrders && (
         <form className="card" onSubmit={(e) => submit(e)}>
           <h3>{view.myOrders.length > 0 ? '추가 주문하기' : '주문서'}</h3>
+          {view.prefill?.limited && <div className="small muted mb">개인정보 보호를 위해 휴대폰 번호·주소는 다시 입력해 주세요.</div>}
           {view.products.map((p) => (
             <div key={p.id} className="product-row">
               <div>
@@ -262,9 +287,9 @@ export default function PublicOrder() {
               </div>
               {p.soldOut ? <span className="badge badge-CANCELLED">품절</span> : (
                 <div className="qty">
-                  <button type="button" onClick={() => setQty({ ...qty, [p.id]: Math.max(0, (qty[p.id] ?? 0) - 1) })}>−</button>
-                  <input type="number" min={0} value={qty[p.id] ?? 0} onChange={(e) => setQty({ ...qty, [p.id]: Math.max(0, Number(e.target.value)) })} />
-                  <button type="button" onClick={() => setQty({ ...qty, [p.id]: (qty[p.id] ?? 0) + 1 })}>+</button>
+                  <button type="button" onClick={() => setQtyFor(p, (qty[p.id] ?? 0) - 1)}>−</button>
+                  <input type="number" min={0} max={maxQty(p)} value={qty[p.id] ?? 0} onChange={(e) => setQtyFor(p, Number(e.target.value))} />
+                  <button type="button" disabled={(qty[p.id] ?? 0) >= maxQty(p)} onClick={() => setQtyFor(p, (qty[p.id] ?? 0) + 1)}>+</button>
                 </div>
               )}
             </div>
@@ -353,17 +378,31 @@ export default function PublicOrder() {
       )}
 
       <div className="card" id="cancel-form">
-        {!cancel.open ? (
+        {!view.acceptingOrders ? (
+          <div className="small muted">주문이 마감되어 여기서는 취소할 수 없습니다. 취소가 필요하면 판매자에게 문의해 주세요.</div>
+        ) : !cancel.open ? (
           <div className="row between"><span className="small">주문을 취소하시려면</span><button className="btn small danger" onClick={() => openCancel()}>주문 취소</button></div>
         ) : (
-          <form onSubmit={doCancel}>
+          <form onSubmit={(e) => doCancel(e)}>
             <h3>주문 취소</h3>
-            <p className="small muted">주문번호와 주문할 때 적은 휴대폰 번호·입금자명을 입력하세요. 마감 후에는 취소할 수 없습니다. 입금 확인된 주문은 취소 후 판매자가 환불합니다.</p>
-            <label className="field"><span>주문번호</span><input type="number" value={cancel.orderNo} onChange={(e) => setCancel({ ...cancel, orderNo: e.target.value })} required /></label>
-            <label className="field"><span>휴대폰 번호</span><input type="tel" value={cancel.phone} onChange={(e) => setCancel({ ...cancel, phone: e.target.value })} required /></label>
-            <label className="field"><span>입금자명</span><input type="text" value={cancel.depositorName} onChange={(e) => setCancel({ ...cancel, depositorName: e.target.value })} required /></label>
+            <p className="small muted">주문할 때 적은 휴대폰 번호와 입금자명을 입력하세요. 주문이 여러 건이면 취소할 주문을 고르게 됩니다. 입금 확인된 주문은 취소 후 판매자가 환불합니다.</p>
+            <label className="field"><span>휴대폰 번호</span><input type="tel" value={cancel.phone} onChange={(e) => setCancel({ ...cancel, phone: e.target.value, choices: [] })} required /></label>
+            <label className="field"><span>입금자명</span><input type="text" value={cancel.depositorName} onChange={(e) => setCancel({ ...cancel, depositorName: e.target.value, choices: [] })} required /></label>
+            {cancel.orderNo && cancel.choices.length === 0 && <div className="small muted mb">{cancel.orderNo}번 주문을 취소합니다.</div>}
             <ErrorBox message={cancel.error} />
-            <div className="row"><button className="btn danger">취소하기</button><button type="button" className="btn" onClick={() => setCancel({ ...cancel, open: false })}>닫기</button></div>
+            {cancel.choices.length > 0 ? (
+              <div>
+                <div className="small mb"><b>취소할 주문을 골라주세요.</b></div>
+                {cancel.choices.map((o) => (
+                  <div key={o.orderNo} className="row between" style={{ borderTop: '1px solid var(--line)', padding: '8px 0' }}>
+                    <span className="small">{o.orderNo}번 · {o.items.map((i) => `${i.productName} ${i.quantity}개`).join(', ')} · {won(o.expectedAmount)} · {o.statusLabel}</span>
+                    <button type="button" className="btn small danger" onClick={() => doCancel(null, o.orderNo)}>이 주문 취소</button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="row"><button className="btn danger">취소하기</button><button type="button" className="btn" onClick={() => setCancel({ ...cancel, open: false })}>닫기</button></div>
+            )}
           </form>
         )}
       </div>

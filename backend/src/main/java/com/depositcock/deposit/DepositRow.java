@@ -60,6 +60,11 @@ public class DepositRow {
     }
 
     public String dedupeKey() {
+        return dedupeKey(depositorName, amount, datetimeText);
+    }
+
+    /** 같은 입금인지 비교하는 키 (이름 + 금액 + 시각 원문) */
+    public static String dedupeKey(String depositorName, int amount, String datetimeText) {
         return depositorName + "|" + amount + "|" + (datetimeText == null ? "" : datetimeText);
     }
 

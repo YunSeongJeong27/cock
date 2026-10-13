@@ -11,6 +11,8 @@ spring:
       hibernate:
         jdbc:
           time_zone: Asia/Seoul
+        # 지연 로딩 N+1 완화 (주문 목록 → 주문 상품, 픽업 지점 등을 묶어서 읽음)
+        default_batch_fetch_size: 100
   flyway:
     enabled: true
   servlet:
@@ -22,7 +24,9 @@ spring:
 
 server:
   error:
-    include-message: always
+    # 예상 못 한 오류의 내부 메시지는 응답에 넣지 않는다 (ApiExceptionHandler 가 ProblemDetail 로 응답)
+    include-message: never
+    include-stacktrace: never
 
 app:
   zone: Asia/Seoul
@@ -36,6 +40,8 @@ app:
   admin-password: ${APP_ADMIN_PASSWORD:}
   # 공개 주문 API: IP 하나당 1분에 허용하는 요청 수
   public-rate-limit-per-minute: 60
+  # 본인 확인·주문 취소: (IP + 공구)마다 10분에 허용하는 요청 수 (뒷4자리 대입 방지)
+  sensitive-rate-limit-per-10-minutes: 20
   vision:
     # fake | anthropic
     provider: ${APP_VISION_PROVIDER:fake}

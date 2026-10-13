@@ -32,8 +32,11 @@ public class Product {
     /** null 이면 재고 제한 없음 */
     private Integer stockLimit;
 
-    /** 판매된 수량. 주문/취소 시 ProductRepository 의 원자 UPDATE 로만 바꾼다. */
-    @Column(nullable = false)
+    /**
+     * 판매된 수량. 주문/취소 시 ProductRepository 의 원자 UPDATE 로만 바꾼다.
+     * updatable = false: 판매자가 상품을 수정할 때 메모리의 옛 값으로 덮어써서 재고가 틀어지는 것 방지.
+     */
+    @Column(nullable = false, updatable = false)
     private int sold;
 
     /** null 이면 1인 최대 수량 제한 없음 */

@@ -43,7 +43,8 @@ public final class OrderDtos {
     public record IdentifyRequest(@NotBlank String depositorName, @NotBlank String phone) {
     }
 
-    public record CancelRequest(@Min(1) int orderNo, @NotBlank String phone, @NotBlank String depositorName) {
+    /** orderNo 는 같은 정보의 주문이 여러 건일 때만 필요 */
+    public record CancelRequest(@Min(1) Integer orderNo, @NotBlank String phone, @NotBlank String depositorName) {
     }
 
     public record PublicProduct(Long id, String name, int unitPrice, Integer remaining, Integer perOrderLimit,
@@ -74,10 +75,13 @@ public final class OrderDtos {
             LocalDateTime orderedAt) {
     }
 
+    /**
+     * @param limited true 면 "입금자명 + 뒷4자리"로만 확인한 기기라 휴대폰·동호수·배송지를 비워서 준다
+     */
     public record Prefill(String phone, String depositorName, String nickname, String unitAddress,
                           ReceiveMethod receiveMethod, Long pickupPointId, PaymentMethod paymentMethod,
                           String recipientName, String recipientPhone, String zipcode, String address,
-                          String addressDetail) {
+                          String addressDetail, boolean limited) {
     }
 
     public record PublicGroupBuy(

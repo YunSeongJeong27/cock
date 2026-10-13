@@ -234,7 +234,7 @@ public class BankStatementReader {
                 String name = get(row, nameIdx).trim();
                 Integer amount = parseAmount(get(row, amountIdx));
                 String type = typeIdx >= 0 ? get(row, typeIdx) : "";
-                if (name.isEmpty() || amount == null || amount <= 0 || type.contains("이자")) {
+                if (name.isEmpty() || amount == null || amount <= 0 || excludedType(type)) {
                     skipped++;
                     continue;
                 }
@@ -250,6 +250,14 @@ public class BankStatementReader {
                         + "아래에서 입금자명 열과 금액 열을 직접 골라주세요.";
         return new ParsedStatement(manual ? requested : new ColumnMapping(null, null, null, null), false, 0,
                 List.of(), options, preview, List.of(), 0, message);
+    }
+
+    /**
+     * 거래 유형 값으로 제외할 줄: 이자(정리본 6-1장), 그리고 출금·지급.
+     * 금액이 항상 양수이고 '구분' 열로 입금/출금을 나누는 은행 형식에서 출금이 입금으로 섞이지 않게 한다.
+     */
+    static boolean excludedType(String type) {
+        return type.contains("이자") || type.contains("출금") || type.contains("지급");
     }
 
     private static List<String> columnOptions(List<List<String>> rows) {

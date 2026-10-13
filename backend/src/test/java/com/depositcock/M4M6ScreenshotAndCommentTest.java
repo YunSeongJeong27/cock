@@ -211,4 +211,26 @@ class M4M6ScreenshotAndCommentTest extends IntegrationTest {
         mvc.perform(get("/api/seller/capture-usage").cookie(seller))
                 .andExpect(jsonPath("$.usage.usedToday").value(3));
     }
+
+    /** 여러 장 중 한 장이 실패해도 나머지 결과는 살리고, 실패한 장 번호를 알려준다. 전부 실패면 502. */
+    @Test
+    void partialFailureKeepsOtherImages() throws Exception {
+        when(visionExtractor.available()).thenReturn(true);
+        when(visionExtractor.provider()).thenReturn("test");
+        when(visionExtractor.extractDeposits(any(), anyString()))
+                .thenReturn(List.of(new ExtractedDeposit("김지영", 3800, "", "입금", 0)))
+                .thenThrow(new com.depositcock.common.ExternalApiException("거절"))
+                .thenReturn(List.of(new ExtractedDeposit("박서준", 1900, "", "입금", 0)));
+        Cookie seller = signup(uniqueEmail());
+        long id = openGroupBuy(seller, groupBuyBody("부분 실패", List.of(product("x", 1000, null))));
+        String url = "/api/seller/group-buys/" + id + "/deposits/screenshots/extract";
+        mvc.perform(multipart(url).file(image("1.png")).file(image("2.png")).file(image("3.png")).cookie(seller))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deposits.length()").value(2))
+                .andExpect(jsonPath("$.notice").value(org.hamcrest.Matchers.containsString("2번째 캡처는 읽지 못했습니다")));
+
+        when(visionExtractor.extractDeposits(any(), anyString()))
+                .thenThrow(new com.depositcock.common.ExternalApiException("비전 AI 호출 실패"));
+        mvc.perform(multipart(url).file(image("1.png")).cookie(seller)).andExpect(status().isBadGateway());
+    }
 }

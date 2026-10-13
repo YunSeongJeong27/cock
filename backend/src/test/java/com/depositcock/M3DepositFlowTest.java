@@ -196,4 +196,28 @@ class M3DepositFlowTest extends IntegrationTest {
         mvc.perform(multipart("/api/seller/group-buys/" + otherId + "/deposits/uploads").file(csv(content))
                 .param("presetId", preset.get("id").asText()).cookie(other)).andExpect(status().isNotFound());
     }
+
+    /** 날짜만 있는 파일: 같은 사람이 같은 날 같은 금액을 두 번 입금(주문 2건) → 같은 파일 안의 두 줄은 둘 다 저장 */
+    @Test
+    void sameDaySameAmountTwiceIsKept() throws Exception {
+        Cookie seller = signup(uniqueEmail());
+        long id = openGroupBuy(seller, "두 번 입금", 5000);
+        placeOrder(seller, id, "010-7000-0001", "김지영");
+        placeOrder(seller, id, "010-7000-0001", "김지영");
+        String content = "거래일자,입금자명,입금액\n2025-11-01,김지영,5000\n2025-11-01,김지영,5000\n";
+        mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/uploads").file(csv(content)).cookie(seller))
+                .andExpect(jsonPath("$.savedCount").value(2))
+                .andExpect(jsonPath("$.duplicateCount").value(0));
+        // 같은 파일을 다시 올리면 2줄 다 건너뜀, 3줄짜리(새 1줄 포함)를 올리면 1줄만 저장
+        mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/uploads").file(csv(content)).cookie(seller))
+                .andExpect(jsonPath("$.savedCount").value(0))
+                .andExpect(jsonPath("$.duplicateCount").value(2));
+        mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/uploads")
+                        .file(csv(content + "2025-11-01,김지영,5000\n")).cookie(seller))
+                .andExpect(jsonPath("$.savedCount").value(1));
+
+        // 판매자가 직접 고를 수 있는 주문 목록(openOrders)에는 다른 입금에 추천된 주문도 들어 있다
+        JsonNode match = read(mvc.perform(get("/api/seller/group-buys/" + id + "/deposits/match").cookie(seller)).andReturn());
+        assertThat(match.get("openOrders")).hasSize(2);
+    }
 }

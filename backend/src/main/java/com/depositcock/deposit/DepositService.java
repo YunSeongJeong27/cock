@@ -99,18 +99,21 @@ public class DepositService {
     public record SaveResult(Long uploadId, int saved, int duplicates) {
     }
 
-    /** 입금 줄 저장. 같은 공구에 이미 올라온 같은 입금(이름·금액·시각 원문 같음)은 건너뛴다. */
+    /**
+     * 입금 줄 저장. 같은 공구에 이미 올라온 같은 입금(이름·금액·시각 원문 같음)은 건너뛴다.
+     * 개수로 센다: 날짜만 있는 은행 파일에서 같은 사람이 같은 날 같은 금액을 두 번 입금한 경우(주문 2건)
+     * 같은 파일 안의 두 줄은 둘 다 저장하고, 같은 파일을 다시 올리면 이미 있는 개수만큼만 건너뛴다.
+     */
     @Transactional
     public SaveResult saveDeposits(Long groupBuyId, DepositSource source, String fileName, List<DepositLine> lines) {
-        Set<String> existing = rowRepository.findByGroupBuyId(groupBuyId).stream().map(DepositRow::dedupeKey)
-                .collect(Collectors.toCollection(HashSet::new));
+        Map<String, Integer> existing = existingCounts(groupBuyId);
         DepositUpload upload = uploadRepository.save(new DepositUpload(groupBuyId, source, fileName, LocalDateTime.now(clock)));
         int saved = 0;
         int duplicates = 0;
         for (DepositLine line : lines) {
             DepositRow row = new DepositRow(upload.getId(), line.rowNo(), line.name(), line.amount(), line.dateText(),
                     line.depositedAt());
-            if (!existing.add(row.dedupeKey())) {
+            if (consume(existing, row.dedupeKey())) {
                 duplicates++;
                 continue;
             }
@@ -118,6 +121,22 @@ public class DepositService {
             saved++;
         }
         return new SaveResult(upload.getId(), saved, duplicates);
+    }
+
+    private Map<String, Integer> existingCounts(Long groupBuyId) {
+        Map<String, Integer> counts = new HashMap<>();
+        rowRepository.findByGroupBuyId(groupBuyId).forEach(r -> counts.merge(r.dedupeKey(), 1, Integer::sum));
+        return counts;
+    }
+
+    /** 이미 있는 같은 입금이 남아 있으면 하나 차감하고 true */
+    private static boolean consume(Map<String, Integer> counts, String key) {
+        Integer left = counts.get(key);
+        if (left == null || left <= 0) {
+            return false;
+        }
+        counts.put(key, left - 1);
+        return true;
     }
 
     public List<UploadSummary> uploads(Long sellerId, Long groupBuyId) {
@@ -186,7 +205,9 @@ public class DepositService {
                             r.getUsedOrderId(), o == null ? 0 : o.getOrderNo());
                 }).toList();
         List<OrderBrief> unpaid = outcome.unpaid().stream().map(p -> brief(orderById.get(p.orderId()))).toList();
-        return new MatchResponse(matchRows, unpaid, used, matched, suggested, ambiguous, unrelated);
+        // 판매자가 직접 고를 수 있는 주문: 다른 입금에 추천된 주문까지 포함한 모든 미입금 선입금 주문
+        List<OrderBrief> openOrders = payees.stream().map(p -> brief(orderById.get(p.orderId()))).toList();
+        return new MatchResponse(matchRows, unpaid, openOrders, used, matched, suggested, ambiguous, unrelated);
     }
 
     private static String statusLabel(Result r) {
@@ -244,6 +265,7 @@ public class DepositService {
                     .ifPresent(aliasRepository::delete);
         }
         rowRepository.findByUsedOrderId(order.getId()).ifPresent(DepositRow::release);
+        // 취소된 주문이면 "입금 확정"이 잘못이었다는 뜻이므로 "환불 필요"도 함께 거둔다
         order.cancelPaid(LocalDateTime.now(clock));
     }
 
@@ -339,11 +361,10 @@ public class DepositService {
     }
 
     private int countDuplicates(Long groupBuyId, List<DepositLine> lines) {
-        Set<String> existing = rowRepository.findByGroupBuyId(groupBuyId).stream().map(DepositRow::dedupeKey)
-                .collect(Collectors.toSet());
+        Map<String, Integer> existing = existingCounts(groupBuyId);
         int count = 0;
         for (DepositLine l : lines) {
-            if (existing.contains(l.name() + "|" + l.amount() + "|" + (l.dateText() == null ? "" : l.dateText()))) {
+            if (consume(existing, DepositRow.dedupeKey(l.name(), l.amount(), l.dateText()))) {
                 count++;
             }
         }

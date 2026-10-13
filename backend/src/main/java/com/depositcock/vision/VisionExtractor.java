@@ -17,4 +17,15 @@ public interface VisionExtractor {
     List<ExtractedDeposit> extractDeposits(byte[] image, String mediaType);
 
     List<ExtractedComment> extractComments(byte[] image, String mediaType);
+
+    /**
+     * 긴 캡처를 자른 조각을 읽는다. 조각 경계에서 잘린 줄은 빼도록 알려줄 수 있는 구현은 이 메서드를 다시 정의한다.
+     */
+    default List<ExtractedDeposit> extractDepositsFromPiece(byte[] image, String mediaType) {
+        return extractDeposits(image, mediaType);
+    }
+
+    default List<ExtractedComment> extractCommentsFromPiece(byte[] image, String mediaType) {
+        return extractComments(image, mediaType);
+    }
 }

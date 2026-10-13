@@ -137,4 +137,17 @@ class BankStatementReaderTest {
         assertThatThrownBy(() -> reader.read("문서.pdf", new byte[]{'%', 'P', 'D', 'F'}, null))
                 .isInstanceOf(ApiException.class).hasMessageContaining("PDF");
     }
+
+    /** 금액이 항상 양수이고 '구분'으로 입금/출금을 나누는 형식: 출금·지급 줄은 빠진다 */
+    @Test
+    void unsignedAmountWithTypeColumn() {
+        String csv = "거래일시,구분,내용,거래금액\n"
+                + "2025-11-01 10:00:00,입금,김지영,3800\n"
+                + "2025-11-01 11:00:00,출금,편의점,5000\n"
+                + "2025-11-01 12:00:00,지급,카드대금,7000\n"
+                + "2025-11-01 13:00:00,입금,박서준,1900\n";
+        ParsedStatement parsed = reader.read("x.csv", csv.getBytes(StandardCharsets.UTF_8), null);
+        assertThat(parsed.deposits()).extracting(DepositLine::name).containsExactly("김지영", "박서준");
+        assertThat(parsed.skippedRows()).isEqualTo(2);
+    }
 }

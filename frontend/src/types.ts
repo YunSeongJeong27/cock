@@ -189,6 +189,8 @@ export interface MatchRow {
 export interface MatchResponse {
   rows: MatchRow[]
   unpaid: OrderBrief[]
+  /** 판매자가 직접 고를 수 있는 모든 미입금 선입금 주문 (다른 입금에 추천된 주문 포함) */
+  openOrders: OrderBrief[]
   used: { rowId: number; depositorName: string; amount: number; datetimeText: string | null; orderId: number; orderNo: number }[]
   matchedCount: number
   suggestedCount: number

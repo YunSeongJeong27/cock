@@ -35,20 +35,39 @@ public class CustomerDevice {
     @Column(nullable = false)
     private LocalDateTime lastSeenAt;
 
+    /** 이 기기에서 주문을 직접 넣었는지. false 면 "입금자명 + 뒷4자리"로만 확인한 기기 */
+    @Column(nullable = false)
+    private boolean verifiedByOrder;
+
     protected CustomerDevice() {
     }
 
-    public CustomerDevice(Long groupBuyId, String cookieToken, String customerKey, LocalDateTime now) {
+    public CustomerDevice(Long groupBuyId, String cookieToken, String customerKey, boolean verifiedByOrder,
+                          LocalDateTime now) {
         this.groupBuyId = groupBuyId;
         this.cookieToken = cookieToken;
         this.customerKey = customerKey;
+        this.verifiedByOrder = verifiedByOrder;
         this.createdAt = now;
         this.lastSeenAt = now;
     }
 
-    public void seen(String customerKey, LocalDateTime now) {
+    /**
+     * 이 기기를 customerKey 의 기기로 기억한다.
+     * 주문으로 확인되면 true 로 올리고, 다른 사람으로 바뀌면 그 사람 기준으로 다시 정한다.
+     */
+    public void seen(String customerKey, boolean byOrder, LocalDateTime now) {
+        if (!customerKey.equals(this.customerKey)) {
+            this.verifiedByOrder = byOrder;
+        } else if (byOrder) {
+            this.verifiedByOrder = true;
+        }
         this.customerKey = customerKey;
         this.lastSeenAt = now;
+    }
+
+    public boolean isVerifiedByOrder() {
+        return verifiedByOrder;
     }
 
     public Long getId() {

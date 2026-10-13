@@ -49,9 +49,14 @@ public final class DepositDtos {
     public record UsedRow(Long rowId, String depositorName, int amount, String datetimeText, Long orderId, int orderNo) {
     }
 
+    /**
+     * @param unpaid     어떤 입금과도 연결되지 않은 미입금 주문
+     * @param openOrders 판매자가 직접 고를 수 있는 모든 미입금 선입금 주문 (다른 입금에 추천된 주문 포함)
+     */
     public record MatchResponse(
             List<MatchRow> rows,
             List<OrderBrief> unpaid,
+            List<OrderBrief> openOrders,
             List<UsedRow> used,
             int matchedCount,
             int suggestedCount,

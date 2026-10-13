@@ -12,3 +12,4 @@ app:
   admin-email: admin@test.local
   admin-password: admin1234
   public-rate-limit-per-minute: 10000
+  sensitive-rate-limit-per-10-minutes: 10000
