@@ -66,6 +66,13 @@
             <version>${poi.version}</version>
         </dependency>
 
+        <!-- 비전 AI(스크린샷 글자 읽기). VisionExtractor 구현체 중 하나 -->
+        <dependency>
+            <groupId>com.anthropic</groupId>
+            <artifactId>anthropic-java</artifactId>
+            <version>2.34.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

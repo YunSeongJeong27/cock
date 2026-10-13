@@ -1,0 +1,152 @@
+package com.depositcock;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import com.depositcock.support.IntegrationTest;
+import com.depositcock.vision.ExtractedComment;
+import com.depositcock.vision.ExtractedDeposit;
+import com.depositcock.vision.VisionExtractor;
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * M4: 은행앱 스크린샷 → 추출 → 검수 → 저장 → 대조. M6: 댓글 → 집계 → 주문 반영 → 입금 대조.
+ * 비전 AI 는 가짜(Mockito)로 바꿔서 테스트한다. 실제 AI 정확도는 실제 캡처로 따로 확인해야 한다 (미검증).
+ */
+class M4M6ScreenshotAndCommentTest extends IntegrationTest {
+
+    @MockitoBean
+    VisionExtractor visionExtractor;
+
+    private long openGroupBuy(Cookie seller, Map<String, Object> body) throws Exception {
+        JsonNode created = read(mvc.perform(withJson(post("/api/seller/group-buys").cookie(seller), body)).andReturn());
+        long id = created.get("id").asLong();
+        mvc.perform(post("/api/seller/group-buys/" + id + "/open").cookie(seller)).andExpect(status().isOk());
+        return id;
+    }
+
+    private static MockMultipartFile image(String name) {
+        return new MockMultipartFile("files", name, "image/png", new byte[]{1, 2, 3});
+    }
+
+    @Test
+    void bankScreenshotFlow() throws Exception {
+        when(visionExtractor.available()).thenReturn(true);
+        when(visionExtractor.provider()).thenReturn("test");
+        when(visionExtractor.extractDeposits(any(), anyString())).thenReturn(
+                List.of(new ExtractedDeposit("김지영", 3800, "10-08 10:01", "입금", 0),
+                        new ExtractedDeposit("편의점", 5000, "10-08 11:00", "출금", 1)),
+                List.of(new ExtractedDeposit("편의점", 5000, "10-08 11:00", "출금", 0),
+                        new ExtractedDeposit("박[?]준", 3800, "10-08 12:00", "입금", 1)));
+
+        Cookie seller = signup(uniqueEmail());
+        long id = openGroupBuy(seller, groupBuyBody("파프리카", List.of(product("파프리카", 3800, null))));
+        JsonNode g = read(mvc.perform(get("/api/seller/group-buys/" + id).cookie(seller)).andReturn());
+        Map<String, Object> order = new HashMap<>();
+        order.put("items", List.of(Map.of("productId", g.get("products").get(0).get("id").asLong(), "quantity", 1)));
+        order.put("phone", "010-3000-0001");
+        order.put("depositorName", "김지영");
+        order.put("acknowledgeWarnings", true);
+        mvc.perform(withJson(post("/api/public/g/" + g.get("publicToken").asText() + "/orders"), order)).andExpect(status().isOk());
+
+        JsonNode extracted = read(mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/screenshots/extract")
+                        .file(image("a.png")).file(image("b.png")).cookie(seller))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(extracted.get("deposits")).hasSize(2);
+        assertThat(extracted.get("skippedWithdrawals").asInt()).isEqualTo(1); // 겹친 출금 1건은 중복 제거 후 1번만
+        assertThat(extracted.get("deposits").get(1).get("name").asText()).isEqualTo("박[?]준");
+
+        // [?] 가 남아 있으면 저장 불가
+        mvc.perform(withJson(post("/api/seller/group-buys/" + id + "/deposits/screenshots/save").cookie(seller),
+                Map.of("rows", List.of(Map.of("name", "박[?]준", "amount", 3800))))).andExpect(status().isBadRequest());
+        mvc.perform(withJson(post("/api/seller/group-buys/" + id + "/deposits/screenshots/save").cookie(seller),
+                        Map.of("rows", List.of(Map.of("name", "김지영", "amount", 3800, "datetimeText", "10-08 10:01"),
+                                Map.of("name", "박서준", "amount", 3800)))))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/seller/group-buys/" + id + "/deposits/match").cookie(seller))
+                .andExpect(jsonPath("$.matchedCount").value(1));
+
+        // 이미지가 아닌 파일은 거부
+        mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/screenshots/extract")
+                .file(new MockMultipartFile("files", "a.txt", "text/plain", new byte[]{1})).cookie(seller))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void commentFlowToOrdersAndDeposit() throws Exception {
+        when(visionExtractor.available()).thenReturn(true);
+        when(visionExtractor.provider()).thenReturn("test");
+        when(visionExtractor.extractComments(any(), anyString())).thenReturn(
+                List.of(new ExtractedComment("꼭지맘 217-1505", "1", 0), new ExtractedComment("205-1205", "1 7시이후 픽업", 1)),
+                List.of(new ExtractedComment("205-1205", "1 7시이후 픽업", 0), new ExtractedComment("망고맘", "1", 1)));
+
+        Cookie seller = signup(uniqueEmail());
+        Map<String, Object> body = groupBuyBody("파프리카 공구", List.of(product("파프리카 한봉지", 1900, null)));
+        body.put("adminNames", "공구장");
+        long id = openGroupBuy(seller, body);
+        String base = "/api/seller/group-buys/" + id + "/comments";
+
+        JsonNode extracted = read(mvc.perform(multipart(base + "/extract").file(image("1.png")).file(image("2.png")).cookie(seller))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(extracted.get("comments")).hasSize(3);
+        assertThat(extracted.get("comments").get(1).get("duplicateSuspected").asBoolean()).isTrue();
+
+        mvc.perform(withJson(post(base).cookie(seller), Map.of("source", "SCREENSHOT", "comments", extracted.get("comments"))))
+                .andExpect(jsonPath("$.savedCount").value(3));
+
+        JsonNode text = read(mvc.perform(withJson(post(base + "/parse-text").cookie(seller), Map.of("text",
+                "쏠 | 1\n신한화 | 1\n캐파101동 | 1\n신지 | 1\n공구장 | 🚫🚫1시부터 현장구매부탁드려요 댓글 ❌🚫🚫\n"))).andReturn());
+        mvc.perform(withJson(post(base).cookie(seller), Map.of("source", "TEXT", "comments", text.get("comments"))))
+                .andExpect(jsonPath("$.savedCount").value(5));
+
+        JsonNode list = read(mvc.perform(get(base).cookie(seller)).andExpect(status().isOk()).andReturn());
+        assertThat(list.get("customers")).hasSize(7);
+        assertThat(list.get("totalQuantity").asInt()).isEqualTo(7);
+        long productId = list.get("productId").asLong();
+
+        mvc.perform(withJson(post(base + "/apply").cookie(seller), Map.of("productId", productId)))
+                .andExpect(jsonPath("$.createdCount").value(7));
+        // 다시 반영해도 중복되지 않는다
+        mvc.perform(withJson(post(base + "/apply").cookie(seller), Map.of("productId", productId)))
+                .andExpect(jsonPath("$.createdCount").value(7));
+        mvc.perform(get("/api/seller/group-buys/" + id + "/dashboard").cookie(seller))
+                .andExpect(jsonPath("$.orderCount").value(7))
+                .andExpect(jsonPath("$.totalAmount").value(13300));
+
+        // 댓글 주문도 입금 대조: 닉네임 숫자 "2171505" → 꼭지맘 217-1505
+        mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/uploads")
+                        .file(new MockMultipartFile("file", "x.csv", "text/csv", "입금자명,입금액\n2171505,1900\n".getBytes()))
+                        .cookie(seller))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/seller/group-buys/" + id + "/deposits/match").cookie(seller))
+                .andExpect(jsonPath("$.rows[0].status").value("MATCHED"))
+                .andExpect(jsonPath("$.rows[0].order.nickname").value("꼭지맘 217-1505"));
+    }
+
+    @Test
+    void notConfiguredVisionReturnsNotice() throws Exception {
+        when(visionExtractor.available()).thenReturn(false);
+        when(visionExtractor.provider()).thenReturn("none");
+        Cookie seller = signup(uniqueEmail());
+        long id = openGroupBuy(seller, groupBuyBody("x", List.of(product("x", 1000, null))));
+        mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/screenshots/extract").file(image("a.png")).cookie(seller))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deposits").isEmpty())
+                .andExpect(jsonPath("$.notice").exists());
+    }
+}

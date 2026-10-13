@@ -333,6 +333,11 @@ public class BankStatementReader {
         return null;
     }
 
+    /** 다른 경로(스크린샷 등)에서 입금 시각 원문을 변환할 때 쓴다. */
+    public static LocalDateTime parseDateTimeText(String raw) {
+        return parseDateTime(raw);
+    }
+
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
     }

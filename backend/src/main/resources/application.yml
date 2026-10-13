@@ -40,4 +40,4 @@ app:
     # fake | anthropic
     provider: ${APP_VISION_PROVIDER:fake}
     anthropic-api-key: ${ANTHROPIC_API_KEY:}
-    anthropic-model: ${APP_VISION_MODEL:claude-sonnet-5-5}
+    anthropic-model: ${APP_VISION_MODEL:claude-opus-5-5}

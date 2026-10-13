@@ -21,4 +21,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Modifying(flushAutomatically = true)
     @Query("update Product p set p.sold = p.sold - :quantity where p.id = :productId and p.sold >= :quantity")
     int decreaseSold(@Param("productId") Long productId, @Param("quantity") int quantity);
+
+    /** 댓글 주문 반영용: 이미 받은 댓글 주문이라 재고 한도와 상관없이 판매 수량에 더한다. */
+    @Modifying(flushAutomatically = true)
+    @Query("update Product p set p.sold = p.sold + :quantity where p.id = :productId")
+    int addSoldUnchecked(@Param("productId") Long productId, @Param("quantity") int quantity);
 }
