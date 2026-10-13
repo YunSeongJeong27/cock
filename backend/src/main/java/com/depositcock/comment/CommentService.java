@@ -10,6 +10,8 @@ import java.util.regex.Pattern;
 import com.depositcock.comment.OrderAggregator.CustomerTotal;
 import com.depositcock.common.ApiException;
 import com.depositcock.common.Tokens;
+import com.depositcock.customer.Customer;
+import com.depositcock.customer.Customers;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.GroupBuyRepository;
 import com.depositcock.groupbuy.GroupBuyService;
@@ -37,12 +39,15 @@ public class CommentService {
     private final ImportedCommentRepository commentRepository;
     private final CustomerOrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final Customers customers;
     private final EntityManager entityManager;
     private final Clock clock;
 
     public CommentService(GroupBuyService groupBuyService, GroupBuyRepository groupBuyRepository,
                           ImportedCommentRepository commentRepository, CustomerOrderRepository orderRepository,
-                          ProductRepository productRepository, EntityManager entityManager, Clock clock) {
+                          ProductRepository productRepository, Customers customers, EntityManager entityManager,
+                          Clock clock) {
+        this.customers = customers;
         this.groupBuyService = groupBuyService;
         this.groupBuyRepository = groupBuyRepository;
         this.commentRepository = commentRepository;
@@ -190,9 +195,11 @@ public class CommentService {
             if (t.quantity() <= 0) {
                 continue; // 확인 필요만 있고 수량 미정인 고객은 판매자가 수량을 정한 뒤 다시 반영
             }
-            CustomerOrder order = new CustomerOrder(groupBuy, ++orderNo, OrderSource.COMMENT, t.customerKey(),
+            // 댓글 고객은 휴대폰을 모르므로 댓글 닉네임으로 알아본다
+            Customer customer = customers.byCommentNickname(groupBuy.getSeller().getId(), t.authorName().trim(), now);
+            CustomerOrder order = new CustomerOrder(groupBuy, ++orderNo, OrderSource.COMMENT, customer,
                     Tokens.random(16), now);
-            order.fillCustomer(null, null, t.authorName(), null);
+            order.fillCustomer(null, t.authorName(), null);
             order.fillReceive(receive, null, payment);
             order.addItem(new OrderItem(order, product, t.quantity()));
             order.fillAmounts(product.getUnitPrice() * t.quantity(), 0);
@@ -201,6 +208,8 @@ public class CommentService {
             created++;
         }
         entityManager.refresh(product);
+        // 다시 반영으로 주문이 하나도 남지 않은 댓글 고객은 지운다
+        customers.deleteWithoutOrders(groupBuy.getSeller().getId());
         return created;
     }
 

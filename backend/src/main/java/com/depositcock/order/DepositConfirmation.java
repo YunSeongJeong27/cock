@@ -48,8 +48,8 @@ public class DepositConfirmation {
     @Enumerated(EnumType.STRING)
     private PaidAliasChange aliasChange;
 
-    /** aliasChange 가 CHANGED 일 때 바꾸기 전 고객 키 */
-    private String aliasPreviousKey;
+    /** aliasChange 가 CHANGED 일 때 바꾸기 전 고객 id (그 고객이 지워졌으면 null) */
+    private Long aliasPreviousCustomerId;
 
     @Column(nullable = false)
     private LocalDateTime confirmedAt;
@@ -75,9 +75,9 @@ public class DepositConfirmation {
     }
 
     /** 확정 때 별칭을 만들었거나 바꿨으면 기록한다 */
-    public void recordAliasChange(PaidAliasChange change, String previousKey) {
+    public void recordAliasChange(PaidAliasChange change, Long previousCustomerId) {
         this.aliasChange = change;
-        this.aliasPreviousKey = previousKey;
+        this.aliasPreviousCustomerId = previousCustomerId;
     }
 
     void cancel(LocalDateTime now) {
@@ -118,8 +118,8 @@ public class DepositConfirmation {
         return aliasChange;
     }
 
-    public String getAliasPreviousKey() {
-        return aliasPreviousKey;
+    public Long getAliasPreviousCustomerId() {
+        return aliasPreviousCustomerId;
     }
 
     public LocalDateTime getConfirmedAt() {

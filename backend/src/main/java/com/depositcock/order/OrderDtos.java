@@ -126,7 +126,7 @@ public final class OrderDtos {
             Long id,
             int orderNo,
             OrderSource source,
-            String customerKey,
+            Long customerId,
             String phone,
             String depositorName,
             String nickname,

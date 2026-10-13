@@ -95,7 +95,7 @@ export interface SellerOrder {
   id: number
   orderNo: number
   source: 'FORM' | 'COMMENT'
-  customerKey: string
+  customerId: number
   phone: string | null
   depositorName: string | null
   nickname: string | null

@@ -27,8 +27,9 @@ public class DepositorAlias {
     @Column(nullable = false)
     private String depositorName;
 
+    /** 이 입금자명이 가리키는 고객 */
     @Column(nullable = false)
-    private String customerKey;
+    private Long customerId;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
@@ -36,15 +37,15 @@ public class DepositorAlias {
     protected DepositorAlias() {
     }
 
-    public DepositorAlias(Long sellerId, String depositorName, String customerKey, LocalDateTime createdAt) {
+    public DepositorAlias(Long sellerId, String depositorName, Long customerId, LocalDateTime createdAt) {
         this.sellerId = sellerId;
         this.depositorName = depositorName;
-        this.customerKey = customerKey;
+        this.customerId = customerId;
         this.createdAt = createdAt;
     }
 
-    public void changeCustomerKey(String customerKey) {
-        this.customerKey = customerKey;
+    public void changeCustomer(Long customerId) {
+        this.customerId = customerId;
     }
 
     public Long getId() {
@@ -59,8 +60,8 @@ public class DepositorAlias {
         return depositorName;
     }
 
-    public String getCustomerKey() {
-        return customerKey;
+    public Long getCustomerId() {
+        return customerId;
     }
 
     public LocalDateTime getCreatedAt() {

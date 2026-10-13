@@ -27,6 +27,8 @@ import com.depositcock.deposit.DepositDtos.PreviewResponse;
 import com.depositcock.deposit.DepositDtos.UploadResponse;
 import com.depositcock.deposit.DepositDtos.UploadSummary;
 import com.depositcock.deposit.DepositDtos.UsedRow;
+import com.depositcock.customer.Customer;
+import com.depositcock.customer.CustomerRepository;
 import com.depositcock.deposit.DepositMatcher.Deposit;
 import com.depositcock.deposit.DepositMatcher.Known;
 import com.depositcock.deposit.DepositMatcher.Outcome;
@@ -59,6 +61,7 @@ public class DepositService {
     private final DepositorAliasRepository aliasRepository;
     private final AliasBook aliasBook;
     private final DepositConfirmationRepository confirmationRepository;
+    private final CustomerRepository customerRepository;
     private final BankColumnPresetRepository presetRepository;
     private final BankStatementReader reader;
     private final Clock clock;
@@ -66,7 +69,7 @@ public class DepositService {
     public DepositService(GroupBuyService groupBuyService, CustomerOrderRepository orderRepository,
                           DepositUploadRepository uploadRepository, DepositRowRepository rowRepository,
                           DepositorAliasRepository aliasRepository, AliasBook aliasBook,
-                          DepositConfirmationRepository confirmationRepository, BankColumnPresetRepository presetRepository,
+                          DepositConfirmationRepository confirmationRepository, CustomerRepository customerRepository, BankColumnPresetRepository presetRepository,
                           BankStatementReader reader, Clock clock) {
         this.groupBuyService = groupBuyService;
         this.orderRepository = orderRepository;
@@ -75,6 +78,7 @@ public class DepositService {
         this.aliasRepository = aliasRepository;
         this.aliasBook = aliasBook;
         this.confirmationRepository = confirmationRepository;
+        this.customerRepository = customerRepository;
         this.presetRepository = presetRepository;
         this.reader = reader;
         this.clock = clock;
@@ -180,7 +184,7 @@ public class DepositService {
         Map<Long, CustomerOrder> orderById = orders.stream().collect(Collectors.toMap(CustomerOrder::getId, Function.identity()));
         List<Payee> payees = orders.stream()
                 .filter(o -> o.isActive() && o.isPrepaid() && !o.isPaid())
-                .map(o -> new Payee(o.getId(), o.getCustomerKey(), o.getDepositorName(), o.getNickname(),
+                .map(o -> new Payee(o.getId(), o.getCustomerId(), o.getDepositorName(), o.getNickname(),
                         o.getExpectedAmount(), o.getOrderedAt()))
                 .toList();
         List<DepositRow> rows = rowRepository.findByGroupBuyId(groupBuy.getId());
@@ -194,7 +198,7 @@ public class DepositService {
         // 대조 대상은 아니지만, 입금자가 이미 입금 확인된 주문·취소된 주문의 입금자인지 알려주는 데 쓴다
         List<Known> known = orders.stream()
                 .filter(o -> o.isPrepaid() && (o.isPaid() || !o.isActive()))
-                .map(o -> new Known(new Payee(o.getId(), o.getCustomerKey(), o.getDepositorName(), o.getNickname(),
+                .map(o -> new Known(new Payee(o.getId(), o.getCustomerId(), o.getDepositorName(), o.getNickname(),
                         o.getExpectedAmount(), o.getOrderedAt()), o.isActive() ? Relation.PAID : Relation.CANCELLED))
                 .toList();
         Outcome outcome = DepositMatcher.match(payees, known, deposits, aliasMap(sellerId));
@@ -327,16 +331,19 @@ public class DepositService {
         return ids;
     }
 
-    private Map<String, String> aliasMap(Long sellerId) {
-        Map<String, String> map = new HashMap<>();
-        aliasRepository.findBySellerId(sellerId).forEach(a -> map.put(a.getDepositorName(), a.getCustomerKey()));
+    private Map<String, Long> aliasMap(Long sellerId) {
+        Map<String, Long> map = new HashMap<>();
+        aliasRepository.findBySellerId(sellerId).forEach(a -> map.put(a.getDepositorName(), a.getCustomerId()));
         return map;
     }
 
     public List<AliasResponse> aliases(Long sellerId) {
-        return aliasRepository.findBySellerId(sellerId).stream()
-                .map(a -> new AliasResponse(a.getId(), a.getDepositorName(), a.getCustomerKey(),
-                        customerLabel(a.getCustomerKey()), a.getCreatedAt()))
+        List<DepositorAlias> list = aliasRepository.findBySellerId(sellerId);
+        Map<Long, Customer> byId = customerRepository.findAllById(list.stream().map(DepositorAlias::getCustomerId).toList())
+                .stream().collect(Collectors.toMap(Customer::getId, Function.identity()));
+        return list.stream()
+                .map(a -> new AliasResponse(a.getId(), a.getDepositorName(), a.getCustomerId(),
+                        byId.containsKey(a.getCustomerId()) ? byId.get(a.getCustomerId()).label() : "", a.getCreatedAt()))
                 .toList();
     }
 
@@ -344,13 +351,6 @@ public class DepositService {
     public void deleteAlias(Long sellerId, Long aliasId) {
         aliasRepository.delete(aliasRepository.findByIdAndSellerId(aliasId, sellerId)
                 .orElseThrow(() -> ApiException.notFound("별칭을 찾을 수 없습니다.")));
-    }
-
-    private static String customerLabel(String customerKey) {
-        if (customerKey.startsWith("nick:")) {
-            return "닉네임 " + customerKey.substring(5);
-        }
-        return "휴대폰 " + PhoneNumbers.format(customerKey);
     }
 
     // ---------- 열 이름 프리셋 ----------

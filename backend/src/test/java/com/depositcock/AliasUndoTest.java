@@ -48,7 +48,8 @@ class AliasUndoTest extends IntegrationTest {
     private Map<String, String> aliases(Cookie seller) throws Exception {
         Map<String, String> map = new HashMap<>();
         for (JsonNode a : read(mvc.perform(get("/api/seller/aliases").cookie(seller)).andReturn())) {
-            map.put(a.get("depositorName").asText(), a.get("customerKey").asText());
+            // 고객 표시 "휴대폰 010-7100-0001" → 숫자만 ("01071000001")
+            map.put(a.get("depositorName").asText(), a.get("customerLabel").asText().replaceAll("\\D", ""));
         }
         return map;
     }

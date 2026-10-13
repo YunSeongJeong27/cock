@@ -92,7 +92,7 @@ public final class DepositDtos {
         }
     }
 
-    public record AliasResponse(Long id, String depositorName, String customerKey, String customerLabel,
+    public record AliasResponse(Long id, String depositorName, Long customerId, String customerLabel,
                                 LocalDateTime createdAt) {
     }
 

@@ -34,14 +34,14 @@ public class AliasBook {
         if (name.isEmpty()) {
             return;
         }
-        String customerKey = order.getCustomerKey();
+        Long customerId = order.getCustomerId();
         DepositorAlias alias = aliasRepository.findBySellerIdAndDepositorName(sellerId, name).orElse(null);
         if (alias == null) {
-            aliasRepository.save(new DepositorAlias(sellerId, name, customerKey, now));
+            aliasRepository.save(new DepositorAlias(sellerId, name, customerId, now));
             confirmation.recordAliasChange(PaidAliasChange.CREATED, null);
-        } else if (!alias.getCustomerKey().equals(customerKey)) {
-            confirmation.recordAliasChange(PaidAliasChange.CHANGED, alias.getCustomerKey());
-            alias.changeCustomerKey(customerKey);
+        } else if (!alias.getCustomerId().equals(customerId)) {
+            confirmation.recordAliasChange(PaidAliasChange.CHANGED, alias.getCustomerId());
+            alias.changeCustomer(customerId);
         }
     }
 
@@ -58,18 +58,18 @@ public class AliasBook {
         }
         String name = DepositMatcher.squash(confirmation.getDepositorName());
         DepositorAlias alias = aliasRepository.findBySellerIdAndDepositorName(sellerId, name).orElse(null);
-        if (alias == null || !alias.getCustomerKey().equals(order.getCustomerKey())) {
+        if (alias == null || !alias.getCustomerId().equals(order.getCustomerId())) {
             return;
         }
-        boolean stillBacked = orderRepository.findOtherPaidOfCustomer(sellerId, order.getCustomerKey(), order.getId())
+        boolean stillBacked = orderRepository.findOtherPaidOfCustomer(order.getCustomerId(), order.getId())
                 .stream()
                 .filter(o -> !ignoredOrderIds.contains(o.getId()))
                 .anyMatch(o -> o.getPaidDepositorName() != null && DepositMatcher.squash(o.getPaidDepositorName()).equals(name));
         if (stillBacked) {
             return;
         }
-        if (confirmation.getAliasChange() == PaidAliasChange.CHANGED && confirmation.getAliasPreviousKey() != null) {
-            alias.changeCustomerKey(confirmation.getAliasPreviousKey());
+        if (confirmation.getAliasChange() == PaidAliasChange.CHANGED && confirmation.getAliasPreviousCustomerId() != null) {
+            alias.changeCustomer(confirmation.getAliasPreviousCustomerId());
         } else {
             aliasRepository.delete(alias);
         }

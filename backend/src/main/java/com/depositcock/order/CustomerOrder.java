@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.depositcock.customer.Customer;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.PickupPoint;
 import jakarta.persistence.CascadeType;
@@ -46,11 +47,11 @@ public class CustomerOrder {
     @Column(nullable = false)
     private OrderSource source;
 
-    /** 고객 키: 주문서 = 정규화한 휴대폰 번호, 댓글 = "nick:" + 닉네임 */
-    @Column(nullable = false)
-    private String customerKey;
+    /** 주문한 고객 (휴대폰 번호·댓글 닉네임은 고객에 있음) */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "customer_id")
+    private Customer customer;
 
-    private String phone;
     private String depositorName;
     private String nickname;
     private String unitAddress;
@@ -127,20 +128,19 @@ public class CustomerOrder {
     protected CustomerOrder() {
     }
 
-    public CustomerOrder(GroupBuy groupBuy, int orderNo, OrderSource source, String customerKey, String lookupToken,
+    public CustomerOrder(GroupBuy groupBuy, int orderNo, OrderSource source, Customer customer, String lookupToken,
                          LocalDateTime now) {
         this.groupBuy = groupBuy;
         this.orderNo = orderNo;
         this.source = source;
-        this.customerKey = customerKey;
+        this.customer = customer;
         this.lookupToken = lookupToken;
         this.status = OrderStatus.ORDERED;
         this.orderedAt = now;
         this.updatedAt = now;
     }
 
-    public void fillCustomer(String phone, String depositorName, String nickname, String unitAddress) {
-        this.phone = phone;
+    public void fillCustomer(String depositorName, String nickname, String unitAddress) {
         this.depositorName = depositorName;
         this.nickname = nickname;
         this.unitAddress = unitAddress;
@@ -279,12 +279,17 @@ public class CustomerOrder {
         return source;
     }
 
-    public String getCustomerKey() {
-        return customerKey;
+    public Customer getCustomer() {
+        return customer;
     }
 
+    public Long getCustomerId() {
+        return customer.getId();
+    }
+
+    /** 주문한 고객의 휴대폰 번호 (댓글 주문은 null) */
     public String getPhone() {
-        return phone;
+        return customer.getPhone();
     }
 
     public String getDepositorName() {

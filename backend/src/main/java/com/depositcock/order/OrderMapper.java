@@ -30,15 +30,15 @@ final class OrderMapper {
     }
 
     static List<SellerOrder> toSellerOrders(List<CustomerOrder> orders) {
-        Map<String, Long> activeByKey = orders.stream().filter(CustomerOrder::isActive)
+        Map<Long, Long> activeByKey = orders.stream().filter(CustomerOrder::isActive)
                 .filter(o -> o.getSource() == OrderSource.FORM)
-                .collect(Collectors.groupingBy(CustomerOrder::getCustomerKey, Collectors.counting()));
-        return orders.stream().map(o -> toSellerOrder(o, activeByKey.getOrDefault(o.getCustomerKey(), 0L) > 1)).toList();
+                .collect(Collectors.groupingBy(CustomerOrder::getCustomerId, Collectors.counting()));
+        return orders.stream().map(o -> toSellerOrder(o, activeByKey.getOrDefault(o.getCustomerId(), 0L) > 1)).toList();
     }
 
     static SellerOrder toSellerOrder(CustomerOrder o, boolean duplicateContact) {
         DisplayStatus status = o.displayStatus();
-        return new SellerOrder(o.getId(), o.getOrderNo(), o.getSource(), o.getCustomerKey(),
+        return new SellerOrder(o.getId(), o.getOrderNo(), o.getSource(), o.getCustomerId(),
                 PhoneNumbers.format(o.getPhone()), o.getDepositorName(), o.getNickname(), o.getUnitAddress(),
                 o.getReceiveMethod(), o.getPickupPoint() == null ? null : o.getPickupPoint().getId(),
                 o.getPickupPoint() == null ? null : o.getPickupPoint().getName(), o.getRecipientName(),

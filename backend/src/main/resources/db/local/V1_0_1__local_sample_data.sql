@@ -26,25 +26,33 @@ SELECT id, '캐파점', '오후 1시~7시', 1 FROM group_buy WHERE public_token 
 INSERT INTO pickup_point (group_buy_id, name, info, sort_order)
 SELECT id, '고촌1호점', '오후 2시~6시', 2 FROM group_buy WHERE public_token = 'demo-paprika';
 
+-- 고객 3명 (판매자별 고객, 휴대폰 번호는 여기에만)
+INSERT INTO customer (seller_id, phone, created_at)
+SELECT s.id, '01011112222', CURRENT_TIMESTAMP FROM seller s WHERE s.email = 'demo@depositcock.local';
+INSERT INTO customer (seller_id, phone, created_at)
+SELECT s.id, '01033334444', CURRENT_TIMESTAMP FROM seller s WHERE s.email = 'demo@depositcock.local';
+INSERT INTO customer (seller_id, phone, created_at)
+SELECT s.id, '01055556666', CURRENT_TIMESTAMP FROM seller s WHERE s.email = 'demo@depositcock.local';
+
 -- 주문 3건 (입금 대기 2, 현장결제 1)
-INSERT INTO customer_order (group_buy_id, order_no, source, customer_key, phone, depositor_name, nickname, receive_method,
+INSERT INTO customer_order (group_buy_id, order_no, source, customer_id, depositor_name, nickname, receive_method,
                             pickup_point_id, payment_method, items_amount, shipping_fee, expected_amount, status,
                             lookup_token, ordered_at, updated_at)
-SELECT g.id, 1, 'FORM', '01011112222', '01011112222', '김지영', '꼭지맘 217-1505', 'PICKUP',
+SELECT g.id, 1, 'FORM', (SELECT c.id FROM customer c WHERE c.seller_id = g.seller_id AND c.phone = '01011112222'), '김지영', '꼭지맘 217-1505', 'PICKUP',
        (SELECT p.id FROM pickup_point p WHERE p.group_buy_id = g.id AND p.sort_order = 1), 'PREPAID', 3800, 0, 3800,
        'ORDERED', 'demo-order-1', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM group_buy g WHERE g.public_token = 'demo-paprika';
-INSERT INTO customer_order (group_buy_id, order_no, source, customer_key, phone, depositor_name, nickname, receive_method,
+INSERT INTO customer_order (group_buy_id, order_no, source, customer_id, depositor_name, nickname, receive_method,
                             pickup_point_id, payment_method, items_amount, shipping_fee, expected_amount, status,
                             lookup_token, ordered_at, updated_at)
-SELECT g.id, 2, 'FORM', '01033334444', '01033334444', '박서준', '망고맘', 'PICKUP',
+SELECT g.id, 2, 'FORM', (SELECT c.id FROM customer c WHERE c.seller_id = g.seller_id AND c.phone = '01033334444'), '박서준', '망고맘', 'PICKUP',
        (SELECT p.id FROM pickup_point p WHERE p.group_buy_id = g.id AND p.sort_order = 2), 'PREPAID', 17800, 0, 17800,
        'ORDERED', 'demo-order-2', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM group_buy g WHERE g.public_token = 'demo-paprika';
-INSERT INTO customer_order (group_buy_id, order_no, source, customer_key, phone, depositor_name, nickname, receive_method,
+INSERT INTO customer_order (group_buy_id, order_no, source, customer_id, depositor_name, nickname, receive_method,
                             pickup_point_id, payment_method, items_amount, shipping_fee, expected_amount, status,
                             lookup_token, ordered_at, updated_at)
-SELECT g.id, 3, 'FORM', '01055556666', '01055556666', '이수진', '신지', 'PICKUP',
+SELECT g.id, 3, 'FORM', (SELECT c.id FROM customer c WHERE c.seller_id = g.seller_id AND c.phone = '01055556666'), '이수진', '신지', 'PICKUP',
        (SELECT p.id FROM pickup_point p WHERE p.group_buy_id = g.id AND p.sort_order = 1), 'ONSITE', 1900, 0, 1900,
        'ORDERED', 'demo-order-3', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM group_buy g WHERE g.public_token = 'demo-paprika';

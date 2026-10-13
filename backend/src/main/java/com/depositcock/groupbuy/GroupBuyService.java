@@ -8,6 +8,7 @@ import java.util.Map;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.Tokens;
+import com.depositcock.customer.Customers;
 import com.depositcock.deposit.AliasBook;
 import com.depositcock.groupbuy.GroupBuyDtos.Dashboard;
 import com.depositcock.groupbuy.GroupBuyDtos.GroupBuyRequest;
@@ -34,12 +35,14 @@ public class GroupBuyService {
     private final CustomerOrderRepository orderRepository;
     private final EntityManager entityManager;
     private final AliasBook aliasBook;
+    private final Customers customers;
     private final Clock clock;
 
     public GroupBuyService(GroupBuyRepository groupBuyRepository, SellerRepository sellerRepository,
                            CustomerOrderRepository orderRepository, EntityManager entityManager, AliasBook aliasBook,
-                           Clock clock) {
+                           Customers customers, Clock clock) {
         this.aliasBook = aliasBook;
+        this.customers = customers;
         this.groupBuyRepository = groupBuyRepository;
         this.sellerRepository = sellerRepository;
         this.orderRepository = orderRepository;
@@ -151,6 +154,8 @@ public class GroupBuyService {
         // 불러온 주문이 지울 공구를 가리키고 있으므로 떼어 낸다 (주문·입금 줄은 DB 의 ON DELETE CASCADE 로 지워짐)
         orders.forEach(entityManager::detach);
         groupBuyRepository.delete(groupBuy);
+        // 이 공구에서만 주문한 고객(휴대폰 번호)과 그 기기·별칭도 파기한다 (다른 공구에 주문이 있는 고객은 남김)
+        customers.deleteWithoutOrders(sellerId);
     }
 
     private void apply(GroupBuy groupBuy, GroupBuyRequest r, LocalDateTime now) {

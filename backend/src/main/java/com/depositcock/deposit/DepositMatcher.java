@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
  *               그 주문에 이름 근거로 추천된 다른 입금이 없음, 이 입금이 이미 연결·확인·취소된 주문의 입금자와 같지 않음)
  *   AMBIGUOUS : 후보가 2명 이상 → 자동 확정 금지, 판매자가 고른다 (목록의 첫 번째에 임의로 붙이지 않는다)
  *   UNRELATED : 관련 없는 입금
- * 입금 1건은 주문 1건에만 쓴다. "후보 몇 명"은 고객(customerKey) 수로 센다 (한 고객의 주문 여러 건은 1명).
+ * 입금 1건은 주문 1건에만 쓴다. "후보 몇 명"은 고객(customerId) 수로 센다 (한 고객의 주문 여러 건은 1명).
  * 1차(자동 매칭)는 입금마다 다른 입금과 상관없이 판단해서, 거래내역의 줄 순서에 따라 결과가 달라지지 않게 한다.
  * </pre>
  */
@@ -75,7 +75,7 @@ public final class DepositMatcher {
     }
 
     /** 대조 대상 주문 (선입금, 취소 안 됨, 입금 확정 안 됨, 금액 > 0) */
-    public record Payee(Long orderId, String customerKey, String depositorName, String nickname, int expectedAmount,
+    public record Payee(Long orderId, Long customerId, String depositorName, String nickname, int expectedAmount,
                         LocalDateTime orderedAt) {
     }
 
@@ -105,14 +105,15 @@ public final class DepositMatcher {
     private DepositMatcher() {
     }
 
-    public static Outcome match(List<Payee> payees, List<Deposit> deposits, Map<String, String> aliasToCustomerKey) {
-        return match(payees, List.of(), deposits, aliasToCustomerKey);
+    /** @param aliasToCustomerId 입금자명(별칭) → 고객 id */
+    public static Outcome match(List<Payee> payees, List<Deposit> deposits, Map<String, Long> aliasToCustomerId) {
+        return match(payees, List.of(), deposits, aliasToCustomerId);
     }
 
     public static Outcome match(List<Payee> payees, List<Known> known, List<Deposit> deposits,
-                                Map<String, String> aliasToCustomerKey) {
-        Map<String, String> aliases = new HashMap<>();
-        aliasToCustomerKey.forEach((name, key) -> aliases.put(normalize(name), key));
+                                Map<String, Long> aliasToCustomerId) {
+        Map<String, Long> aliases = new HashMap<>();
+        aliasToCustomerId.forEach((name, id) -> aliases.put(normalize(name), id));
         List<Payee> targets = payees.stream().filter(p -> p.expectedAmount() > 0)
                 .sorted(Comparator.comparing(Payee::orderedAt, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(Payee::orderId))
@@ -154,7 +155,7 @@ public final class DepositMatcher {
             if (withEvidence.isEmpty()) {
                 continue;
             }
-            long customers = withEvidence.stream().map(c -> byId.get(c.orderId()).customerKey()).distinct().count();
+            long customers = withEvidence.stream().map(c -> byId.get(c.orderId()).customerId()).distinct().count();
             if (customers == 1) {
                 Candidate c = withEvidence.get(0); // 같은 고객의 주문 중 금액이 맞는(가까운) 것
                 suggestedByEvidence.add(c.orderId());
@@ -210,7 +211,7 @@ public final class DepositMatcher {
         }
         Evidence best = all.stream().map(Candidate::evidence).min(Comparator.naturalOrder()).orElseThrow();
         List<Candidate> top = best.strong() ? all.stream().filter(c -> c.evidence() == best).toList() : all;
-        if (top.stream().map(c -> byId.get(c.orderId()).customerKey()).distinct().count() != 1) {
+        if (top.stream().map(c -> byId.get(c.orderId()).customerId()).distinct().count() != 1) {
             return List.of();
         }
         return sorted(top.stream().filter(c -> c.amountDiff() == 0).toList(), byId);
@@ -228,7 +229,7 @@ public final class DepositMatcher {
 
     /** 근거 없는 입금이 이미 다른 주문(이번에 연결됨 / 입금 확인됨 / 취소됨)의 입금자인지 */
     private static Related related(Deposit d, List<Payee> targets, Set<Long> reserved, List<Known> known,
-                                   Map<String, String> aliases) {
+                                   Map<String, Long> aliases) {
         for (Payee p : targets) {
             if (reserved.contains(p.orderId()) && evidence(d.name(), p, aliases) != null) {
                 return new Related(p.orderId(), Relation.LINKED);
@@ -244,7 +245,7 @@ public final class DepositMatcher {
         return null;
     }
 
-    private static List<Candidate> candidates(Deposit d, List<Payee> targets, Map<String, String> aliases,
+    private static List<Candidate> candidates(Deposit d, List<Payee> targets, Map<String, Long> aliases,
                                               Set<Long> reserved) {
         List<Candidate> list = new ArrayList<>();
         for (Payee p : targets) {
@@ -260,13 +261,13 @@ public final class DepositMatcher {
     }
 
     /** aliases 의 키는 normalize 한 입금자명이어야 한다 */
-    static Evidence evidence(String depositName, Payee p, Map<String, String> aliases) {
+    static Evidence evidence(String depositName, Payee p, Map<String, Long> aliases) {
         String name = normalize(depositName);
         if (p.depositorName() != null && !name.isEmpty() && name.equals(normalize(p.depositorName()))) {
             return Evidence.DEPOSITOR_NAME;
         }
-        String aliasKey = aliases.get(name);
-        if (aliasKey != null && aliasKey.equals(p.customerKey())) {
+        Long aliasCustomerId = aliases.get(name);
+        if (aliasCustomerId != null && aliasCustomerId.equals(p.customerId())) {
             return Evidence.ALIAS;
         }
         if (p.nickname() != null && !p.nickname().isBlank()) {

@@ -4,7 +4,7 @@ import { ErrorBox } from '../../components/Ui'
 import type { Preset } from '../../types'
 
 interface Defaults { date: string[]; name: string[]; amount: string[]; type: string[] }
-interface Alias { id: number; depositorName: string; customerKey: string; customerLabel: string; createdAt: string }
+interface Alias { id: number; depositorName: string; customerId: number; customerLabel: string; createdAt: string }
 
 /** 은행 거래내역 열 설정 (은행마다 열 이름이 달라서) + 저장된 입금자 별칭 관리 */
 export default function BankSettings() {

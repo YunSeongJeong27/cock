@@ -17,8 +17,15 @@ class DepositMatcherTest {
 
     private static final LocalDateTime T = LocalDateTime.of(2026, 10, 1, 10, 0);
 
-    private static Payee payee(long id, String key, String depositor, String nickname, int amount) {
-        return new Payee(id, key, depositor, nickname, amount, T.plusMinutes(id));
+    /** 테스트에서는 고객을 이름("k1" 등)으로 적고, 이름마다 고객 id 를 하나씩 붙인다 */
+    private static final Map<String, Long> CUSTOMER_IDS = new java.util.HashMap<>();
+
+    private static Long cid(String name) {
+        return CUSTOMER_IDS.computeIfAbsent(name, n -> (long) CUSTOMER_IDS.size() + 1);
+    }
+
+    private static Payee payee(long id, String customer, String depositor, String nickname, int amount) {
+        return new Payee(id, cid(customer), depositor, nickname, amount, T.plusMinutes(id));
     }
 
     @Test
@@ -46,7 +53,7 @@ class DepositMatcherTest {
     void aliasEvidence() {
         Outcome o = DepositMatcher.match(
                 List.of(payee(1, "01011112222", "김지영", null, 5000)),
-                List.of(new Deposit(10L, "김 지 영 엄마", 5000)), Map.of("김지영엄마", "01011112222"));
+                List.of(new Deposit(10L, "김 지 영 엄마", 5000)), Map.of("김지영엄마", cid("01011112222")));
         assertThat(o.results().get(0).status()).isEqualTo(Status.MATCHED);
         assertThat(o.results().get(0).evidence()).isEqualTo(Evidence.ALIAS);
     }
@@ -130,7 +137,7 @@ class DepositMatcherTest {
 
     // ---- 2026-10-14 점검에서 찾은 경우들 ----
 
-    private static Outcome both(List<Payee> payees, List<Deposit> deposits, Map<String, String> aliases) {
+    private static Outcome both(List<Payee> payees, List<Deposit> deposits, Map<String, Long> aliases) {
         Outcome forward = DepositMatcher.match(payees, deposits, aliases);
         List<Deposit> reversed = new java.util.ArrayList<>(deposits);
         java.util.Collections.reverse(reversed);
@@ -187,7 +194,7 @@ class DepositMatcherTest {
     @Test
     void resultDoesNotDependOnRowOrder() {
         Outcome o = both(List.of(payee(1, "k1", "김민지", null, 19900), payee(2, "k2", "김민지", null, 19900)),
-                List.of(new Deposit(10L, "김민지", 19900), new Deposit(11L, "민지아빠", 19900)), Map.of("민지아빠", "k2"));
+                List.of(new Deposit(10L, "김민지", 19900), new Deposit(11L, "민지아빠", 19900)), Map.of("민지아빠", cid("k2")));
         var byRow = new java.util.HashMap<Long, DepositMatcher.Result>();
         o.results().forEach(r -> byRow.put(r.deposit().rowId(), r));
         assertThat(byRow.get(11L).status()).isEqualTo(Status.MATCHED);

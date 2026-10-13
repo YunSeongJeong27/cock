@@ -11,7 +11,7 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     List<CustomerOrder> findByGroupBuyIdOrderByOrderNoAsc(Long groupBuyId);
 
-    List<CustomerOrder> findByGroupBuyIdAndCustomerKeyOrderByOrderNoAsc(Long groupBuyId, String customerKey);
+    List<CustomerOrder> findByGroupBuyIdAndCustomer_IdOrderByOrderNoAsc(Long groupBuyId, Long customerId);
 
     List<CustomerOrder> findByGroupBuyIdAndSource(Long groupBuyId, OrderSource source);
 
@@ -19,7 +19,7 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     List<CustomerOrder> findByGroupBuyIdAndDeviceTokenOrderByOrderNoAsc(Long groupBuyId, String deviceToken);
 
-    boolean existsByGroupBuyIdAndCustomerKeyAndStatus(Long groupBuyId, String customerKey, OrderStatus status);
+    boolean existsByGroupBuyIdAndCustomer_IdAndStatus(Long groupBuyId, Long customerId, OrderStatus status);
 
 
     @Query("select coalesce(max(o.orderNo), 0) from CustomerOrder o where o.groupBuy.id = :groupBuyId")
@@ -29,11 +29,8 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     boolean existsByPickupPointId(Long pickupPointId);
 
-    /** 이 판매자의 모든 공구에서 이 고객의 입금 확정 주문 (별칭을 되돌려도 되는지 볼 때) */
-    @Query("select o from CustomerOrder o where o.groupBuy.seller.id = :sellerId and o.customerKey = :customerKey"
-            + " and o.id <> :excludeId and exists"
+    /** 이 고객의 다른 입금 확정 주문 (별칭을 되돌려도 되는지 볼 때. 고객은 판매자별이라 판매자 조건은 따로 필요 없음) */
+    @Query("select o from CustomerOrder o where o.customer.id = :customerId and o.id <> :excludeId and exists"
             + " (select c from DepositConfirmation c where c.order = o and c.cancelledAt is null)")
-    List<CustomerOrder> findOtherPaidOfCustomer(@Param("sellerId") Long sellerId,
-                                                @Param("customerKey") String customerKey,
-                                                @Param("excludeId") Long excludeId);
+    List<CustomerOrder> findOtherPaidOfCustomer(@Param("customerId") Long customerId, @Param("excludeId") Long excludeId);
 }

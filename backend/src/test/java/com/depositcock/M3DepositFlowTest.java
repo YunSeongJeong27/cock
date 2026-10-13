@@ -114,7 +114,7 @@ class M3DepositFlowTest extends IntegrationTest {
                 .andExpect(jsonPath("$.confirmedCount").value(0));
 
         mvc.perform(get("/api/seller/aliases").cookie(seller))
-                .andExpect(jsonPath("$[?(@.depositorName == '박서준맘')].customerKey").value("01010000002"));
+                .andExpect(jsonPath("$[?(@.depositorName == '박서준맘')].customerLabel").value("휴대폰 010-1000-0002"));
 
         // 고객 화면에도 입금 확인됨
         mvc.perform(get("/api/seller/group-buys/" + id + "/dashboard").cookie(seller))

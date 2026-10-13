@@ -12,6 +12,9 @@ import java.util.Optional;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.Tokens;
+import com.depositcock.customer.Customer;
+import com.depositcock.customer.CustomerRepository;
+import com.depositcock.customer.Customers;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.GroupBuyDtos.PickupPointResponse;
 import com.depositcock.groupbuy.GroupBuyRepository;
@@ -48,12 +51,17 @@ public class PublicOrderService {
     private final ProductRepository productRepository;
     private final CustomerOrderRepository orderRepository;
     private final CustomerDeviceRepository deviceRepository;
+    private final CustomerRepository customerRepository;
+    private final Customers customers;
     private final EntityManager entityManager;
     private final Clock clock;
 
     public PublicOrderService(GroupBuyRepository groupBuyRepository, ProductRepository productRepository,
                               CustomerOrderRepository orderRepository, CustomerDeviceRepository deviceRepository,
+                              CustomerRepository customerRepository, Customers customers,
                               EntityManager entityManager, Clock clock) {
+        this.customerRepository = customerRepository;
+        this.customers = customers;
         this.entityManager = entityManager;
         this.groupBuyRepository = groupBuyRepository;
         this.productRepository = productRepository;
@@ -117,7 +125,10 @@ public class PublicOrderService {
         if (quantities.isEmpty()) {
             throw ApiException.badRequest("상품 수량을 1개 이상 선택해 주세요.");
         }
-        checkPerPersonLimit(groupBuy, phone, products, quantities);
+        Long sellerId = groupBuy.getSeller().getId();
+        // 처음 주문하는 번호면 아직 고객이 없다. 고객은 검사를 모두 통과한 뒤에 만든다 (실패한 주문의 번호를 남기지 않게)
+        Long existingCustomerId = customerRepository.findBySellerIdAndPhone(sellerId, phone).map(Customer::getId).orElse(null);
+        checkPerPersonLimit(groupBuy, existingCustomerId, products, quantities);
 
         // 배송 정보 검사는 경고(409)보다 먼저 한다 (경고를 확인한 뒤에 입력 오류가 나오지 않게)
         String recipientPhone = null;
@@ -129,7 +140,7 @@ public class PublicOrderService {
         }
 
         if (!r.acknowledgeWarnings()) {
-            List<String> warnings = warnings(groupBuy, phone, depositorName);
+            List<String> warnings = warnings(groupBuy, existingCustomerId, depositorName);
             if (!warnings.isEmpty()) {
                 ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, String.join("\n", warnings));
                 problem.setProperty("warnings", warnings);
@@ -137,13 +148,14 @@ public class PublicOrderService {
             }
         }
 
+        Customer customer = customers.byPhone(sellerId, phone, now);
         // 주문만으로는 본인 확인으로 치지 않는다 (남의 번호로 주문해 그 사람의 주문·개인정보를 보는 것 방지)
-        String newCookie = rememberDevice(groupBuy, cookieToken, phone, false, now);
+        String newCookie = rememberDevice(groupBuy, cookieToken, customer.getId(), false, now);
         String deviceToken = newCookie != null ? newCookie : cookieToken;
         CustomerOrder order = new CustomerOrder(groupBuy, orderRepository.maxOrderNo(groupBuy.getId()) + 1,
-                OrderSource.FORM, phone, Tokens.random(16), now);
+                OrderSource.FORM, customer, Tokens.random(16), now);
         order.placedFrom(deviceToken);
-        order.fillCustomer(phone, depositorName, nickname, unitAddress);
+        order.fillCustomer(depositorName, nickname, unitAddress);
         order.fillReceive(receiveMethod, pickupPoint, paymentMethod);
         if (receiveMethod == ReceiveMethod.DELIVERY) {
             order.fillDelivery(r.recipientName().trim(), recipientPhone, trimToNull(r.zipcode()), r.address().trim(),
@@ -189,23 +201,23 @@ public class PublicOrderService {
         String depositorName = squash(r.depositorName());
         String digits = r.phone().replaceAll("\\D", "");
         String full = PhoneNumbers.normalize(r.phone());
-        List<String> keys = orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()).stream()
+        List<Long> customerIds = orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()).stream()
                 .filter(o -> o.getSource() == OrderSource.FORM)
                 .filter(o -> depositorName.equals(squash(o.getDepositorName())))
                 .filter(o -> full != null ? full.equals(o.getPhone())
                         : digits.length() == 4 && PhoneNumbers.last4(o.getPhone()).equals(digits))
-                .map(CustomerOrder::getCustomerKey)
+                .map(CustomerOrder::getCustomerId)
                 .distinct()
                 .toList();
-        if (keys.isEmpty()) {
+        if (customerIds.isEmpty()) {
             throw ApiException.notFound("일치하는 주문이 없습니다. 입금자명과 휴대폰 번호를 확인해 주세요.");
         }
-        if (keys.size() > 1) {
+        if (customerIds.size() > 1) {
             throw ApiException.conflict("같은 정보의 주문이 여러 명 있습니다. 휴대폰 번호 전체를 입력해 주세요.");
         }
         // 본인 확인을 거친 기기는 이 고객의 주문 상태를 볼 수 있다. 개인정보(휴대폰 전체·동호수·배송지) 자동 채움은
         // 그 기기에서 넣은 주문에서만 가져오므로, 다른 기기 주문의 개인정보는 여기서도 나가지 않는다.
-        String newCookie = rememberDevice(groupBuy, cookieToken, keys.get(0), true, now);
+        String newCookie = rememberDevice(groupBuy, cookieToken, customerIds.get(0), true, now);
         CustomerDevice device = deviceRepository.findByCookieTokenAndGroupBuyId(
                 newCookie != null ? newCookie : cookieToken, groupBuy.getId()).orElseThrow();
         return new WithCookie<>(toPublic(groupBuy, device, now), newCookie);
@@ -311,15 +323,15 @@ public class PublicOrderService {
      *
      * @param identified 본인 확인(입금자명 + 휴대폰)을 거쳤는지
      */
-    private String rememberDevice(GroupBuy groupBuy, String cookieToken, String customerKey, boolean identified,
+    private String rememberDevice(GroupBuy groupBuy, String cookieToken, Long customerId, boolean identified,
                                   LocalDateTime now) {
         Optional<CustomerDevice> device = device(groupBuy, cookieToken);
         if (device.isPresent()) {
-            device.get().seen(customerKey, identified, now);
+            device.get().seen(customerId, identified, now);
             return null;
         }
         String token = Tokens.random(24);
-        deviceRepository.saveAndFlush(new CustomerDevice(groupBuy.getId(), token, customerKey, identified, now));
+        deviceRepository.saveAndFlush(new CustomerDevice(groupBuy.getId(), token, customerId, identified, now));
         return token;
     }
 
@@ -334,7 +346,7 @@ public class PublicOrderService {
         orderRepository.findByGroupBuyIdAndDeviceTokenOrderByOrderNoAsc(g.getId(), device.getCookieToken())
                 .forEach(o -> orders.put(o.getId(), o));
         if (device.isIdentified()) {
-            orderRepository.findByGroupBuyIdAndCustomerKeyOrderByOrderNoAsc(g.getId(), device.getCustomerKey())
+            orderRepository.findByGroupBuyIdAndCustomer_IdOrderByOrderNoAsc(g.getId(), device.getCustomerId())
                     .forEach(o -> orders.putIfAbsent(o.getId(), o));
         }
         return orders.values().stream().sorted(Comparator.comparingInt(CustomerOrder::getOrderNo)).toList();
@@ -343,10 +355,10 @@ public class PublicOrderService {
     /**
      * 1인 최대 수량 (정리본 5장): 같은 사람(휴대폰 번호)이 이 공구에 이미 주문한 수량(취소 제외)까지 합쳐서 본다.
      */
-    private void checkPerPersonLimit(GroupBuy groupBuy, String customerKey, Map<Long, Product> products,
+    private void checkPerPersonLimit(GroupBuy groupBuy, Long customerId, Map<Long, Product> products,
                                      Map<Long, Integer> quantities) {
-        List<CustomerOrder> previous = orderRepository
-                .findByGroupBuyIdAndCustomerKeyOrderByOrderNoAsc(groupBuy.getId(), customerKey).stream()
+        List<CustomerOrder> previous = customerId == null ? List.of() : orderRepository
+                .findByGroupBuyIdAndCustomer_IdOrderByOrderNoAsc(groupBuy.getId(), customerId).stream()
                 .filter(CustomerOrder::isActive)
                 .toList();
         for (Map.Entry<Long, Integer> e : quantities.entrySet()) {
@@ -365,15 +377,17 @@ public class PublicOrderService {
         }
     }
 
-    private List<String> warnings(GroupBuy groupBuy, String phone, String depositorName) {
+    /** @param customerId 이 번호의 기존 고객 (처음 주문하는 번호면 null) */
+    private List<String> warnings(GroupBuy groupBuy, Long customerId, String depositorName) {
         List<String> warnings = new ArrayList<>();
-        if (orderRepository.existsByGroupBuyIdAndCustomerKeyAndStatus(groupBuy.getId(), phone, OrderStatus.ORDERED)) {
+        if (customerId != null
+                && orderRepository.existsByGroupBuyIdAndCustomer_IdAndStatus(groupBuy.getId(), customerId, OrderStatus.ORDERED)) {
             warnings.add("이 휴대폰 번호로 이미 주문한 내역이 있습니다. 추가 주문이 맞으면 그대로 진행해 주세요.");
         }
         // 띄어쓰기·대소문자만 다른 이름도 같은 이름으로 본다 (입금 대조도 그렇게 비교함)
         String name = squash(depositorName).toLowerCase(java.util.Locale.ROOT);
         boolean sameNameByOther = orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()).stream()
-                .anyMatch(o -> o.getStatus() == OrderStatus.ORDERED && !phone.equals(o.getCustomerKey())
+                .anyMatch(o -> o.getStatus() == OrderStatus.ORDERED && !o.getCustomerId().equals(customerId)
                         && name.equals(squash(o.getDepositorName()).toLowerCase(java.util.Locale.ROOT)));
         if (sameNameByOther) {
             warnings.add("같은 입금자명으로 주문한 다른 분이 있습니다. 입금 확인이 헷갈리지 않게 입금자명 뒤에 동·호수나 숫자를 "
