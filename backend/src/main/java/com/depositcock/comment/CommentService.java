@@ -68,6 +68,10 @@ public class CommentService {
                                    int reviewCount, int appliedOrderCount, Long productId) {
     }
 
+    public void checkOwned(Long sellerId, Long groupBuyId) {
+        groupBuyService.getOwned(sellerId, groupBuyId);
+    }
+
     public CommentsResponse list(Long sellerId, Long groupBuyId, Long productId) {
         GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
         Product product = resolveProduct(groupBuy, productId, false);
@@ -148,8 +152,7 @@ public class CommentService {
      */
     @Transactional
     public int apply(Long sellerId, Long groupBuyId, Long productId) {
-        GroupBuy owned = groupBuyService.getOwned(sellerId, groupBuyId);
-        GroupBuy groupBuy = groupBuyRepository.findByIdForUpdate(owned.getId()).orElseThrow();
+        GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         Product product = resolveProduct(groupBuy, productId, true);
         List<CustomerOrder> existing = orderRepository.findByGroupBuyIdAndSource(groupBuy.getId(), OrderSource.COMMENT);
         if (existing.stream().anyMatch(o -> o.isPaid() || o.isPickedUp() || o.isRefundRequired())) {

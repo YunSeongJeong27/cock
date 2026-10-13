@@ -54,6 +54,7 @@ public class CommentController {
     /** 텍스트를 댓글 목록으로 나눠서 돌려준다 (저장 안 함, 검수 후 저장) */
     @PostMapping("/parse-text")
     public Map<String, List<CommentInput>> parseText(@PathVariable Long groupBuyId, @Valid @RequestBody TextRequest request) {
+        service.checkOwned(CurrentSeller.id(), groupBuyId); // 저장은 안 하지만 남의 공구 경로로는 쓰지 못하게
         return Map.of("comments", CommentService.parseText(request.text()));
     }
 

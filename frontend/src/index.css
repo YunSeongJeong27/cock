@@ -26,11 +26,18 @@ h2 { font-size: 1.25rem; }
 h3 { font-size: 1.05rem; }
 
 .container { max-width: 960px; margin: 0 auto; padding: 16px; }
+/* 판매자·관리자 화면은 PC 에서 더 넓게 (표·통계가 한 줄에 들어가게) */
+.container.wide { max-width: 1200px; }
+.container.wider { max-width: 1440px; }
+input[type=date].date-compact { width: 150px; padding: 8px; }
 .narrow { max-width: 480px; }
 .page-loading { padding: 40px; text-align: center; color: var(--muted); }
 
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px;
+  /* 넓은 화면에서 로고·메뉴를 본문(.container.wide) 양 끝에 맞춘다 */
+  padding-left: max(16px, calc((100% - 1200px) / 2 + 16px)); padding-right: max(16px, calc((100% - 1200px) / 2 + 16px));
   background: var(--card); border-bottom: 1px solid var(--line); flex-wrap: wrap; position: sticky; top: 0; z-index: 10; }
+.topbar.wider { padding-left: max(16px, calc((100% - 1440px) / 2 + 16px)); padding-right: max(16px, calc((100% - 1440px) / 2 + 16px)); }
 .topbar nav { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 0.95rem; }
 .topbar nav a { color: var(--muted); }
 .topbar nav a.active { color: var(--text); font-weight: 700; }
@@ -116,6 +123,8 @@ tr.dim td { color: var(--muted); }
 .badge-CLOSED { background: var(--danger-weak); color: #991b1b; }
 
 .list-item { display: block; color: inherit; }
+/* PC 에서는 공구 목록을 2열로 (폰에서는 1열) */
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); gap: 0 14px; }
 .list-item:hover .card { border-color: var(--primary); }
 
 .product-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
@@ -135,7 +144,34 @@ tr.dim td { color: var(--muted); }
 .chip { display: inline-block; background: var(--primary-weak); color: #1e3a8a; border-radius: 6px; padding: 2px 8px; font-size: 0.82rem; margin: 2px; }
 .mapping-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
 .preview-table td { font-size: 0.8rem; white-space: nowrap; }
-@media (max-width: 600px) {
+
+/* 관리자 표: PC 에서는 한 줄, 폰에서는 아래 카드 모양 */
+@media (min-width: 641px) {
+  .admin-table { min-width: 1080px; }
+  .show-mobile { display: none; }
+}
+
+/*
+ * table.stack: 폰 폭에서는 표 대신 줄마다 카드로 보여 준다 (열이 많은 표가 글자 단위로 줄바꿈되는 문제).
+ * td 의 data-label 이 카드 안의 항목 이름이 된다. stack-title 은 카드 제목, stack-action 은 버튼 줄.
+ */
+@media (max-width: 640px) {
   .hide-mobile { display: none; }
   .container { padding: 12px; }
+  .stats { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+  .stat { padding: 8px 10px; }
+  .stat-value { font-size: 1.05rem; }
+  table.stack, table.stack tbody, table.stack tr, table.stack td { display: block; width: 100%; }
+  table.stack { background: transparent; }
+  table.stack thead { display: none; }
+  table.stack tr { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+  table.stack tr.stack-detail { margin-top: -8px; border-top: none; border-radius: 0 0 10px 10px; }
+  table.stack td { border: none; padding: 3px 0; text-align: left; }
+  table.stack td.hide-mobile { display: none; }
+  table.stack td[data-label] { display: flex; gap: 10px; align-items: baseline; }
+  table.stack td[data-label]::before { content: attr(data-label); flex: 0 0 76px; color: var(--muted); font-size: 0.8rem; }
+  table.stack td.stack-title { font-size: 1rem; padding-bottom: 6px; }
+  table.stack td.stack-action { padding-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+  table.stack td.stack-action:empty { display: none; }
+  table.stack td input[type=text], table.stack td input[type=number], table.stack td input[type=date], table.stack td select { flex: 1; min-width: 0; width: auto !important; }
 }

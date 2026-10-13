@@ -19,7 +19,9 @@ import com.depositcock.order.CustomerOrderRepository;
 import com.depositcock.order.DisplayStatus;
 import com.depositcock.seller.Seller;
 import com.depositcock.seller.SellerRepository;
+import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -29,14 +31,40 @@ public class GroupBuyService {
     private final GroupBuyRepository groupBuyRepository;
     private final SellerRepository sellerRepository;
     private final CustomerOrderRepository orderRepository;
+    private final EntityManager entityManager;
     private final Clock clock;
 
     public GroupBuyService(GroupBuyRepository groupBuyRepository, SellerRepository sellerRepository,
-                           CustomerOrderRepository orderRepository, Clock clock) {
+                           CustomerOrderRepository orderRepository, EntityManager entityManager, Clock clock) {
         this.groupBuyRepository = groupBuyRepository;
         this.sellerRepository = sellerRepository;
         this.orderRepository = orderRepository;
+        this.entityManager = entityManager;
         this.clock = clock;
+    }
+
+    /**
+     * 내 공구를 찾아 잠근다 (공구 행 SELECT ... FOR UPDATE).
+     * 같은 공구의 주문·취소·입금 확정·댓글 반영·공구 수정을 한 줄로 세워서, 동시에 들어온 요청 때문에
+     * 재고가 두 번 복구되거나 입금 1건이 두 주문에 확정되는 일을 막는다. 이 뒤에 읽는 주문·입금은 최신 상태다.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupBuy lockOwned(Long sellerId, Long groupBuyId) {
+        return lock(getOwned(sellerId, groupBuyId));
+    }
+
+    /** id 로 공구 행만 잠근다 (소유 확인은 호출한 쪽에서 이미 했을 때) */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lockById(Long groupBuyId) {
+        groupBuyRepository.findByIdForUpdate(groupBuyId);
+    }
+
+    /** 이미 찾은 공구를 잠그고, 잠그기 전에 읽은 값이 낡았을 수 있으므로 다시 읽는다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupBuy lock(GroupBuy groupBuy) {
+        groupBuyRepository.findByIdForUpdate(groupBuy.getId());
+        entityManager.refresh(groupBuy);
+        return groupBuy;
     }
 
     /** 로그인한 판매자의 공구만 찾는다. 다른 판매자의 공구는 404 (존재 여부도 알려주지 않음). */
@@ -75,7 +103,7 @@ public class GroupBuyService {
 
     @Transactional
     public GroupBuyResponse update(Long sellerId, Long groupBuyId, GroupBuyRequest request) {
-        GroupBuy groupBuy = getOwned(sellerId, groupBuyId);
+        GroupBuy groupBuy = lockOwned(sellerId, groupBuyId);
         LocalDateTime now = LocalDateTime.now(clock);
         apply(groupBuy, request, now);
         if (groupBuy.getStatus() == GroupBuyStatus.OPEN) {
@@ -87,7 +115,7 @@ public class GroupBuyService {
 
     @Transactional
     public GroupBuyResponse open(Long sellerId, Long groupBuyId) {
-        GroupBuy groupBuy = getOwned(sellerId, groupBuyId);
+        GroupBuy groupBuy = lockOwned(sellerId, groupBuyId);
         LocalDateTime now = LocalDateTime.now(clock);
         validateOpenable(groupBuy);
         if (groupBuy.getCloseAt() != null && !groupBuy.getCloseAt().isAfter(now)) {
@@ -99,7 +127,7 @@ public class GroupBuyService {
 
     @Transactional
     public GroupBuyResponse close(Long sellerId, Long groupBuyId) {
-        GroupBuy groupBuy = getOwned(sellerId, groupBuyId);
+        GroupBuy groupBuy = lockOwned(sellerId, groupBuyId);
         LocalDateTime now = LocalDateTime.now(clock);
         groupBuy.changeStatus(GroupBuyStatus.CLOSED, now);
         return GroupBuyResponse.of(groupBuy, now);
@@ -185,7 +213,15 @@ public class GroupBuyService {
                 groupBuy.getPickupPoints().add(new PickupPoint(groupBuy, r.name().trim(), blankToNull(r.info()), order));
             }
         }
-        groupBuy.getPickupPoints().removeIf(p -> p.getId() != null && !kept.contains(p.getId()));
+        for (PickupPoint point : List.copyOf(groupBuy.getPickupPoints())) {
+            if (point.getId() != null && !kept.contains(point.getId())) {
+                // 지우면 그 지점을 고른 주문의 픽업 지점이 조용히 비워지므로(FK SET NULL) 막는다
+                if (orderRepository.existsByPickupPointId(point.getId())) {
+                    throw ApiException.badRequest("주문이 있는 픽업 지점('" + point.getName() + "')은 삭제할 수 없습니다.");
+                }
+                groupBuy.getPickupPoints().remove(point);
+            }
+        }
     }
 
     private void validateOpenable(GroupBuy groupBuy) {

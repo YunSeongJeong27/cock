@@ -79,9 +79,9 @@ export default function AdminSellers() {
       </div>
       <ErrorBox message={error} />
       <div className="table-wrap">
-        <table style={{ minWidth: 1200 }}>
+        <table className="stack admin-table">
           <thead>
-            <tr><th>판매자</th><th>가입일</th><th>공구</th><th>플랜</th><th>무료 체험 끝</th><th>유료 만료일</th><th>상태</th><th>캡처 오늘/이번 달</th><th>캡처 하루 제한</th><th>메모</th><th></th></tr>
+            <tr><th>판매자</th><th>플랜</th><th>무료 체험 끝</th><th>유료 만료일</th><th>상태</th><th>캡처 (오늘/이번 달 · 하루 제한)</th><th>메모</th><th></th></tr>
           </thead>
           <tbody>
             {shown.map((row) => {
@@ -90,35 +90,34 @@ export default function AdminSellers() {
               const update = (patch: Partial<Row>) => setEditing((e) => ({ ...e, [row.id]: { ...r, ...patch } }))
               return (
                 <tr key={row.id}>
-                  <td>{row.displayName}<div className="muted small">{row.email}{row.role === 'ADMIN' && ' (관리자)'}</div></td>
-                  <td className="small">{row.createdAt.substring(0, 10)}</td>
-                  <td>{row.groupBuyCount}</td>
-                  <td>
-                    <select value={r.plan} onChange={(e) => update({ plan: e.target.value as Plan })} disabled={row.role === 'ADMIN'} style={{ minWidth: 110 }}>
+                  <td className="stack-title">{row.displayName}<div className="muted small">{row.email}{row.role === 'ADMIN' && ' (관리자)'}</div>
+                    <div className="muted small">가입 {row.createdAt.substring(0, 10)} · 공구 {row.groupBuyCount}개</div></td>
+                  <td data-label="플랜">
+                    <select value={r.plan} onChange={(e) => update({ plan: e.target.value as Plan })} disabled={row.role === 'ADMIN'} style={{ minWidth: 120 }}>
                       <option value="TRIAL">무료 체험</option>
                       <option value="PAID">유료</option>
                     </select>
                   </td>
-                  <td><input type="date" value={r.trialEndsAt.substring(0, 10)} onChange={(e) => {
+                  <td data-label="무료 체험 끝"><input type="date" className="date-compact" value={r.trialEndsAt.substring(0, 10)} onChange={(e) => {
                     // 날짜를 지우면 'T23:59:59' 만 보내져 저장이 400 으로 실패하므로 무시한다 (무료 체험 종료일은 필수)
                     if (e.target.value) update({ trialEndsAt: e.target.value + 'T23:59:59' })
                   }} disabled={row.role === 'ADMIN'} /></td>
-                  <td><input type="date" value={r.paidUntil ?? ''} onChange={(e) => update({ paidUntil: e.target.value })} disabled={row.role === 'ADMIN'} /></td>
-                  <td>
+                  <td data-label="유료 만료일"><input type="date" className="date-compact" value={r.paidUntil ?? ''} onChange={(e) => update({ paidUntil: e.target.value })} disabled={row.role === 'ADMIN'} /></td>
+                  <td data-label="상태">
                     {row.expired && <div className="badge badge-CLOSED">만료</div>}
                     <label className="check small" style={{ whiteSpace: 'nowrap' }}><input type="checkbox" checked={r.suspended} onChange={(e) => update({ suspended: e.target.checked })} disabled={row.role === 'ADMIN'} /> 사용 제한</label>
                   </td>
-                  <td className="small">{row.captureToday} / {row.captureThisMonth}장</td>
-                  <td>
-                    <input type="number" min={0} style={{ width: 80 }}
+                  <td data-label="캡처">
+                    <div className="small" style={{ whiteSpace: 'nowrap' }}>오늘 {row.captureToday} / 이번 달 {row.captureThisMonth}장</div>
+                    <input type="number" min={0} style={{ width: 110 }} aria-label="캡처 하루 제한"
                       value={r.customCaptureLimit ? r.dailyCaptureLimit : ''}
                       placeholder="기본값"
                       onChange={(e) => update(e.target.value === ''
                         ? { customCaptureLimit: false }
                         : { customCaptureLimit: true, dailyCaptureLimit: Number(e.target.value) })} />
                   </td>
-                  <td><input type="text" value={r.adminMemo ?? ''} onChange={(e) => update({ adminMemo: e.target.value })} placeholder="입금 기록 등" style={{ minWidth: 140 }} /></td>
-                  <td>
+                  <td data-label="메모"><input type="text" value={r.adminMemo ?? ''} onChange={(e) => update({ adminMemo: e.target.value })} placeholder="입금 기록 등" style={{ minWidth: 120 }} /></td>
+                  <td className="stack-action">
                     {isEditing && <button className="btn small primary" onClick={() => save(r)}>저장</button>}
                     {row.role !== 'ADMIN' && <button className="btn small danger" onClick={() => remove(row)}>탈퇴</button>}
                   </td>

@@ -84,7 +84,7 @@ public class DepositService {
 
     @Transactional
     public UploadResponse upload(Long sellerId, Long groupBuyId, MultipartFile file, ColumnMapping mapping, Long presetId) {
-        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         ResolvedMapping resolved = resolveMapping(sellerId, mapping, presetId);
         String fileName = file.getOriginalFilename();
         ParsedStatement parsed = reader.read(fileName, bytes(file), resolved.mapping());
@@ -107,6 +107,7 @@ public class DepositService {
      */
     @Transactional
     public SaveResult saveDeposits(Long groupBuyId, DepositSource source, String fileName, List<DepositLine> lines) {
+        groupBuyService.lockById(groupBuyId); // 같은 파일을 동시에 두 번 올려도 중복 검사가 맞게
         Map<String, Integer> existing = existingCounts(groupBuyId);
         DepositUpload upload = uploadRepository.save(new DepositUpload(groupBuyId, source, fileName, LocalDateTime.now(clock)));
         int saved = 0;
@@ -151,7 +152,7 @@ public class DepositService {
 
     @Transactional
     public void deleteUpload(Long sellerId, Long groupBuyId, Long uploadId) {
-        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         DepositUpload upload = uploadRepository.findByIdAndGroupBuyId(uploadId, groupBuy.getId())
                 .orElseThrow(() -> ApiException.notFound("업로드를 찾을 수 없습니다."));
         boolean used = rowRepository.findByUploadId(upload.getId()).stream().anyMatch(r -> r.getUsedOrderId() != null);
@@ -223,7 +224,7 @@ public class DepositService {
     /** 판매자가 확정: 주문을 입금 확인됨으로 바꾸고, 입금자명 → 고객 별칭을 저장한다. */
     @Transactional
     public ConfirmResponse confirm(Long sellerId, Long groupBuyId, List<ConfirmItem> items) {
-        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         LocalDateTime now = LocalDateTime.now(clock);
         List<String> errors = new ArrayList<>();
         int confirmed = 0;
@@ -254,7 +255,7 @@ public class DepositService {
     /** 입금 확정 취소: 입금 줄을 다시 쓸 수 있게 풀고, 이 확정이 만든·바꾼 별칭을 되돌린다. */
     @Transactional
     public void unconfirm(Long sellerId, Long groupBuyId, Long orderId) {
-        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         CustomerOrder order = orderRepository.findByIdAndGroupBuyId(orderId, groupBuy.getId())
                 .orElseThrow(() -> ApiException.notFound("주문을 찾을 수 없습니다."));
         if (!order.isPaid()) {
@@ -269,7 +270,7 @@ public class DepositService {
     /** 거래내역 없이 수동으로 입금 확정 (판매자가 은행앱으로 직접 확인한 경우) */
     @Transactional
     public void manualConfirm(Long sellerId, Long groupBuyId, Long orderId, String depositorName, int amount) {
-        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         CustomerOrder order = orderRepository.findByIdAndGroupBuyId(orderId, groupBuy.getId())
                 .orElseThrow(() -> ApiException.notFound("주문을 찾을 수 없습니다."));
         if (!order.isActive() || !order.isPrepaid() || order.isPaid()) {

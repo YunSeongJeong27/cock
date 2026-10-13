@@ -181,27 +181,27 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
               <button className="btn small danger" onClick={() => confirm('저장한 댓글을 모두 지울까요?') && run(() => api.del(base), load)}>모두 지우기</button>
             </div>
             <div className="table-wrap">
-              <table>
+              <table className="stack">
                 <thead><tr><th>#</th><th>작성자</th><th>내용</th><th>해석</th><th>수량 직접 입력</th><th></th></tr></thead>
                 <tbody>
                   {data.comments.map((c) => (
                     <tr key={c.id} className={c.excludedAsAdmin || c.type === 'NOT_ORDER' ? 'dim' : ''} style={{ background: c.type === 'REVIEW' && c.manualQuantity === null ? 'var(--warn-weak)' : undefined }}>
-                      <td>{c.seq}</td>
-                      <td>{c.authorName}{c.excludedAsAdmin && <div className="small">관리자 제외</div>}</td>
-                      <td>{c.content}{c.duplicateSuspected && <div className="small" style={{ color: 'var(--warn)' }}>중복 의심</div>}</td>
-                      <td className="small">
+                      <td className="hide-mobile">{c.seq}</td>
+                      <td className="stack-title"><span className="show-mobile muted">{c.seq}. </span>{c.authorName}{c.excludedAsAdmin && <div className="small">관리자 제외</div>}</td>
+                      <td data-label="내용">{c.content}{c.duplicateSuspected && <div className="small" style={{ color: 'var(--warn)' }}>중복 의심</div>}</td>
+                      <td className="small" data-label="해석">
                         {TYPE_LABEL[c.type]}{c.quantity !== null && ` ${c.quantity}개`}
                         {c.reviewReason && <div className="muted">{c.reviewReason}</div>}
                         {c.memo && <div className="muted">메모: {c.memo}</div>}
                       </td>
-                      <td>
+                      <td data-label="수량 직접 입력">
                         <input type="number" min={0} defaultValue={c.manualQuantity ?? ''} style={{ width: 80 }}
                           onBlur={(e) => {
                             const v = e.target.value === '' ? null : Number(e.target.value)
                             if (v !== c.manualQuantity) updateComment(c, { manualQuantity: v })
                           }} />
                       </td>
-                      <td><button className="btn small danger" onClick={() => run(() => api.del(`${base}/${c.id}`), load)}>삭제</button></td>
+                      <td className="stack-action"><button className="btn small danger" onClick={() => run(() => api.del(`${base}/${c.id}`), load)}>삭제</button></td>
                     </tr>
                   ))}
                 </tbody>

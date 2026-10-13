@@ -63,22 +63,22 @@ public class PublicOrderService {
     }
 
     /** 공개 화면 결과 + 쿠키에 새로 넣을 토큰(있으면) */
+    /** 주문 1건 금액 상한 (int 넘침 방지). 공구 주문으로 1억원은 넘지 않는다고 본다 [판단] */
+    static final long MAX_ORDER_AMOUNT = 100_000_000L;
+
     public record WithCookie<T>(T body, String cookieToken) {
     }
 
     public PublicGroupBuy view(String publicToken, String cookieToken) {
         GroupBuy groupBuy = findVisible(publicToken);
-        LocalDateTime now = LocalDateTime.now(clock);
-        Optional<CustomerDevice> device = device(groupBuy, cookieToken);
-        return toPublic(groupBuy, device.map(CustomerDevice::getCustomerKey).orElse(null),
-                device.map(CustomerDevice::isVerifiedByOrder).orElse(false), now);
+        return toPublic(groupBuy, device(groupBuy, cookieToken).orElse(null), LocalDateTime.now(clock));
     }
 
     @Transactional
     public WithCookie<PlaceOrderResponse> placeOrder(String publicToken, String cookieToken, PlaceOrderRequest r) {
-        GroupBuy found = findVisible(publicToken);
-        // 공구 행을 잠가서 같은 공구의 주문을 한 줄로 세운다 (주문번호 중복 방지).
-        GroupBuy groupBuy = groupBuyRepository.findByIdForUpdate(found.getId()).orElseThrow();
+        // 공구 행을 잠가서 같은 공구의 주문·취소를 한 줄로 세운다 (주문번호 중복, 재고 이중 처리 방지).
+        // 잠그기 전에 읽은 상태(마감 여부 등)는 낡았을 수 있으므로 잠근 뒤 다시 읽는다.
+        GroupBuy groupBuy = lock(findVisible(publicToken));
         LocalDateTime now = LocalDateTime.now(clock);
         if (!groupBuy.isAcceptingOrders(now)) {
             throw ApiException.badRequest("주문이 마감되었습니다.");
@@ -137,8 +137,12 @@ public class PublicOrderService {
             }
         }
 
+        // 주문만으로는 본인 확인으로 치지 않는다 (남의 번호로 주문해 그 사람의 주문·개인정보를 보는 것 방지)
+        String newCookie = rememberDevice(groupBuy, cookieToken, phone, false, now);
+        String deviceToken = newCookie != null ? newCookie : cookieToken;
         CustomerOrder order = new CustomerOrder(groupBuy, orderRepository.maxOrderNo(groupBuy.getId()) + 1,
                 OrderSource.FORM, phone, Tokens.random(16), now);
+        order.placedFrom(deviceToken);
         order.fillCustomer(phone, depositorName, nickname, unitAddress);
         order.fillReceive(receiveMethod, pickupPoint, paymentMethod);
         if (receiveMethod == ReceiveMethod.DELIVERY) {
@@ -146,7 +150,7 @@ public class PublicOrderService {
                     trimToNull(r.addressDetail()));
         }
 
-        int itemsAmount = 0;
+        long itemsAmount = 0;
         for (Map.Entry<Long, Integer> e : quantities.entrySet()) {
             Product product = products.get(e.getKey());
             // 재고 원자 처리. 실패하면 예외 → 트랜잭션 롤백으로 앞서 늘린 수량도 되돌아간다.
@@ -158,15 +162,18 @@ public class PublicOrderService {
             }
             entityManager.refresh(product);
             order.addItem(new OrderItem(order, product, e.getValue()));
-            itemsAmount += product.getUnitPrice() * e.getValue();
+            itemsAmount += (long) product.getUnitPrice() * e.getValue();
         }
         int shippingFee = receiveMethod == ReceiveMethod.DELIVERY && groupBuy.getShippingFeeType() == ShippingFeeType.FIXED
                 ? groupBuy.getShippingFee() : 0;
-        order.fillAmounts(itemsAmount, shippingFee);
+        if (itemsAmount + shippingFee > MAX_ORDER_AMOUNT) {
+            throw ApiException.badRequest("주문 금액이 너무 큽니다. 수량을 확인해 주세요.");
+        }
+        order.fillAmounts((int) itemsAmount, shippingFee);
         orderRepository.save(order);
 
-        String newCookie = rememberDevice(groupBuy, cookieToken, phone, true, now);
-        List<MyOrder> myOrders = myOrders(groupBuy, phone, now);
+        List<MyOrder> myOrders = myOrders(groupBuy, deviceRepository.findByCookieTokenAndGroupBuyId(deviceToken,
+                groupBuy.getId()).orElse(null), now);
         AccountInfo account = paymentMethod == PaymentMethod.PREPAID ? account(groupBuy) : null;
         return new WithCookie<>(new PlaceOrderResponse(order.getOrderNo(), order.getExpectedAmount(), paymentMethod,
                 depositorName, account, myOrders), newCookie);
@@ -196,10 +203,12 @@ public class PublicOrderService {
         if (keys.size() > 1) {
             throw ApiException.conflict("같은 정보의 주문이 여러 명 있습니다. 휴대폰 번호 전체를 입력해 주세요.");
         }
-        // 휴대폰 전체 번호로 확인했으면 주문한 기기와 같은 수준으로 본다. 뒷4자리만이면 개인정보는 채우지 않는다.
-        boolean strong = full != null;
-        String newCookie = rememberDevice(groupBuy, cookieToken, keys.get(0), strong, now);
-        return new WithCookie<>(toPublic(groupBuy, keys.get(0), strong, now), newCookie);
+        // 본인 확인을 거친 기기는 이 고객의 주문 상태를 볼 수 있다. 개인정보(휴대폰 전체·동호수·배송지) 자동 채움은
+        // 그 기기에서 넣은 주문에서만 가져오므로, 다른 기기 주문의 개인정보는 여기서도 나가지 않는다.
+        String newCookie = rememberDevice(groupBuy, cookieToken, keys.get(0), true, now);
+        CustomerDevice device = deviceRepository.findByCookieTokenAndGroupBuyId(
+                newCookie != null ? newCookie : cookieToken, groupBuy.getId()).orElseThrow();
+        return new WithCookie<>(toPublic(groupBuy, device, now), newCookie);
     }
 
     /** 고객의 "입금했어요". 확정이 아니라 신고이며, 확정은 판매자가 입금내역 대조 후 누른다. */
@@ -207,10 +216,10 @@ public class PublicOrderService {
     public PublicGroupBuy reportDeposit(String publicToken, String cookieToken, int orderNo) {
         GroupBuy groupBuy = findVisible(publicToken);
         LocalDateTime now = LocalDateTime.now(clock);
-        String customerKey = customerKeyFromCookie(groupBuy, cookieToken)
+        CustomerDevice device = device(groupBuy, cookieToken)
                 .orElseThrow(() -> ApiException.forbidden("본인 확인이 필요합니다."));
-        CustomerOrder order = orderRepository.findByGroupBuyIdAndCustomerKeyOrderByOrderNoAsc(groupBuy.getId(), customerKey)
-                .stream().filter(o -> o.getOrderNo() == orderNo).findFirst()
+        CustomerOrder order = visibleOrders(groupBuy, device).stream()
+                .filter(o -> o.getOrderNo() == orderNo).findFirst()
                 .orElseThrow(() -> ApiException.notFound("주문을 찾을 수 없습니다."));
         if (!order.isActive() || !order.isPrepaid()) {
             throw ApiException.badRequest("입금 신고를 할 수 없는 주문입니다.");
@@ -219,7 +228,7 @@ public class PublicOrderService {
             throw ApiException.badRequest("이미 입금이 확인된 주문입니다.");
         }
         order.reportDeposit(now);
-        return toPublic(groupBuy, customerKey, deviceVerifiedFor(groupBuy, cookieToken, customerKey), now);
+        return toPublic(groupBuy, device, now);
     }
 
     /**
@@ -229,7 +238,8 @@ public class PublicOrderService {
      */
     @Transactional
     public PublicGroupBuy cancel(String publicToken, String cookieToken, CancelRequest r) {
-        GroupBuy groupBuy = findVisible(publicToken);
+        // 같은 주문을 동시에 두 번 취소해도 재고가 한 번만 돌아오게 공구를 잠근다
+        GroupBuy groupBuy = lock(findVisible(publicToken));
         LocalDateTime now = LocalDateTime.now(clock);
         if (!groupBuy.isAcceptingOrders(now)) {
             throw ApiException.badRequest("마감된 공구는 취소할 수 없습니다. 판매자에게 문의해 주세요.");
@@ -268,9 +278,8 @@ public class PublicOrderService {
             throw ApiException.badRequest("이미 수령한 주문은 취소할 수 없습니다.");
         }
         OrderCancellation.cancel(order, productRepository, entityManager, now);
-        // 휴대폰 전체 번호 + 입금자명을 아는 사람이므로 주문 목록을 보여준다 (개인정보 자동 채움은 쿠키 기기 기준)
-        return toPublic(groupBuy, order.getCustomerKey(),
-                deviceVerifiedFor(groupBuy, cookieToken, order.getCustomerKey()), now);
+        // 응답은 이 기기가 볼 수 있는 주문만 (취소 정보를 안다고 그 사람의 다른 주문까지 보여주지 않음)
+        return toPublic(groupBuy, device(groupBuy, cookieToken).orElse(null), now);
     }
 
     // ---------- 내부 ----------
@@ -284,6 +293,12 @@ public class PublicOrderService {
         return groupBuy;
     }
 
+    private GroupBuy lock(GroupBuy groupBuy) {
+        groupBuyRepository.findByIdForUpdate(groupBuy.getId());
+        entityManager.refresh(groupBuy);
+        return groupBuy;
+    }
+
     private Optional<CustomerDevice> device(GroupBuy groupBuy, String cookieToken) {
         if (cookieToken == null || cookieToken.isBlank()) {
             return Optional.empty();
@@ -291,33 +306,38 @@ public class PublicOrderService {
         return deviceRepository.findByCookieTokenAndGroupBuyId(cookieToken, groupBuy.getId());
     }
 
-    private Optional<String> customerKeyFromCookie(GroupBuy groupBuy, String cookieToken) {
-        return device(groupBuy, cookieToken).map(CustomerDevice::getCustomerKey);
-    }
-
-    /** 쿠키 기기가 이 고객의 기기이고, 주문(또는 휴대폰 전체 번호)으로 확인된 기기인지 */
-    private boolean deviceVerifiedFor(GroupBuy groupBuy, String cookieToken, String customerKey) {
-        return device(groupBuy, cookieToken)
-                .filter(d -> d.getCustomerKey().equals(customerKey))
-                .map(CustomerDevice::isVerifiedByOrder)
-                .orElse(false);
-    }
-
     /**
      * 기기를 기억한다. 새 쿠키 토큰을 만들었으면 그 값을, 기존 쿠키를 그대로 쓰면 null 을 돌려준다.
      *
-     * @param byOrder 주문(또는 휴대폰 전체 번호)으로 확인했는지. true 인 기기만 이전 입력값의 개인정보를 채운다
+     * @param identified 본인 확인(입금자명 + 휴대폰)을 거쳤는지
      */
-    private String rememberDevice(GroupBuy groupBuy, String cookieToken, String customerKey, boolean byOrder,
+    private String rememberDevice(GroupBuy groupBuy, String cookieToken, String customerKey, boolean identified,
                                   LocalDateTime now) {
         Optional<CustomerDevice> device = device(groupBuy, cookieToken);
         if (device.isPresent()) {
-            device.get().seen(customerKey, byOrder, now);
+            device.get().seen(customerKey, identified, now);
             return null;
         }
         String token = Tokens.random(24);
-        deviceRepository.save(new CustomerDevice(groupBuy.getId(), token, customerKey, byOrder, now));
+        deviceRepository.saveAndFlush(new CustomerDevice(groupBuy.getId(), token, customerKey, identified, now));
         return token;
+    }
+
+    /**
+     * 이 기기가 볼 수 있는 주문: 이 기기에서 넣은 주문 + (본인 확인을 거쳤으면) 그 고객의 주문.
+     */
+    private List<CustomerOrder> visibleOrders(GroupBuy g, CustomerDevice device) {
+        if (device == null) {
+            return List.of();
+        }
+        Map<Long, CustomerOrder> orders = new LinkedHashMap<>();
+        orderRepository.findByGroupBuyIdAndDeviceTokenOrderByOrderNoAsc(g.getId(), device.getCookieToken())
+                .forEach(o -> orders.put(o.getId(), o));
+        if (device.isIdentified()) {
+            orderRepository.findByGroupBuyIdAndCustomerKeyOrderByOrderNoAsc(g.getId(), device.getCustomerKey())
+                    .forEach(o -> orders.putIfAbsent(o.getId(), o));
+        }
+        return orders.values().stream().sorted(Comparator.comparingInt(CustomerOrder::getOrderNo)).toList();
     }
 
     /**
@@ -350,8 +370,12 @@ public class PublicOrderService {
         if (orderRepository.existsByGroupBuyIdAndCustomerKeyAndStatus(groupBuy.getId(), phone, OrderStatus.ORDERED)) {
             warnings.add("이 휴대폰 번호로 이미 주문한 내역이 있습니다. 추가 주문이 맞으면 그대로 진행해 주세요.");
         }
-        if (orderRepository.existsByGroupBuyIdAndDepositorNameAndStatusAndCustomerKeyNot(groupBuy.getId(), depositorName,
-                OrderStatus.ORDERED, phone)) {
+        // 띄어쓰기·대소문자만 다른 이름도 같은 이름으로 본다 (입금 대조도 그렇게 비교함)
+        String name = squash(depositorName).toLowerCase(java.util.Locale.ROOT);
+        boolean sameNameByOther = orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()).stream()
+                .anyMatch(o -> o.getStatus() == OrderStatus.ORDERED && !phone.equals(o.getCustomerKey())
+                        && name.equals(squash(o.getDepositorName()).toLowerCase(java.util.Locale.ROOT)));
+        if (sameNameByOther) {
             warnings.add("같은 입금자명으로 주문한 다른 분이 있습니다. 입금 확인이 헷갈리지 않게 입금자명 뒤에 동·호수나 숫자를 "
                     + "붙여주세요. (예: 김민지1505)");
         }
@@ -404,11 +428,11 @@ public class PublicOrderService {
                 .orElseThrow(() -> ApiException.badRequest("픽업 지점을 찾을 수 없습니다."));
     }
 
-    private PublicGroupBuy toPublic(GroupBuy g, String customerKey, boolean verifiedDevice, LocalDateTime now) {
+    private PublicGroupBuy toPublic(GroupBuy g, CustomerDevice device, LocalDateTime now) {
         boolean accepting = g.isAcceptingOrders(now);
         String closedReason = accepting ? null : "주문이 마감되었습니다.";
-        List<MyOrder> myOrders = customerKey == null ? List.of() : myOrders(g, customerKey, now);
-        Prefill prefill = customerKey == null ? null : prefill(g, customerKey, verifiedDevice);
+        List<MyOrder> myOrders = myOrders(g, device, now);
+        Prefill prefill = prefill(g, device);
         return new PublicGroupBuy(g.getTitle(), g.getDescription(), g.getSeller().getDisplayName(), accepting,
                 closedReason, g.getCloseAt(),
                 g.sortedProducts().stream().map(p -> new PublicProduct(p.getId(), p.getName(), p.getUnitPrice(),
@@ -419,9 +443,9 @@ public class PublicOrderService {
                 g.getKakaoInquiryUrl(), g.usesPrepay() ? account(g) : null, myOrders, prefill);
     }
 
-    private List<MyOrder> myOrders(GroupBuy g, String customerKey, LocalDateTime now) {
+    private List<MyOrder> myOrders(GroupBuy g, CustomerDevice device, LocalDateTime now) {
         boolean accepting = g.isAcceptingOrders(now);
-        return orderRepository.findByGroupBuyIdAndCustomerKeyOrderByOrderNoAsc(g.getId(), customerKey).stream()
+        return visibleOrders(g, device).stream()
                 .sorted(Comparator.comparingInt(CustomerOrder::getOrderNo).reversed())
                 .map(o -> OrderMapper.toMyOrder(o, accepting))
                 .toList();
@@ -429,15 +453,22 @@ public class PublicOrderService {
 
     /**
      * 다음 주문 때 이전 입력값을 자동으로 채운다 (같은 공구 안에서).
-     * 뒷4자리로만 확인한 기기에는 휴대폰 전체 번호·동호수·배송지를 채우지 않는다 (남이 뒷4자리를 맞혀 개인정보를 보는 것 방지).
+     * 휴대폰 전체 번호·동호수·배송지는 이 기기에서 넣은 주문에서만 가져온다.
+     * 본인 확인만 거친 기기(다른 기기에서 주문)에는 입금자명·닉네임·수령 방법만 채운다 (limited).
      */
-    private Prefill prefill(GroupBuy g, String customerKey, boolean verifiedDevice) {
-        List<CustomerOrder> orders = orderRepository.findByGroupBuyIdAndCustomerKeyOrderByOrderNoAsc(g.getId(), customerKey);
+    private Prefill prefill(GroupBuy g, CustomerDevice device) {
+        if (device == null) {
+            return null;
+        }
+        List<CustomerOrder> own = orderRepository.findByGroupBuyIdAndDeviceTokenOrderByOrderNoAsc(g.getId(),
+                device.getCookieToken());
+        boolean fromOwn = !own.isEmpty();
+        List<CustomerOrder> orders = fromOwn ? own : visibleOrders(g, device);
         if (orders.isEmpty()) {
             return null;
         }
         CustomerOrder last = orders.get(orders.size() - 1);
-        if (!verifiedDevice) {
+        if (!fromOwn) {
             return new Prefill(null, last.getDepositorName(), last.getNickname(), null, last.getReceiveMethod(),
                     last.getPickupPoint() == null ? null : last.getPickupPoint().getId(), last.getPaymentMethod(),
                     null, null, null, null, null, true);

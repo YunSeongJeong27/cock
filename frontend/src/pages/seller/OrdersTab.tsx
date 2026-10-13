@@ -54,7 +54,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
       </div>
       <ErrorBox message={error} />
       <div className="table-wrap">
-        <table>
+        <table className="stack">
           <thead>
             <tr><th>#</th><th>고객</th><th>상품</th><th className="right">금액</th><th>결제</th><th>상태</th><th></th></tr>
           </thead>
@@ -62,29 +62,30 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             {shown.map((o) => (
               <Fragment key={o.id}>
                 <tr className={o.active ? '' : 'dim'}>
-                  <td>{o.orderNo}</td>
-                  <td>
+                  <td className="hide-mobile">{o.orderNo}</td>
+                  <td className="stack-title">
+                    <span className="show-mobile muted">{o.orderNo}번 · </span>
                     <b>{o.nickname || o.depositorName}</b>
                     {o.nickname && o.depositorName && <div className="small muted">입금자 {o.depositorName}</div>}
                     {o.phone && <div className="small muted">{o.phone}</div>}
                     {o.duplicateContact && <div className="small" style={{ color: 'var(--warn)' }}>⚠ 같은 연락처 주문 여러 건</div>}
                     {o.source === 'COMMENT' && <span className="chip">댓글</span>}
                   </td>
-                  <td className="small">{o.items.map((i) => `${i.productName} ${i.quantity}`).join(', ')}</td>
-                  <td className="right">{won(o.expectedAmount)}</td>
-                  <td className="small">
+                  <td className="small" data-label="상품">{o.items.map((i) => `${i.productName} ${i.quantity}`).join(', ')}</td>
+                  <td className="right" data-label="금액">{won(o.expectedAmount)}</td>
+                  <td className="small" data-label="결제">
                     {o.paymentMethod === 'PREPAID' ? '선입금' : '현장결제'}
                     <div className="muted">{o.receiveMethod === 'DELIVERY' ? '배송' : `픽업${o.pickupPointName ? ' · ' + o.pickupPointName : ''}`}</div>
                   </td>
-                  <td>
+                  <td data-label="상태">
                     <StatusBadge status={o.status} label={o.statusLabel} />
                     {o.refundRequired && !o.refundedAt && <div><span className="badge badge-CANCELLED">환불 필요</span></div>}
                     {o.refundedAt && <div className="small muted">환불 완료</div>}
                   </td>
-                  <td><button className="btn small" onClick={() => setOpen(open === o.id ? null : o.id)}>{open === o.id ? '닫기' : '상세'}</button></td>
+                  <td className="stack-action"><button className="btn small" onClick={() => setOpen(open === o.id ? null : o.id)}>{open === o.id ? '닫기' : '상세'}</button></td>
                 </tr>
                 {open === o.id && (
-                  <tr>
+                  <tr className="stack-detail">
                     <td colSpan={7} style={{ background: '#fafafa' }}>
                       <div className="small">
                         주문 {dateTime(o.orderedAt)}

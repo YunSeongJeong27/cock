@@ -1,12 +1,14 @@
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth'
 
 export default function SellerLayout() {
   const { me, logout } = useAuth()
   const navigate = useNavigate()
+  // 관리자 표는 열이 많아 PC 에서 더 넓게 쓴다
+  const wider = useLocation().pathname.startsWith('/admin')
   return (
     <div>
-      <header className="topbar">
+      <header className={`topbar${wider ? ' wider' : ''}`}>
         <Link to="/seller" className="brand">📌 입금콕</Link>
         <nav>
           <NavLink to="/seller" end>공구</NavLink>
@@ -32,7 +34,7 @@ export default function SellerLayout() {
           이용 기간이 끝났습니다{me.plan === 'TRIAL' ? ' (무료 체험 종료)' : ''}. 계속 쓰시려면 관리자에게 이용료를 입금해 주세요.
         </div>
       )}
-      <main className="container">
+      <main className={`container wide${wider ? ' wider' : ''}`}>
         <Outlet />
       </main>
       <footer className="footer">

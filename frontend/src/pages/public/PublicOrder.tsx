@@ -27,7 +27,7 @@ interface Prefill {
   phone: string; depositorName: string; nickname: string | null; unitAddress: string | null; receiveMethod: ReceiveMethod
   pickupPointId: number | null; paymentMethod: PaymentMethod; recipientName: string | null; recipientPhone: string | null
   zipcode: string | null; address: string | null; addressDetail: string | null
-  /** true: 입금자명 + 뒷4자리로만 확인한 기기라 휴대폰·동호수·배송지는 비어 있음 */
+  /** true: 이 기기에서 넣은 주문이 없어(본인 확인만 함) 휴대폰·동호수·배송지는 비어 있음 */
   limited: boolean
 }
 interface View {
@@ -278,7 +278,7 @@ export default function PublicOrder() {
       {view.acceptingOrders && (
         <form className="card" onSubmit={(e) => submit(e)}>
           <h3>{view.myOrders.length > 0 ? '추가 주문하기' : '주문서'}</h3>
-          {view.prefill?.limited && <div className="small muted mb">개인정보 보호를 위해 휴대폰 번호·주소는 다시 입력해 주세요.</div>}
+          {view.prefill?.limited && <div className="small muted mb">개인정보 보호를 위해 다른 기기에서 입력한 휴대폰 번호·주소는 채우지 않습니다. 다시 입력해 주세요.</div>}
           {view.products.map((p) => (
             <div key={p.id} className="product-row">
               <div>

@@ -4,7 +4,7 @@ import { api, dateTime, errorMessage, won } from '../../api'
 import { ErrorBox, StatusBadge } from '../../components/Ui'
 import type { GroupBuySummary } from '../../types'
 
-const STATUS_LABEL = { DRAFT: '작성 중', OPEN: '진행 중', CLOSED: '마감' } as const
+const STATUS_LABEL = { DRAFT: '작성 중', OPEN: '주문 받는 중', CLOSED: '마감' } as const
 
 export default function GroupBuyList() {
   const [list, setList] = useState<GroupBuySummary[] | null>(null)
@@ -28,6 +28,7 @@ export default function GroupBuyList() {
           <Link className="btn primary" to="/seller/group-buys/new">첫 주문서 링크 만들기</Link>
         </div>
       )}
+      <div className="card-grid">
       {list?.map((g) => (
         <Link key={g.id} to={`/seller/group-buys/${g.id}`} className="list-item">
           <div className="card">
@@ -47,6 +48,7 @@ export default function GroupBuyList() {
           </div>
         </Link>
       ))}
+      </div>
     </div>
   )
 }

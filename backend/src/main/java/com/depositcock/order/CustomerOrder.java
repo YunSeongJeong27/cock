@@ -112,6 +112,9 @@ public class CustomerOrder {
     private boolean refundRequired;
     private LocalDateTime refundedAt;
 
+    /** 이 주문을 넣은 고객 기기의 쿠키 토큰. 그 기기에만 주문 내용·이전 입력값을 보여준다 (댓글 주문 등은 null) */
+    private String deviceToken;
+
     /** 내부용 랜덤 토큰 (고객에게 안내하지 않음) */
     @Column(nullable = false, unique = true)
     private String lookupToken;
@@ -206,6 +209,10 @@ public class CustomerOrder {
             depositReportedAt = now;
             updatedAt = now;
         }
+    }
+
+    public void placedFrom(String deviceToken) {
+        this.deviceToken = deviceToken;
     }
 
     public void confirmPaid(String depositorName, int amount, Long depositRowId, LocalDateTime now) {
@@ -367,6 +374,10 @@ public class CustomerOrder {
 
     public String getPaidDepositorName() {
         return paidDepositorName;
+    }
+
+    public String getDeviceToken() {
+        return deviceToken;
     }
 
     public PaidAliasChange getPaidAliasChange() {

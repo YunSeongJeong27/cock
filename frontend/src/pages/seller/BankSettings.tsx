@@ -71,12 +71,12 @@ export default function BankSettings() {
         <button className="btn primary">저장</button>
         {presets.length > 0 && (
           <div className="table-wrap mt">
-            <table>
+            <table className="stack">
               <thead><tr><th>이름</th><th>입금자명</th><th>금액</th><th>날짜</th><th>유형</th><th></th></tr></thead>
               <tbody>
                 {presets.map((p) => (
-                  <tr key={p.id}><td>{p.name}</td><td>{p.nameColumn}</td><td>{p.amountColumn}</td><td>{p.dateColumn ?? '-'}</td><td>{p.typeColumn ?? '-'}</td>
-                    <td><button type="button" className="btn small danger" onClick={() => remove(`/api/seller/bank-columns/presets/${p.id}`)}>삭제</button></td></tr>
+                  <tr key={p.id}><td className="stack-title">{p.name}</td><td data-label="입금자명">{p.nameColumn}</td><td data-label="금액">{p.amountColumn}</td><td data-label="날짜">{p.dateColumn ?? '-'}</td><td data-label="유형">{p.typeColumn ?? '-'}</td>
+                    <td className="stack-action"><button type="button" className="btn small danger" onClick={() => remove(`/api/seller/bank-columns/presets/${p.id}`)}>삭제</button></td></tr>
                 ))}
               </tbody>
             </table>

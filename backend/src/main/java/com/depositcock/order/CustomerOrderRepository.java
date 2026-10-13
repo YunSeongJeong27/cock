@@ -17,15 +17,17 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     Optional<CustomerOrder> findByIdAndGroupBuyId(Long id, Long groupBuyId);
 
+    List<CustomerOrder> findByGroupBuyIdAndDeviceTokenOrderByOrderNoAsc(Long groupBuyId, String deviceToken);
+
     boolean existsByGroupBuyIdAndCustomerKeyAndStatus(Long groupBuyId, String customerKey, OrderStatus status);
 
-    boolean existsByGroupBuyIdAndDepositorNameAndStatusAndCustomerKeyNot(Long groupBuyId, String depositorName,
-                                                                         OrderStatus status, String customerKey);
 
     @Query("select coalesce(max(o.orderNo), 0) from CustomerOrder o where o.groupBuy.id = :groupBuyId")
     int maxOrderNo(@Param("groupBuyId") Long groupBuyId);
 
     boolean existsByItemsProductId(Long productId);
+
+    boolean existsByPickupPointId(Long pickupPointId);
 
     /** 이 판매자의 모든 공구에서 이 고객의 입금 확정 주문 (별칭을 되돌려도 되는지 볼 때) */
     @Query("select o from CustomerOrder o where o.groupBuy.seller.id = :sellerId and o.customerKey = :customerKey"

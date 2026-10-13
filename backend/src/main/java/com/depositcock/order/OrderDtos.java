@@ -6,6 +6,7 @@ import java.util.List;
 import com.depositcock.groupbuy.GroupBuyDtos.PickupPointResponse;
 import com.depositcock.groupbuy.ShippingFeeType;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -19,7 +20,7 @@ public final class OrderDtos {
 
     // ---------- 고객(공개) ----------
 
-    public record OrderItemRequest(@NotNull Long productId, @Min(0) int quantity) {
+    public record OrderItemRequest(@NotNull Long productId, @Min(0) @Max(9999) int quantity) {
     }
 
     public record PlaceOrderRequest(

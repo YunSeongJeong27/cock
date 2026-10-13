@@ -91,13 +91,15 @@ class ReviewFixesOrderTest extends IntegrationTest {
     void cancelWithPhoneAndNameOnly() throws Exception {
         Opened g = open(groupBuyBody("취소", List.of(product("상품", 1000, null))));
         String url = "/api/public/g/" + g.token();
-        mvc.perform(withJson(post(url + "/orders"), order(g.productId(), 1, "010-5200-0001", "김 지영", true))).andExpect(status().isOk());
+        MvcResult first = mvc.perform(withJson(post(url + "/orders"), order(g.productId(), 1, "010-5200-0001", "김 지영", true)))
+                .andExpect(status().isOk()).andReturn();
+        Cookie device = first.getResponse().getCookie("dcg_" + g.token());
 
-        // 주문 1건: 주문번호 없이 휴대폰 + 입금자명(띄어쓰기 달라도)으로 취소
+        // 주문 1건: 주문번호 없이 휴대폰 + 입금자명(띄어쓰기 달라도)으로 취소. 주문한 기기에서는 취소된 주문이 보인다
         Map<String, Object> cancel = new HashMap<>();
         cancel.put("phone", "01052000001");
         cancel.put("depositorName", "김지영");
-        mvc.perform(withJson(post(url + "/cancel"), cancel)).andExpect(status().isOk())
+        mvc.perform(withJson(post(url + "/cancel").cookie(device), cancel)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.myOrders[0].status").value("CANCELLED"));
 
         // 주문 2건: 고르라는 409 + 주문 목록 → 주문번호로 취소
@@ -150,10 +152,11 @@ class ReviewFixesOrderTest extends IntegrationTest {
                 .andExpect(jsonPath("$.prefill.limited").value(true))
                 .andExpect(jsonPath("$.prefill.address").doesNotExist());
 
-        // 휴대폰 전체 번호로 확인하면 주문한 기기와 같은 수준
+        // 휴대폰 전체 번호로 확인해도 다른 기기에서 넣은 주문의 개인정보는 채우지 않는다 (2026-10-14 보안 점검)
         mvc.perform(withJson(post(url + "/identify"), Map.of("depositorName", "박서준", "phone", "010-5300-1234")))
-                .andExpect(jsonPath("$.prefill.limited").value(false))
-                .andExpect(jsonPath("$.prefill.address").value("서울시 비밀구 1"));
+                .andExpect(jsonPath("$.myOrders.length()").value(1))
+                .andExpect(jsonPath("$.prefill.limited").value(true))
+                .andExpect(jsonPath("$.prefill.address").doesNotExist());
     }
 
     @Test

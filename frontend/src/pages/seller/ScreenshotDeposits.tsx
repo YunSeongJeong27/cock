@@ -83,16 +83,16 @@ export default function ScreenshotDeposits({ groupBuy, onSaved }: { groupBuy: Gr
           {rows && (
             <div className="mt">
               <div className="table-wrap">
-                <table>
+                <table className="stack">
                   <thead><tr><th>캡처</th><th>입금자명</th><th>금액</th><th>일시</th><th></th></tr></thead>
                   <tbody>
                     {rows.map((r, i) => (
                       <tr key={i} style={{ background: r.duplicateSuspected ? 'var(--warn-weak)' : undefined }}>
-                        <td className="small">{r.imageIndex + 1}{r.duplicateSuspected && <div style={{ color: 'var(--warn)' }}>중복 의심</div>}</td>
-                        <td><input type="text" value={r.name} onChange={(e) => update(i, { name: e.target.value })} style={{ borderColor: r.name.includes('[?]') ? 'var(--danger)' : undefined }} /></td>
-                        <td><input type="number" value={r.amount} onChange={(e) => update(i, { amount: Number(e.target.value) })} style={{ width: 110 }} /></td>
-                        <td><input type="text" value={r.datetime ?? ''} onChange={(e) => update(i, { datetime: e.target.value })} style={{ width: 140 }} /></td>
-                        <td><button className="btn small danger" onClick={() => setRows(rows.filter((_, j) => j !== i))}>삭제</button></td>
+                        <td className="small" data-label="캡처">{r.imageIndex + 1}번째{r.duplicateSuspected && <div style={{ color: 'var(--warn)' }}>중복 의심</div>}</td>
+                        <td data-label="입금자명"><input type="text" value={r.name} onChange={(e) => update(i, { name: e.target.value })} style={{ borderColor: r.name.includes('[?]') ? 'var(--danger)' : undefined }} /></td>
+                        <td data-label="금액"><input type="number" value={r.amount} onChange={(e) => update(i, { amount: Number(e.target.value) })} style={{ width: 110 }} /></td>
+                        <td data-label="일시"><input type="text" value={r.datetime ?? ''} onChange={(e) => update(i, { datetime: e.target.value })} style={{ width: 140 }} /></td>
+                        <td className="stack-action"><button className="btn small danger" onClick={() => setRows(rows.filter((_, j) => j !== i))}>삭제</button></td>
                       </tr>
                     ))}
                   </tbody>

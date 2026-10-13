@@ -40,16 +40,16 @@ public class SellerOrderService {
         return OrderMapper.toSellerOrders(orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()));
     }
 
-    /** 다른 판매자의 주문이면 404 */
-    public CustomerOrder getOwnedOrder(Long sellerId, Long groupBuyId, Long orderId) {
-        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+    /** 다른 판매자의 주문이면 404. 주문을 바꾸는 요청이므로 공구를 잠근 뒤 최신 주문을 읽는다 */
+    private CustomerOrder getOwnedOrderForUpdate(Long sellerId, Long groupBuyId, Long orderId) {
+        GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         return orderRepository.findByIdAndGroupBuyId(orderId, groupBuy.getId())
                 .orElseThrow(() -> ApiException.notFound("주문을 찾을 수 없습니다."));
     }
 
     @Transactional
     public SellerOrder setPickedUp(Long sellerId, Long groupBuyId, Long orderId, boolean pickedUp) {
-        CustomerOrder order = getOwnedOrder(sellerId, groupBuyId, orderId);
+        CustomerOrder order = getOwnedOrderForUpdate(sellerId, groupBuyId, orderId);
         if (!order.isActive()) {
             throw ApiException.badRequest("취소된 주문입니다.");
         }
@@ -59,7 +59,7 @@ public class SellerOrderService {
 
     @Transactional
     public SellerOrder cancel(Long sellerId, Long groupBuyId, Long orderId) {
-        CustomerOrder order = getOwnedOrder(sellerId, groupBuyId, orderId);
+        CustomerOrder order = getOwnedOrderForUpdate(sellerId, groupBuyId, orderId);
         if (!order.isActive()) {
             throw ApiException.badRequest("이미 취소된 주문입니다.");
         }
@@ -69,7 +69,7 @@ public class SellerOrderService {
 
     @Transactional
     public SellerOrder markRefunded(Long sellerId, Long groupBuyId, Long orderId) {
-        CustomerOrder order = getOwnedOrder(sellerId, groupBuyId, orderId);
+        CustomerOrder order = getOwnedOrderForUpdate(sellerId, groupBuyId, orderId);
         if (!order.isRefundRequired()) {
             throw ApiException.badRequest("환불이 필요한 주문이 아닙니다.");
         }
