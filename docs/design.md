@@ -25,7 +25,7 @@
 | M1 가입/로그인·멀티테넌트·관리자 | 구현 + 테스트 |
 | M2 주문서 링크 | 구현 + 테스트 + 실제 실행(브라우저) 확인 |
 | M3 입금 대조·수령·엑셀·문구 | 구현 + 테스트 + 실제 실행 확인 |
-| M4 은행앱 스크린샷 | 구현 + 테스트(비전 AI는 가짜로 대체). 실제 AI 정확도·비용 미검증 (API 키·실제 캡처 필요) |
+| M4 은행앱 스크린샷 | 구현 + 테스트(비전 AI는 가짜로 대체). Spring AI + claude-haiku-5-5 로 교체, 하루 캡처 제한. 실제 API 동작·정확도·비용 미검증 (API 키 필요) |
 | M5 운영 준비 | 일부: 요청 제한, prod 프로필, Dockerfile, 탈퇴·공구 삭제 시 파기, 약관·방침 초안. 남음: 배포처·운영 DB·백업·오류 알림·사업자/통신판매업 확인·법률 검토 |
 | M6 댓글 집계 | 구현 + 테스트 (파프리카 픽스처 통과). 다품목 규칙은 미결이라 상품 1개 기준 |
 | M7 카톡 파일 파서 | 보류: 실제 샘플 없음 (원문 3장 "추측으로 작성 금지") |
@@ -49,7 +49,7 @@
 - PDF 거래내역: 안내 문구로 거절 (미결 16 유지)
 - 주문 정리표 엑셀(입금콕이 만들어 판매자에게 주는 장부 파일, 은행 거래내역과 별개): 취소 주문은 별도 시트
 - 입금 확인 문구 형식: "[공구명] 입금 확인 안내 / ✅ 닉네임(없으면 입금자명) 상품 N개 입금 확인"
-- 비전 AI: VisionExtractor 구현체로 Claude API(공식 Java SDK, 기본 모델 claude-opus-5-5, 구조화 출력). 환경변수 APP_VISION_PROVIDER=anthropic + ANTHROPIC_API_KEY 일 때만 켬. 없으면 꺼짐(검수 표에 직접 입력). 모델 거절(refusal) 시 대체 모델 자동 재시도(fallback)는 넣지 않음
+- 비전 AI 거절(refusal) 시 대체 모델 자동 재시도(fallback)는 넣지 않음. "거절했습니다, 직접 입력" 안내
 - 스크린샷: 한 번에 20장, 장당 10MB, 이미지는 메모리에서만 쓰고 저장 안 함. [?] 가 남으면 저장 불가
 - 댓글 텍스트 붙여넣기 형식: 한 줄에 "닉네임 | 댓글" / "닉네임: 댓글" / 탭 (우리가 정한 형식. 밴드 복사 텍스트 실제 형식은 미확인)
 - 댓글 → 주문 반영: source=COMMENT 주문으로 만들어 입금 대조·수령·엑셀을 그대로 씀. 재반영 시 이전 댓글 주문을 지우고 새로 만듦(입금 확정·수령된 게 있으면 거부). 결제 방식은 공구가 선입금을 쓰면 선입금, 아니면 현장결제
@@ -58,6 +58,25 @@
 - 가입 직후 첫 화면 = "주문서 링크 만들기"
 - 판매자 본인 탈퇴 기능 (비밀번호 확인 → 전체 파기)
 - 로컬 샘플 데이터: db/local/V1_0_1 (데모 판매자·공구·주문), 로컬 프로필에서만
+
+### 비전 AI 결정 (2026-10-13, 2차)
+- 호출 방식: Anthropic Java SDK 직접 호출 → **Spring AI** 로 교체. VisionExtractor 인터페이스는 유지 [결정] (상업 서비스 + 포트폴리오 둘 다 고려)
+- Spring AI 버전: **1.1.8** — 1.1.x 가 Spring Boot 3.5 대상, 2.x 는 Boot 4 대상이라 못 씀 [사실, Spring AI GitHub v1.1.8 / v2.0.1 루트 pom 의 spring-boot.version 3.5.15 / 4.1.1]
+- starter(자동 설정) 대신 모듈(spring-ai-anthropic, spring-ai-client-chat)을 직접 써서, 키가 없으면 빈을 만들지 않음 [제안]
+- 구조화 출력: `AdvisorParams.ENABLE_NATIVE_STRUCTURED_OUTPUT` 으로 네이티브 구조화 출력 켬 [결정]
+  - [사실, 소스·로컬 가짜 서버로 확인] Spring AI 1.1.8 은 이때 요청에 `output_format: {type: json_schema, schema}` + 베타 헤더 `structured-outputs-2025-11-13` 를 보낸다
+  - [미확인] Anthropic 문서는 `output_format` 을 deprecated(현재는 `output_config.format`)로 표기. 진짜 API 가 claude-haiku-5-5 에서 이 요청을 받아주는지는 API 키로 확인 필요
+- 기본 모델: **claude-haiku-5-5** (환경변수 APP_VISION_MODEL 로 변경). 기본은 꺼짐 유지 (APP_VISION_PROVIDER=anthropic + ANTHROPIC_API_KEY 일 때만 켬) [결정]
+- Haiku 5.5 대응 [사실, Anthropic 마이그레이션 문서 기준]:
+  - temperature 는 1 이 아니면 400 → 1.0 고정 (Spring AI 기본 0.8 이라 명시 필요)
+  - thinking 이 기본으로 켜져 응답이 thinking 블록으로 시작할 수 있음 → Spring AI 1.1.8 의 `.entity()` 는 첫 번째 Generation 만 읽어서 실패함 → ThinkingFilterAdvisor 로 thinking Generation 을 걸러냄 [제안]
+- 재시도: Spring AI 기본(최대 10회, 긴 대기) 대신 2회 [제안]
+- 캡처 사용량 제한: 판매자별 하루 장수 제한, 기본 30장 (APP_VISION_DAILY_CAPTURE_LIMIT). 날짜는 Asia/Seoul. AI 로 보내기 전에 장수를 먼저 차감(실패해도 되돌리지 않음). 남은 장수보다 많이 올리면 아무것도 차감하지 않고 "오늘 한도 초과, 직접 입력" 안내 + 빈 검수 표 [결정: 제한·기본값·안내 / 제안: 차감 방식]
+- AI 가 꺼져 있으면 사용량을 세지 않음 [제안]
+- 관리자 화면: 판매자별 캡처 사용 장수(오늘 / 이번 달), 하루 제한 장수 변경(비우면 기본값) [결정]
+- DB: V2__capture_usage.sql (seller.daily_capture_limit, capture_usage 테이블) 
+- 확인한 것: 단위·통합 테스트(가짜 ChatModel로 네이티브 스키마가 AnthropicChatOptions 에 들어가는지, temperature 1, 이미지 첨부, thinking 필터, 거절 처리), 로컬 가짜 Anthropic 서버로 실제 HTTP 요청 본문 확인
+- 남은 확인 [미결]: API 키가 생기면 claude-haiku-5-5 로 실제 동작 확인 (output_format 수용 여부, 실제 캡처 정확도, 장당 비용)
 
 ### 새 미결 (이번 개발에서 드러난 것)
 - 프론트 react-router 6.x 에 남은 보통(moderate) 보안 권고 1건: 7.x 로 올려야 해결 (주요 변경). 우리 코드는 사용자 입력을 이동 경로로 쓰지 않음

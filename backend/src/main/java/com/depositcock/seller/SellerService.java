@@ -8,6 +8,7 @@ import java.util.Locale;
 import com.depositcock.common.ApiException;
 import com.depositcock.common.AppProperties;
 import com.depositcock.groupbuy.GroupBuyRepository;
+import com.depositcock.vision.CaptureUsageService;
 import com.depositcock.seller.SellerDtos.AdminSellerRow;
 import com.depositcock.seller.SellerDtos.AdminUpdateRequest;
 import com.depositcock.seller.SellerDtos.SignupRequest;
@@ -25,14 +26,17 @@ public class SellerService {
     private final GroupBuyRepository groupBuyRepository;
     private final PasswordEncoder passwordEncoder;
     private final AppProperties properties;
+    private final CaptureUsageService captureUsageService;
     private final Clock clock;
 
     public SellerService(SellerRepository sellerRepository, GroupBuyRepository groupBuyRepository,
-                         PasswordEncoder passwordEncoder, AppProperties properties, Clock clock) {
+                         PasswordEncoder passwordEncoder, AppProperties properties,
+                         CaptureUsageService captureUsageService, Clock clock) {
         this.sellerRepository = sellerRepository;
         this.groupBuyRepository = groupBuyRepository;
         this.passwordEncoder = passwordEncoder;
         this.properties = properties;
+        this.captureUsageService = captureUsageService;
         this.clock = clock;
     }
 
@@ -73,9 +77,13 @@ public class SellerService {
     public List<AdminSellerRow> listForAdmin() {
         LocalDateTime now = LocalDateTime.now(clock);
         return sellerRepository.findAllByOrderByIdDesc().stream()
-                .map(s -> new AdminSellerRow(s.getId(), s.getEmail(), s.getDisplayName(), s.getRole(), s.getPlan(),
-                        s.getTrialEndsAt(), s.getPaidUntil(), s.isExpired(now), s.isSuspended(), s.getAdminMemo(),
-                        s.getCreatedAt(), groupBuyRepository.countBySellerId(s.getId())))
+                .map(s -> {
+                    CaptureUsageService.Usage usage = captureUsageService.usage(s.getId());
+                    return new AdminSellerRow(s.getId(), s.getEmail(), s.getDisplayName(), s.getRole(), s.getPlan(),
+                            s.getTrialEndsAt(), s.getPaidUntil(), s.isExpired(now), s.isSuspended(), s.getAdminMemo(),
+                            s.getCreatedAt(), groupBuyRepository.countBySellerId(s.getId()), usage.usedToday(),
+                            usage.usedThisMonth(), usage.dailyLimit(), usage.customLimit());
+                })
                 .toList();
     }
 
@@ -88,6 +96,7 @@ public class SellerService {
         }
         seller.updateByAdmin(request.plan(), request.paidUntil(), request.trialEndsAt(), request.suspended(),
                 blankToNull(request.adminMemo()));
+        seller.changeDailyCaptureLimit(request.dailyCaptureLimit());
     }
 
     /**

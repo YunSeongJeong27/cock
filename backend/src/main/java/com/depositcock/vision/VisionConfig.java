@@ -7,7 +7,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * app.vision.provider = anthropic 이고 ANTHROPIC_API_KEY 가 있으면 Claude, 아니면 Fake.
+ * app.vision.provider = anthropic 이고 ANTHROPIC_API_KEY 가 있으면 Claude(Spring AI, 기본 모델 claude-haiku-5-5), 아니면 꺼짐(Fake).
+ * 기본은 꺼짐.
  */
 @Configuration
 public class VisionConfig {

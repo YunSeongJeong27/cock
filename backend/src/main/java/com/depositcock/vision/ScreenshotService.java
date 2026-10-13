@@ -31,11 +31,14 @@ public class ScreenshotService {
     private final VisionExtractor extractor;
     private final GroupBuyService groupBuyService;
     private final DepositService depositService;
+    private final CaptureUsageService usageService;
 
-    public ScreenshotService(VisionExtractor extractor, GroupBuyService groupBuyService, DepositService depositService) {
+    public ScreenshotService(VisionExtractor extractor, GroupBuyService groupBuyService, DepositService depositService,
+                             CaptureUsageService usageService) {
         this.extractor = extractor;
         this.groupBuyService = groupBuyService;
         this.depositService = depositService;
+        this.usageService = usageService;
     }
 
     public record DepositDraft(String name, long amount, String datetime, String type, boolean duplicateSuspected,
@@ -43,13 +46,14 @@ public class ScreenshotService {
     }
 
     public record DepositExtractResponse(List<DepositDraft> deposits, int skippedWithdrawals, String provider,
-                                         String notice) {
+                                         String notice, boolean limitExceeded, Integer remainingToday) {
     }
 
     public record CommentDraft(String author, String content, boolean duplicateSuspected, int imageIndex) {
     }
 
-    public record CommentExtractResponse(List<CommentDraft> comments, String provider, String notice) {
+    public record CommentExtractResponse(List<CommentDraft> comments, String provider, String notice,
+                                         boolean limitExceeded, Integer remainingToday) {
     }
 
     public record SaveRow(String name, int amount, String datetimeText) {
@@ -58,10 +62,17 @@ public class ScreenshotService {
     public DepositExtractResponse extractDeposits(Long sellerId, Long groupBuyId, List<MultipartFile> files) {
         groupBuyService.getOwned(sellerId, groupBuyId);
         if (!extractor.available()) {
-            return new DepositExtractResponse(List.of(), 0, extractor.provider(), notConfigured());
+            return new DepositExtractResponse(List.of(), 0, extractor.provider(), notConfigured(), false, null);
         }
+        checked(files);
+        CaptureUsageService.Reservation reservation = usageService.reserve(sellerId, files.size());
+        if (!reservation.allowed()) {
+            return new DepositExtractResponse(List.of(), 0, extractor.provider(),
+                    limitNotice(reservation, files.size()), true, reservation.remainingBefore());
+        }
+        int remainingAfter = reservation.remainingBefore() - files.size();
         List<List<ExtractedDeposit>> perImage = new ArrayList<>();
-        for (MultipartFile file : checked(files)) {
+        for (MultipartFile file : files) {
             List<ExtractedDeposit> list = new ArrayList<>(extractor.extractDeposits(bytes(file), mediaType(file)));
             list.sort(Comparator.comparingInt(ExtractedDeposit::order));
             perImage.add(list);
@@ -81,7 +92,8 @@ public class ScreenshotService {
                     type, item.duplicateSuspected(), item.imageIndex()));
         }
         return new DepositExtractResponse(drafts, skipped, extractor.provider(),
-                "AI가 읽은 결과입니다. 화면과 비교해 이름·금액을 꼭 확인하세요.");
+                "AI가 읽은 결과입니다. 화면과 비교해 이름·금액을 꼭 확인하세요. (오늘 남은 캡처 " + remainingAfter + "장)",
+                false, remainingAfter);
     }
 
     public DepositService.SaveResult saveDeposits(Long sellerId, Long groupBuyId, List<SaveRow> rows) {
@@ -108,10 +120,17 @@ public class ScreenshotService {
     public CommentExtractResponse extractComments(Long sellerId, Long groupBuyId, List<MultipartFile> files) {
         groupBuyService.getOwned(sellerId, groupBuyId);
         if (!extractor.available()) {
-            return new CommentExtractResponse(List.of(), extractor.provider(), notConfigured());
+            return new CommentExtractResponse(List.of(), extractor.provider(), notConfigured(), false, null);
         }
+        checked(files);
+        CaptureUsageService.Reservation reservation = usageService.reserve(sellerId, files.size());
+        if (!reservation.allowed()) {
+            return new CommentExtractResponse(List.of(), extractor.provider(), limitNotice(reservation, files.size()),
+                    true, reservation.remainingBefore());
+        }
+        int remainingAfter = reservation.remainingBefore() - files.size();
         List<List<ExtractedComment>> perImage = new ArrayList<>();
-        for (MultipartFile file : checked(files)) {
+        for (MultipartFile file : files) {
             List<ExtractedComment> list = new ArrayList<>(extractor.extractComments(bytes(file), mediaType(file)));
             list.sort(Comparator.comparingInt(ExtractedComment::order));
             perImage.add(list);
@@ -120,7 +139,16 @@ public class ScreenshotService {
                 .map(i -> new CommentDraft(nullToEmpty(i.value().author()).trim(), nullToEmpty(i.value().content()).trim(),
                         i.duplicateSuspected(), i.imageIndex()))
                 .toList();
-        return new CommentExtractResponse(drafts, extractor.provider(), "AI가 읽은 결과입니다. 작성자·내용을 확인하세요.");
+        return new CommentExtractResponse(drafts, extractor.provider(),
+                "AI가 읽은 결과입니다. 작성자·내용을 확인하세요. (오늘 남은 캡처 " + remainingAfter + "장)", false, remainingAfter);
+    }
+
+    private static String limitNotice(CaptureUsageService.Reservation r, int requested) {
+        if (r.remainingBefore() <= 0) {
+            return "오늘 캡처 한도(" + r.dailyLimit() + "장)를 초과했습니다. 아래 표에 직접 입력해 주세요. (내일 다시 쓸 수 있습니다)";
+        }
+        return "오늘 캡처 한도 초과: 남은 장수는 " + r.remainingBefore() + "장인데 " + requested
+                + "장을 올렸습니다. 장수를 줄여서 다시 올리거나 아래 표에 직접 입력해 주세요.";
     }
 
     private static String notConfigured() {

@@ -16,6 +16,10 @@ interface Row {
   adminMemo: string | null
   createdAt: string
   groupBuyCount: number
+  captureToday: number
+  captureThisMonth: number
+  dailyCaptureLimit: number
+  customCaptureLimit: boolean
 }
 
 /** 슈퍼 관리자: 판매자 목록, 플랜(무료 체험/유료)·유료 만료일·사용 제한 수동 변경 */
@@ -35,6 +39,8 @@ export default function AdminSellers() {
     try {
       await api.put(`/api/admin/sellers/${r.id}`, {
         plan: r.plan, paidUntil: r.paidUntil || null, trialEndsAt: r.trialEndsAt || null, suspended: r.suspended, adminMemo: r.adminMemo,
+        // 기본값을 쓰던 판매자는 제한을 바꾸지 않았으면 그대로 기본값(null) 유지
+        dailyCaptureLimit: r.customCaptureLimit ? r.dailyCaptureLimit : null,
       })
       setEditing((e) => {
         const next = { ...e }
@@ -62,6 +68,7 @@ export default function AdminSellers() {
   return (
     <div>
       <h1>판매자 관리</h1>
+      <p className="muted small">캡처(비전 AI) 하루 제한: 판매자별로 바꿀 수 있습니다. 비우면 기본값을 씁니다. 날짜는 한국 시간 기준입니다.</p>
       <p className="muted small">판매자가 이용료를 입금하면 플랜을 "유료"로 바꾸고 유료 만료일을 넣으세요. 기간이 끝나도 자동으로 막지 않습니다. 막아야 하면 "사용 제한"을 켜세요 (조회만 가능, 고객 주문은 계속 받음).</p>
       <div className="row mb">
         <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} style={{ width: 200 }}>
@@ -72,9 +79,9 @@ export default function AdminSellers() {
       </div>
       <ErrorBox message={error} />
       <div className="table-wrap">
-        <table>
+        <table style={{ minWidth: 1200 }}>
           <thead>
-            <tr><th>판매자</th><th>가입일</th><th>공구</th><th>플랜</th><th>무료 체험 끝</th><th>유료 만료일</th><th>상태</th><th>메모</th><th></th></tr>
+            <tr><th>판매자</th><th>가입일</th><th>공구</th><th>플랜</th><th>무료 체험 끝</th><th>유료 만료일</th><th>상태</th><th>캡처 오늘/이번 달</th><th>캡처 하루 제한</th><th>메모</th><th></th></tr>
           </thead>
           <tbody>
             {shown.map((row) => {
@@ -87,7 +94,7 @@ export default function AdminSellers() {
                   <td className="small">{row.createdAt.substring(0, 10)}</td>
                   <td>{row.groupBuyCount}</td>
                   <td>
-                    <select value={r.plan} onChange={(e) => update({ plan: e.target.value as Plan })} disabled={row.role === 'ADMIN'}>
+                    <select value={r.plan} onChange={(e) => update({ plan: e.target.value as Plan })} disabled={row.role === 'ADMIN'} style={{ minWidth: 110 }}>
                       <option value="TRIAL">무료 체험</option>
                       <option value="PAID">유료</option>
                     </select>
@@ -96,9 +103,18 @@ export default function AdminSellers() {
                   <td><input type="date" value={r.paidUntil ?? ''} onChange={(e) => update({ paidUntil: e.target.value })} disabled={row.role === 'ADMIN'} /></td>
                   <td>
                     {row.expired && <div className="badge badge-CLOSED">만료</div>}
-                    <label className="check small"><input type="checkbox" checked={r.suspended} onChange={(e) => update({ suspended: e.target.checked })} disabled={row.role === 'ADMIN'} /> 사용 제한</label>
+                    <label className="check small" style={{ whiteSpace: 'nowrap' }}><input type="checkbox" checked={r.suspended} onChange={(e) => update({ suspended: e.target.checked })} disabled={row.role === 'ADMIN'} /> 사용 제한</label>
                   </td>
-                  <td><input type="text" value={r.adminMemo ?? ''} onChange={(e) => update({ adminMemo: e.target.value })} placeholder="입금 기록 등" /></td>
+                  <td className="small">{row.captureToday} / {row.captureThisMonth}장</td>
+                  <td>
+                    <input type="number" min={0} style={{ width: 80 }}
+                      value={r.customCaptureLimit ? r.dailyCaptureLimit : ''}
+                      placeholder="기본값"
+                      onChange={(e) => update(e.target.value === ''
+                        ? { customCaptureLimit: false }
+                        : { customCaptureLimit: true, dailyCaptureLimit: Number(e.target.value) })} />
+                  </td>
+                  <td><input type="text" value={r.adminMemo ?? ''} onChange={(e) => update({ adminMemo: e.target.value })} placeholder="입금 기록 등" style={{ minWidth: 140 }} /></td>
                   <td>
                     {isEditing && <button className="btn small primary" onClick={() => save(r)}>저장</button>}
                     {row.role !== 'ADMIN' && <button className="btn small danger" onClick={() => remove(row)}>탈퇴</button>}

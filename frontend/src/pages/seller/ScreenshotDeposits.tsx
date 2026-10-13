@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { api, errorMessage, won } from '../../api'
 import { ErrorBox } from '../../components/Ui'
 import type { GroupBuy } from '../../types'
+import { CaptureUsageLine, useCaptureStatus } from '../../components/CaptureUsage'
 
 interface Extracted { name: string; amount: number; datetime: string | null; type: string | null; duplicateSuspected: boolean; imageIndex: number }
-interface ExtractResponse { deposits: Extracted[]; skippedWithdrawals: number; provider: string; notice: string | null }
+interface ExtractResponse { deposits: Extracted[]; skippedWithdrawals: number; provider: string; notice: string | null; limitExceeded: boolean }
 
 /**
  * 은행앱 거래내역 스크린샷 → 비전 AI 추출 → 검수(수정·삭제·추가) → 저장 (정리본 7장, M4)
@@ -18,6 +19,8 @@ export default function ScreenshotDeposits({ groupBuy, onSaved }: { groupBuy: Gr
   const [busy, setBusy] = useState(false)
   const [open, setOpen] = useState(false)
   const [inputKey, setInputKey] = useState(0)
+  const [usageKey, setUsageKey] = useState(0)
+  const capture = useCaptureStatus(usageKey)
   const base = `/api/seller/group-buys/${groupBuy.id}/deposits`
 
   async function extract() {
@@ -28,8 +31,11 @@ export default function ScreenshotDeposits({ groupBuy, onSaved }: { groupBuy: Gr
       const fd = new FormData()
       Array.from(files).forEach((f) => fd.append('files', f))
       const res = await api.post<ExtractResponse>(`${base}/screenshots/extract`, fd)
-      setRows(res.deposits)
-      setInfo([res.notice, res.skippedWithdrawals ? `출금 ${res.skippedWithdrawals}건은 뺐습니다.` : null].filter(Boolean).join(' '))
+      setUsageKey((k) => k + 1)
+      // 한도 초과·AI 꺼짐이어도 빈 표를 열어서 직접 입력할 수 있게 한다
+      setRows(res.deposits.length ? res.deposits : [{ name: '', amount: 0, datetime: null, type: '입금', duplicateSuspected: false, imageIndex: 0 }])
+      if (res.limitExceeded) setError(res.notice)
+      setInfo(res.limitExceeded ? null : [res.notice, res.skippedWithdrawals ? `출금 ${res.skippedWithdrawals}건은 뺐습니다.` : null].filter(Boolean).join(' '))
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -68,6 +74,7 @@ export default function ScreenshotDeposits({ groupBuy, onSaved }: { groupBuy: Gr
       {open && (
         <>
           <p className="muted small">폰에서 엑셀 받기가 번거로우면 은행앱 거래내역 화면을 캡처해서 여러 장 올리세요. AI가 입금자명·금액을 읽고, 직접 확인·수정한 뒤 저장합니다. 읽기 어려운 글자는 [?]로 표시됩니다. 캡처 이미지는 외부 AI 서비스로 전송되며 읽은 직후 삭제됩니다.</p>
+          <CaptureUsageLine status={capture} />
           <input key={inputKey} type="file" accept="image/*" multiple onChange={(e) => setFiles(e.target.files)} />
           <div className="row mt"><button className="btn" disabled={!files || busy} onClick={extract}>{busy ? '읽는 중…' : '글자 읽기'}</button></div>
           <ErrorBox message={error} />

@@ -1,25 +1,25 @@
 package com.depositcock.vision;
 
-import java.util.Base64;
 import java.util.List;
-import java.util.Optional;
 
-import com.anthropic.client.AnthropicClient;
-import com.anthropic.client.okhttp.AnthropicOkHttpClient;
-import com.anthropic.errors.AnthropicException;
-import com.anthropic.models.messages.Base64ImageSource;
-import com.anthropic.models.messages.ContentBlockParam;
-import com.anthropic.models.messages.ImageBlockParam;
-import com.anthropic.models.messages.MessageCreateParams;
-import com.anthropic.models.messages.StopReason;
-import com.anthropic.models.messages.StructuredMessage;
-import com.anthropic.models.messages.StructuredMessageCreateParams;
-import com.anthropic.models.messages.TextBlockParam;
 import com.depositcock.common.ExternalApiException;
+import org.springframework.ai.anthropic.AnthropicChatModel;
+import org.springframework.ai.anthropic.AnthropicChatOptions;
+import org.springframework.ai.anthropic.api.AnthropicApi;
+import org.springframework.ai.chat.client.AdvisorParams;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.retry.support.RetryTemplate;
+import org.springframework.util.MimeTypeUtils;
 
 /**
- * Claude API(공식 Java SDK)로 스크린샷 글자를 읽는다. 결과는 구조화 출력(JSON 스키마)으로 강제한다.
+ * Spring AI(ChatClient)로 Claude 에 스크린샷 글자 읽기를 요청한다.
+ * - 구조화 출력: AdvisorParams.ENABLE_NATIVE_STRUCTURED_OUTPUT (모델 API 가 JSON 스키마를 강제하는 방식)
+ * - Haiku 5.5 는 thinking 블록을 먼저 돌려줄 수 있어 ThinkingFilterAdvisor 로 걸러낸 뒤 JSON 을 읽는다.
+ * - Haiku 5.5 는 temperature 가 1 이 아니면 400 이라 1.0 으로 고정한다 (Spring AI 기본값 0.8).
  * API 키는 환경변수 ANTHROPIC_API_KEY. 이미지는 메모리에서만 쓰고 저장하지 않는다.
+ * 실제 API 로는 아직 확인 못 함 (API 키 필요) — docs/design.md 참고.
  */
 public class AnthropicVisionExtractor implements VisionExtractor {
 
@@ -29,7 +29,7 @@ public class AnthropicVisionExtractor implements VisionExtractor {
     record CommentList(List<ExtractedComment> comments) {
     }
 
-    private static final String DEPOSIT_PROMPT = """
+    static final String DEPOSIT_PROMPT = """
             이 이미지는 한국 은행 앱의 계좌 거래내역 화면 캡처입니다.
             화면에 보이는 거래를 위에서 아래 순서대로 모두 읽어 deposits 배열에 넣으세요.
             - name: 거래 상대 이름(입금자명/적요/내용)을 화면에 보이는 글자 그대로
@@ -41,7 +41,7 @@ public class AnthropicVisionExtractor implements VisionExtractor {
             잔액, 광고, 메뉴 버튼은 거래가 아니므로 넣지 마세요.
             """;
 
-    private static final String COMMENT_PROMPT = """
+    static final String COMMENT_PROMPT = """
             이 이미지는 네이버 밴드(또는 카카오톡) 게시글의 댓글 화면 캡처입니다.
             화면에 보이는 댓글을 위에서 아래 순서대로 모두 읽어 comments 배열에 넣으세요.
             - author: 작성자 닉네임을 글자 그대로 (숫자·동호수 포함)
@@ -52,12 +52,44 @@ public class AnthropicVisionExtractor implements VisionExtractor {
             읽을 수 없는 글자는 추측하지 말고 그 자리에 [?] 를 쓰세요.
             """;
 
-    private final AnthropicClient client;
+    private final ChatClient chatClient;
     private final String model;
 
     public AnthropicVisionExtractor(String apiKey, String model) {
-        this.client = AnthropicOkHttpClient.builder().apiKey(apiKey).build();
+        this(createChatModel(apiKey, model), model);
+    }
+
+    /** 테스트에서 가짜 ChatModel 을 넣을 수 있게 열어 둔 생성자 */
+    AnthropicVisionExtractor(ChatModel chatModel, String model) {
+        this.chatClient = ChatClient.builder(chatModel).defaultAdvisors(new ThinkingFilterAdvisor()).build();
         this.model = model;
+    }
+
+    static ChatModel createChatModel(String apiKey, String model) {
+        return createChatModel(apiKey, model, null);
+    }
+
+    /** baseUrl 은 테스트용 (null 이면 Anthropic 기본 주소) */
+    static ChatModel createChatModel(String apiKey, String model, String baseUrl) {
+        AnthropicApi.Builder apiBuilder = AnthropicApi.builder().apiKey(apiKey);
+        if (baseUrl != null) {
+            apiBuilder.baseUrl(baseUrl);
+        }
+        AnthropicApi api = apiBuilder.build();
+        return AnthropicChatModel.builder()
+                .anthropicApi(api)
+                .defaultOptions(defaultOptions(model))
+                // Spring AI 기본 재시도(최대 10회, 긴 대기)는 웹 요청에 너무 길어서 2회로 줄인다
+                .retryTemplate(RetryTemplate.builder().maxAttempts(2).fixedBackoff(1000).build())
+                .build();
+    }
+
+    static AnthropicChatOptions defaultOptions(String model) {
+        return AnthropicChatOptions.builder()
+                .model(model)
+                .maxTokens(16000)
+                .temperature(1.0)
+                .build();
     }
 
     @Override
@@ -83,35 +115,16 @@ public class AnthropicVisionExtractor implements VisionExtractor {
     }
 
     private <T> T call(byte[] image, String mediaType, String prompt, Class<T> type) {
-        StructuredMessageCreateParams<T> params = MessageCreateParams.builder()
-                .model(model)
-                .maxTokens(16000L)
-                .outputConfig(type)
-                .addUserMessageOfBlockParams(List.of(
-                        ContentBlockParam.ofImage(ImageBlockParam.builder()
-                                .source(Base64ImageSource.builder()
-                                        .mediaType(Base64ImageSource.MediaType.of(mediaType))
-                                        .data(Base64.getEncoder().encodeToString(image))
-                                        .build())
-                                .build()),
-                        ContentBlockParam.ofText(TextBlockParam.builder().text(prompt).build())))
-                .build();
         try {
-            StructuredMessage<T> response = client.messages().create(params);
-            Optional<StopReason> stop = response.stopReason();
-            if (stop.isPresent() && stop.get().equals(StopReason.REFUSAL)) {
-                throw new ExternalApiException("비전 AI가 이 이미지 읽기를 거절했습니다. 직접 입력해 주세요.");
-            }
-            if (stop.isPresent() && stop.get().equals(StopReason.MAX_TOKENS)) {
-                throw new ExternalApiException("캡처 한 장에 글자가 너무 많습니다. 더 작게 나눠서 올려주세요.");
-            }
-            return response.content().stream()
-                    .flatMap(block -> block.text().stream())
-                    .map(typed -> typed.text())
-                    .findFirst()
-                    .orElse(null);
-        } catch (AnthropicException e) {
-            throw new ExternalApiException("비전 AI 호출에 실패했습니다: " + e.getMessage(), e);
+            return chatClient.prompt()
+                    .advisors(AdvisorParams.ENABLE_NATIVE_STRUCTURED_OUTPUT)
+                    .user(u -> u.text(prompt).media(MimeTypeUtils.parseMimeType(mediaType), new ByteArrayResource(image)))
+                    .call()
+                    .entity(type);
+        } catch (ExternalApiException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new ExternalApiException("비전 AI 호출에 실패했습니다. 직접 입력해 주세요. (" + e.getMessage() + ")", e);
         }
     }
 }

@@ -48,6 +48,9 @@ public class Seller {
 
     private String adminMemo;
 
+    /** 하루 캡처(비전 AI) 제한 장수. null 이면 설정 기본값 */
+    private Integer dailyCaptureLimit;
+
     private String defaultBankName;
     private String defaultAccountNumber;
     private String defaultAccountHolder;
@@ -87,6 +90,14 @@ public class Seller {
         this.defaultBankName = bankName;
         this.defaultAccountNumber = accountNumber;
         this.defaultAccountHolder = accountHolder;
+    }
+
+    public void changeDailyCaptureLimit(Integer dailyCaptureLimit) {
+        this.dailyCaptureLimit = dailyCaptureLimit;
+    }
+
+    public Integer getDailyCaptureLimit() {
+        return dailyCaptureLimit;
     }
 
     public void updateByAdmin(Plan plan, LocalDate paidUntil, LocalDateTime trialEndsAt, boolean suspended, String adminMemo) {

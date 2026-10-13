@@ -19,7 +19,21 @@
     <properties>
         <java.version>21</java.version>
         <poi.version>5.4.1</poi.version>
+        <!-- Spring AI 1.1.x 가 Spring Boot 3.5 대상 (2.x 는 Boot 4 대상이라 못 씀) -->
+        <spring-ai.version>1.1.8</spring-ai.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -66,11 +80,17 @@
             <version>${poi.version}</version>
         </dependency>
 
-        <!-- 비전 AI(스크린샷 글자 읽기). VisionExtractor 구현체 중 하나 -->
+        <!--
+            비전 AI(스크린샷 글자 읽기): Spring AI (VisionExtractor 구현체 중 하나).
+            starter(자동 설정) 대신 모듈을 직접 써서, API 키가 없을 때는 빈을 아예 만들지 않는다.
+        -->
         <dependency>
-            <groupId>com.anthropic</groupId>
-            <artifactId>anthropic-java</artifactId>
-            <version>2.34.0</version>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-anthropic</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-client-chat</artifactId>
         </dependency>
 
         <dependency>

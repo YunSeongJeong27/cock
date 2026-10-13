@@ -4,6 +4,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -62,7 +64,11 @@ public final class SellerDtos {
             boolean suspended,
             String adminMemo,
             LocalDateTime createdAt,
-            long groupBuyCount) {
+            long groupBuyCount,
+            int captureToday,
+            int captureThisMonth,
+            int dailyCaptureLimit,
+            boolean customCaptureLimit) {
     }
 
     public record AdminUpdateRequest(
@@ -70,6 +76,8 @@ public final class SellerDtos {
             LocalDate paidUntil,
             LocalDateTime trialEndsAt,
             boolean suspended,
-            @Size(max = 1000) String adminMemo) {
+            @Size(max = 1000) String adminMemo,
+            /** 하루 캡처 제한 장수. null 이면 기본값(설정) 사용 */
+            @Min(0) @Max(10000) Integer dailyCaptureLimit) {
     }
 }

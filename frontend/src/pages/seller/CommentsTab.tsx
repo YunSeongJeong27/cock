@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage, won } from '../../api'
 import { ErrorBox } from '../../components/Ui'
 import type { GroupBuy } from '../../types'
+import { CaptureUsageLine, useCaptureStatus } from '../../components/CaptureUsage'
 
 interface CommentView {
   id: number
@@ -36,6 +37,8 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const base = `/api/seller/group-buys/${groupBuy.id}/comments`
+  const [usageKey, setUsageKey] = useState(0)
+  const capture = useCaptureStatus(usageKey)
 
   const load = useCallback(() => {
     api.get<CommentsResponse>(`${base}?productId=${productId}`).then(setData).catch((e) => setError(errorMessage(e)))
@@ -61,8 +64,13 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
   const extract = () => run(async () => {
     const fd = new FormData()
     Array.from(files!).forEach((f) => fd.append('files', f))
-    return api.post<{ comments: Draft[]; notice: string | null }>(`${base}/extract`, fd)
-  }, (r) => { setDrafts(r.comments); if (r.notice) setNotice(r.notice) })
+    return api.post<{ comments: Draft[]; notice: string | null; limitExceeded: boolean }>(`${base}/extract`, fd)
+  }, (r) => {
+    setUsageKey((k) => k + 1)
+    setDrafts(r.comments.length ? r.comments : [{ author: '', content: '', duplicateSuspected: false }])
+    if (r.limitExceeded) setError(r.notice)
+    else if (r.notice) setNotice(r.notice)
+  })
 
   const parseText = () => run(() => api.post<{ comments: Draft[] }>(`${base}/parse-text`, { text }), (r) => setDrafts(r.comments))
 
@@ -92,6 +100,7 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
       <div className="card">
         <h3>댓글 올리기</h3>
         <p className="muted small">밴드 댓글 화면 캡처(여러 장) 또는 댓글 텍스트를 붙여넣으세요. 공지·광고도 일단 읽고, 관리자 닉네임(공구 설정)과 주문 아닌 댓글은 집계에서 뺍니다. 캡처는 외부 AI로 전송되고 읽은 직후 삭제됩니다.</p>
+        <CaptureUsageLine status={capture} />
         <div className="row">
           <input type="file" accept="image/*" multiple onChange={(e) => setFiles(e.target.files)} />
           <button className="btn" disabled={!files || busy} onClick={extract}>캡처 글자 읽기</button>

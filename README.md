@@ -16,10 +16,10 @@
 |---|---|
 | 주문서 링크 | 로그인 없는 고객 주문, 픽업/배송·결제 방식 선택, 재고 선착순(원자 처리), 쿠키로 재방문 인식, 입금자명+휴대폰 뒷자리로 본인 확인, "입금했어요" 신고, 주문 취소 |
 | 입금 대조 | 은행 거래내역 엑셀(xlsx/xls)·CSV 업로드, 열 자동 인식 + 직접 지정 + 은행별 열 설정 저장, 자동 매칭/추천/후보 선택, 확정 시 입금자 별칭 저장(다음 공구 자동 매칭) |
-| 스크린샷 | 은행앱 거래내역 캡처 → 비전 AI 추출 → 검수 → 대조 (AI 키 설정 시) |
+| 스크린샷 | 은행앱 거래내역 캡처 → 비전 AI 추출 → 검수 → 대조 (AI 키 설정 시, 판매자별 하루 장수 제한) |
 | 댓글 집계 | 밴드 댓글 캡처·텍스트 → 해석·집계 → 주문으로 반영 |
 | 정리 | 수령 체크(미입금 경고), 대시보드, 주문 정리표 엑셀, 입금 확인 문구 복사, 입금 확인된 닉네임 목록 |
-| 관리자 | 판매자 목록, 무료 체험/유료 전환·만료일, 사용 제한 |
+| 관리자 | 판매자 목록, 무료 체험/유료 전환·만료일, 사용 제한, 캡처 사용량 조회·하루 제한 변경 |
 
 ## 기술 스택
 
@@ -28,7 +28,7 @@
 | Backend | Java 21, Spring Boot 3.5.6, Spring Data JPA, Flyway, Spring Security(JWT, httpOnly 쿠키), Apache POI, Maven Wrapper |
 | Frontend | React 18, Vite, TypeScript, React Router |
 | DB | H2 (개발, PostgreSQL 호환 모드), PostgreSQL (운영) |
-| 비전 AI | `VisionExtractor` 인터페이스 (구현: Claude API Java SDK / 키 없으면 꺼짐) |
+| 비전 AI | Spring AI 1.1.8 (Anthropic, 네이티브 구조화 출력), `VisionExtractor` 인터페이스, 기본 꺼짐 |
 
 ```
 backend/   Spring Boot (패키지 com.depositcock)
@@ -106,7 +106,8 @@ docker run -p 8080:8080 \
 | `APP_ADMIN_EMAIL`, `APP_ADMIN_PASSWORD` | 최초 관리자 계정 (이미 있으면 그대로 둠) |
 | `APP_VISION_PROVIDER` | `anthropic` 이면 스크린샷 글자 읽기 켬 (기본 `fake` = 꺼짐) |
 | `ANTHROPIC_API_KEY` | 위가 `anthropic` 일 때 필요 |
-| `APP_VISION_MODEL` | 비전 모델 (기본 `claude-opus-5-5`) |
+| `APP_VISION_MODEL` | 비전 모델 (기본 `claude-haiku-5-5`) |
+| `APP_VISION_DAILY_CAPTURE_LIMIT` | 판매자별 하루 캡처 장수 기본 제한 (기본 30, 관리자 화면에서 판매자별 변경) |
 
 비밀값은 저장소에 올리지 않고 환경변수로만 넣습니다. 배포처는 아직 정하지 않았습니다 (docs/design.md 참고).
 

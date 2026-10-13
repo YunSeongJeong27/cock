@@ -21,6 +21,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -148,5 +149,66 @@ class M4M6ScreenshotAndCommentTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.deposits").isEmpty())
                 .andExpect(jsonPath("$.notice").exists());
+    }
+
+    @Test
+    void dailyCaptureLimitAndAdminControl() throws Exception {
+        when(visionExtractor.available()).thenReturn(true);
+        when(visionExtractor.provider()).thenReturn("test");
+        when(visionExtractor.extractDeposits(any(), anyString())).thenReturn(List.of());
+
+        String email = uniqueEmail();
+        Cookie seller = signup(email);
+        long id = openGroupBuy(seller, groupBuyBody("한도", List.of(product("x", 1000, null))));
+        String url = "/api/seller/group-buys/" + id + "/deposits/screenshots/extract";
+
+        mvc.perform(get("/api/seller/capture-usage").cookie(seller))
+                .andExpect(jsonPath("$.visionAvailable").value(true))
+                .andExpect(jsonPath("$.usage.dailyLimit").value(30))
+                .andExpect(jsonPath("$.usage.remainingToday").value(30));
+
+        // 관리자가 이 판매자의 하루 제한을 3장으로
+        Cookie admin = login("admin@test.local", "admin1234");
+        JsonNode sellers = read(mvc.perform(get("/api/admin/sellers").cookie(admin)).andReturn());
+        long sellerId = 0;
+        for (JsonNode s : sellers) {
+            if (s.get("email").asText().equals(email)) {
+                sellerId = s.get("id").asLong();
+                assertThat(s.get("dailyCaptureLimit").asInt()).isEqualTo(30);
+                assertThat(s.get("customCaptureLimit").asBoolean()).isFalse();
+            }
+        }
+        Map<String, Object> update = new HashMap<>();
+        update.put("plan", "TRIAL");
+        update.put("suspended", false);
+        update.put("dailyCaptureLimit", 3);
+        mvc.perform(withJson(put("/api/admin/sellers/" + sellerId).cookie(admin), update)).andExpect(status().isOk());
+
+        mvc.perform(multipart(url).file(image("1.png")).file(image("2.png")).cookie(seller))
+                .andExpect(jsonPath("$.limitExceeded").value(false))
+                .andExpect(jsonPath("$.remainingToday").value(1));
+        // 남은 1장인데 2장 → 한도 초과 안내, 차감 안 함
+        mvc.perform(multipart(url).file(image("1.png")).file(image("2.png")).cookie(seller))
+                .andExpect(jsonPath("$.limitExceeded").value(true))
+                .andExpect(jsonPath("$.notice").value(org.hamcrest.Matchers.containsString("한도 초과")));
+        mvc.perform(multipart(url).file(image("1.png")).cookie(seller))
+                .andExpect(jsonPath("$.limitExceeded").value(false));
+        mvc.perform(multipart(url).file(image("1.png")).cookie(seller))
+                .andExpect(jsonPath("$.limitExceeded").value(true))
+                .andExpect(jsonPath("$.notice").value(org.hamcrest.Matchers.containsString("직접 입력")));
+
+        // 관리자 화면: 오늘/이번 달 사용 장수
+        JsonNode after = read(mvc.perform(get("/api/admin/sellers").cookie(admin)).andReturn());
+        for (JsonNode s : after) {
+            if (s.get("id").asLong() == sellerId) {
+                assertThat(s.get("captureToday").asInt()).isEqualTo(3);
+                assertThat(s.get("captureThisMonth").asInt()).isEqualTo(3);
+                assertThat(s.get("customCaptureLimit").asBoolean()).isTrue();
+            }
+        }
+        // AI 가 꺼져 있으면 사용량을 세지 않는다
+        when(visionExtractor.available()).thenReturn(false);
+        mvc.perform(get("/api/seller/capture-usage").cookie(seller))
+                .andExpect(jsonPath("$.usage.usedToday").value(3));
     }
 }

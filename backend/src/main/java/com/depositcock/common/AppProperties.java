@@ -17,6 +17,6 @@ public record AppProperties(
         int publicRateLimitPerMinute,
         Vision vision
 ) {
-    public record Vision(String provider, String anthropicApiKey, String anthropicModel) {
+    public record Vision(String provider, String anthropicApiKey, String anthropicModel, int dailyCaptureLimit) {
     }
 }

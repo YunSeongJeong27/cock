@@ -8,6 +8,7 @@ import com.depositcock.vision.ScreenshotService.CommentExtractResponse;
 import com.depositcock.vision.ScreenshotService.DepositExtractResponse;
 import com.depositcock.vision.ScreenshotService.SaveRow;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,9 +20,22 @@ import org.springframework.web.multipart.MultipartFile;
 public class ScreenshotController {
 
     private final ScreenshotService service;
+    private final CaptureUsageService usageService;
+    private final VisionExtractor extractor;
 
-    public ScreenshotController(ScreenshotService service) {
+    public ScreenshotController(ScreenshotService service, CaptureUsageService usageService, VisionExtractor extractor) {
         this.service = service;
+        this.usageService = usageService;
+        this.extractor = extractor;
+    }
+
+    public record CaptureStatus(boolean visionAvailable, CaptureUsageService.Usage usage) {
+    }
+
+    /** 판매자 화면: 비전 AI 켜짐 여부 + 오늘 남은 캡처 장수 */
+    @GetMapping("/api/seller/capture-usage")
+    public CaptureStatus captureUsage() {
+        return new CaptureStatus(extractor.available(), usageService.usage(CurrentSeller.id()));
     }
 
     public record SaveRequest(@NotNull List<SaveRow> rows) {
