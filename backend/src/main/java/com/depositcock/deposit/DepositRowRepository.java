@@ -18,6 +18,4 @@ public interface DepositRowRepository extends JpaRepository<DepositRow, Long> {
     Optional<DepositRow> findByIdAndGroupBuyId(@Param("rowId") Long rowId, @Param("groupBuyId") Long groupBuyId);
 
     List<DepositRow> findByUploadId(Long uploadId);
-
-    Optional<DepositRow> findByUsedOrderId(Long orderId);
 }

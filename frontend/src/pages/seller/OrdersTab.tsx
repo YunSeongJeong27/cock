@@ -93,7 +93,12 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
                         {o.receiveMethod === 'DELIVERY' && <div>배송: {o.recipientName} / {o.recipientPhone} / ({o.zipcode}) {o.address} {o.addressDetail}</div>}
                         {o.shippingFee > 0 && <div>상품 {won(o.itemsAmount)} + 배송비 {won(o.shippingFee)}</div>}
                         {o.depositReportedAt && <div>고객 입금 신고: {dateTime(o.depositReportedAt)}</div>}
-                        {o.paid && <div>입금 확정: {dateTime(o.paidAt)} · {o.paidDepositorName} {won(o.paidAmount)}</div>}
+                        {o.payments.map((p, i) => (
+                          <div key={i} className={p.cancelledAt ? 'muted' : undefined}>
+                            입금 확정{p.manual ? '(수동)' : ''}: {dateTime(p.confirmedAt)} · {p.depositorName} {won(p.amount)}
+                            {p.cancelledAt && <> → {dateTime(p.cancelledAt)} 확정 취소</>}
+                          </div>
+                        ))}
                         {o.cancelledAt && <div>취소: {dateTime(o.cancelledAt)}</div>}
                       </div>
                       <div className="row mt">

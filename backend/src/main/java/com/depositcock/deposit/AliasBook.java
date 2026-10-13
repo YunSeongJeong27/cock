@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 
 import com.depositcock.order.CustomerOrder;
 import com.depositcock.order.CustomerOrderRepository;
+import com.depositcock.order.DepositConfirmation;
 import com.depositcock.order.PaidAliasChange;
 import org.springframework.stereotype.Component;
 
@@ -27,9 +28,9 @@ public class AliasBook {
         this.orderRepository = orderRepository;
     }
 
-    /** 입금자명 → 고객 별칭을 저장하고, 새로 만들었는지·바꿨는지를 주문에 기록한다 */
-    public void record(Long sellerId, CustomerOrder order, String depositorName, LocalDateTime now) {
-        String name = DepositMatcher.squash(depositorName);
+    /** 입금자명 → 고객 별칭을 저장하고, 새로 만들었는지·바꿨는지를 그 확정 기록에 남긴다 */
+    public void record(Long sellerId, CustomerOrder order, DepositConfirmation confirmation, LocalDateTime now) {
+        String name = DepositMatcher.squash(confirmation.getDepositorName());
         if (name.isEmpty()) {
             return;
         }
@@ -37,9 +38,9 @@ public class AliasBook {
         DepositorAlias alias = aliasRepository.findBySellerIdAndDepositorName(sellerId, name).orElse(null);
         if (alias == null) {
             aliasRepository.save(new DepositorAlias(sellerId, name, customerKey, now));
-            order.recordAliasChange(PaidAliasChange.CREATED, null);
+            confirmation.recordAliasChange(PaidAliasChange.CREATED, null);
         } else if (!alias.getCustomerKey().equals(customerKey)) {
-            order.recordAliasChange(PaidAliasChange.CHANGED, alias.getCustomerKey());
+            confirmation.recordAliasChange(PaidAliasChange.CHANGED, alias.getCustomerKey());
             alias.changeCustomerKey(customerKey);
         }
     }
@@ -51,10 +52,11 @@ public class AliasBook {
      * - 같은 입금자명으로 이 고객에게 확정된 다른 주문(ignoredOrderIds 제외)이 아직 있다 (그 확정이 이 별칭의 근거)
      */
     public void undo(Long sellerId, CustomerOrder order, Set<Long> ignoredOrderIds) {
-        if (order.getPaidAliasChange() == null || order.getPaidDepositorName() == null) {
+        DepositConfirmation confirmation = order.activeConfirmation().orElse(null);
+        if (confirmation == null || confirmation.getAliasChange() == null) {
             return;
         }
-        String name = DepositMatcher.squash(order.getPaidDepositorName());
+        String name = DepositMatcher.squash(confirmation.getDepositorName());
         DepositorAlias alias = aliasRepository.findBySellerIdAndDepositorName(sellerId, name).orElse(null);
         if (alias == null || !alias.getCustomerKey().equals(order.getCustomerKey())) {
             return;
@@ -66,8 +68,8 @@ public class AliasBook {
         if (stillBacked) {
             return;
         }
-        if (order.getPaidAliasChange() == PaidAliasChange.CHANGED && order.getPaidAliasPreviousKey() != null) {
-            alias.changeCustomerKey(order.getPaidAliasPreviousKey());
+        if (confirmation.getAliasChange() == PaidAliasChange.CHANGED && confirmation.getAliasPreviousKey() != null) {
+            alias.changeCustomerKey(confirmation.getAliasPreviousKey());
         } else {
             aliasRepository.delete(alias);
         }

@@ -111,6 +111,14 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+            <plugin>
+                <!-- 테스트 JVM 도 한국 시간대로 (DB 드라이버가 시작할 때 시간대를 읽어 두므로 JVM 시작 옵션으로 준다) -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>-Duser.timezone=Asia/Seoul</argLine>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 

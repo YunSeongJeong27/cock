@@ -35,9 +35,6 @@ public class DepositRow {
     /** 변환한 입금 시각 (형식을 모르면 null) */
     private LocalDateTime depositedAt;
 
-    /** 이 입금을 확정에 쓴 주문 id. 입금 1건은 주문 1건에만 쓴다. */
-    private Long usedOrderId;
-
     protected DepositRow() {
     }
 
@@ -49,14 +46,6 @@ public class DepositRow {
         this.amount = amount;
         this.datetimeText = datetimeText;
         this.depositedAt = depositedAt;
-    }
-
-    public void use(Long orderId) {
-        this.usedOrderId = orderId;
-    }
-
-    public void release() {
-        this.usedOrderId = null;
     }
 
     public String dedupeKey() {
@@ -94,9 +83,5 @@ public class DepositRow {
 
     public LocalDateTime getDepositedAt() {
         return depositedAt;
-    }
-
-    public Long getUsedOrderId() {
-        return usedOrderId;
     }
 }

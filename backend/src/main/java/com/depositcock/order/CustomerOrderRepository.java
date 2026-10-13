@@ -31,7 +31,8 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     /** 이 판매자의 모든 공구에서 이 고객의 입금 확정 주문 (별칭을 되돌려도 되는지 볼 때) */
     @Query("select o from CustomerOrder o where o.groupBuy.seller.id = :sellerId and o.customerKey = :customerKey"
-            + " and o.paid = true and o.id <> :excludeId")
+            + " and o.id <> :excludeId and exists"
+            + " (select c from DepositConfirmation c where c.order = o and c.cancelledAt is null)")
     List<CustomerOrder> findOtherPaidOfCustomer(@Param("sellerId") Long sellerId,
                                                 @Param("customerKey") String customerKey,
                                                 @Param("excludeId") Long excludeId);

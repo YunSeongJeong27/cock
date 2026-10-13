@@ -19,6 +19,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 
 /**
@@ -88,17 +89,10 @@ public class CustomerOrder {
     /** 고객이 "입금했어요"를 누른 시각 (확정 아님) */
     private LocalDateTime depositReportedAt;
 
-    @Column(nullable = false)
-    private boolean paid;
-    private LocalDateTime paidAt;
-    private String paidDepositorName;
-    private Integer paidAmount;
-    private Long depositRowId;
-    /** 이 확정이 별칭을 새로 만들었는지·바꿨는지. 확정 취소 때 이것만 되돌린다 (null 이면 건드리지 않음) */
-    @Enumerated(EnumType.STRING)
-    private PaidAliasChange paidAliasChange;
-    /** paidAliasChange 가 CHANGED 일 때 바꾸기 전 고객 키 */
-    private String paidAliasPreviousKey;
+    /** 입금 확정 이력 (확정 취소도 지우지 않고 남김). 살아 있는 확정은 최대 1건 */
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
+    @OrderBy("id")
+    private List<DepositConfirmation> confirmations = new ArrayList<>();
 
     @Column(nullable = false)
     private boolean onsitePaid;
@@ -195,7 +189,7 @@ public class CustomerOrder {
         if (paymentMethod == PaymentMethod.ONSITE) {
             return DisplayStatus.RESERVED;
         }
-        if (paid) {
+        if (isPaid()) {
             return DisplayStatus.PAID;
         }
         if (depositReportedAt != null) {
@@ -215,37 +209,30 @@ public class CustomerOrder {
         this.deviceToken = deviceToken;
     }
 
-    public void confirmPaid(String depositorName, int amount, Long depositRowId, LocalDateTime now) {
-        this.paid = true;
-        this.paidAt = now;
-        this.paidDepositorName = depositorName;
-        this.paidAmount = amount;
-        this.depositRowId = depositRowId;
-        this.paidAliasChange = null;
-        this.paidAliasPreviousKey = null;
+    /** 입금 확정. 확정 기록을 새로 남기고 돌려준다 (depositRowId 는 수동 확정이면 null) */
+    public DepositConfirmation confirmPaid(String depositorName, int amount, Long depositRowId, LocalDateTime now) {
+        if (isPaid()) {
+            throw new IllegalStateException("이미 입금 확정된 주문입니다: " + id);
+        }
+        DepositConfirmation confirmation = new DepositConfirmation(this, depositRowId, depositorName, amount, now);
+        confirmations.add(confirmation);
         this.updatedAt = now;
+        return confirmation;
     }
 
-    /** 입금 확정 때 별칭을 만들었거나 바꿨으면 기록한다 */
-    public void recordAliasChange(PaidAliasChange change, String previousKey) {
-        this.paidAliasChange = change;
-        this.paidAliasPreviousKey = previousKey;
-    }
-
-    /** 입금 확정 취소. 취소된 주문이면 "환불 필요"도 거둔다 (확정이 잘못이었으므로). */
+    /** 입금 확정 취소. 기록은 남기고 취소 시각만 채운다. 취소된 주문이면 "환불 필요"도 거둔다 (확정이 잘못이었으므로). */
     public void cancelPaid(LocalDateTime now) {
         if (status == OrderStatus.CANCELLED) {
             this.refundRequired = false;
             this.refundedAt = null;
         }
-        this.paid = false;
-        this.paidAt = null;
-        this.paidDepositorName = null;
-        this.paidAmount = null;
-        this.depositRowId = null;
-        this.paidAliasChange = null;
-        this.paidAliasPreviousKey = null;
+        activeConfirmation().ifPresent(c -> c.cancel(now));
         this.updatedAt = now;
+    }
+
+    /** 살아 있는 입금 확정 (없으면 미입금) */
+    public java.util.Optional<DepositConfirmation> activeConfirmation() {
+        return confirmations.stream().filter(DepositConfirmation::isActive).findFirst();
     }
 
     /** 수령 체크. 현장결제 주문은 수령할 때 결제 완료로 처리한다. */
@@ -262,7 +249,7 @@ public class CustomerOrder {
         this.status = OrderStatus.CANCELLED;
         this.cancelledAt = now;
         this.updatedAt = now;
-        if (paid) {
+        if (isPaid()) {
             this.refundRequired = true;
         }
     }
@@ -365,35 +352,27 @@ public class CustomerOrder {
     }
 
     public boolean isPaid() {
-        return paid;
+        return activeConfirmation().isPresent();
     }
 
     public LocalDateTime getPaidAt() {
-        return paidAt;
+        return activeConfirmation().map(DepositConfirmation::getConfirmedAt).orElse(null);
     }
 
     public String getPaidDepositorName() {
-        return paidDepositorName;
+        return activeConfirmation().map(DepositConfirmation::getDepositorName).orElse(null);
+    }
+
+    public List<DepositConfirmation> getConfirmations() {
+        return confirmations;
     }
 
     public String getDeviceToken() {
         return deviceToken;
     }
 
-    public PaidAliasChange getPaidAliasChange() {
-        return paidAliasChange;
-    }
-
-    public String getPaidAliasPreviousKey() {
-        return paidAliasPreviousKey;
-    }
-
     public Integer getPaidAmount() {
-        return paidAmount;
-    }
-
-    public Long getDepositRowId() {
-        return depositRowId;
+        return activeConfirmation().map(DepositConfirmation::getAmount).orElse(null);
     }
 
     public boolean isOnsitePaid() {

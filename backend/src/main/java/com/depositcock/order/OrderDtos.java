@@ -161,7 +161,14 @@ public final class OrderDtos {
             /** 같은 공구에 같은 연락처의 다른 주문이 있음 (경고 표시용) */
             boolean duplicateContact,
             LocalDateTime orderedAt,
-            LocalDateTime cancelledAt) {
+            LocalDateTime cancelledAt,
+            /** 입금 확정 이력 (취소된 확정 포함, 오래된 순) */
+            List<PaymentRecord> payments) {
+    }
+
+    /** 입금 확정 1건. manual = 거래내역 없이 수동 확정, cancelledAt 이 있으면 취소된 확정 */
+    public record PaymentRecord(String depositorName, int amount, boolean manual, LocalDateTime confirmedAt,
+                                LocalDateTime cancelledAt) {
     }
 
     public record PickedUpRequest(boolean pickedUp) {

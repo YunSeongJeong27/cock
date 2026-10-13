@@ -130,6 +130,8 @@ export interface SellerOrder {
   duplicateContact: boolean
   orderedAt: string
   cancelledAt: string | null
+  /** 입금 확정 이력 (취소된 확정 포함, 오래된 순) */
+  payments: PaymentRecord[]
 }
 
 export interface ColumnMapping {
@@ -216,4 +218,13 @@ export interface UploadSummary {
   uploadedAt: string
   rowCount: number
   usedCount: number
+}
+
+/** 입금 확정 1건. manual = 거래내역 없이 수동 확정, cancelledAt 이 있으면 취소된 확정 */
+export interface PaymentRecord {
+  depositorName: string
+  amount: number
+  manual: boolean
+  confirmedAt: string
+  cancelledAt: string | null
 }

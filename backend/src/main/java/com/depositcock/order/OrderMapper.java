@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.depositcock.order.OrderDtos.MyOrder;
+import com.depositcock.order.OrderDtos.PaymentRecord;
 import com.depositcock.order.OrderDtos.PublicItem;
 import com.depositcock.order.OrderDtos.SellerOrder;
 import com.depositcock.order.OrderDtos.SellerOrderItem;
@@ -48,6 +49,8 @@ final class OrderMapper {
                 o.totalQuantity(), o.getItemsAmount(), o.getShippingFee(), o.getExpectedAmount(), status,
                 status.getLabel(), o.isActive(), o.getDepositReportedAt(), o.isPaid(), o.getPaidAt(),
                 o.getPaidDepositorName(), o.getPaidAmount(), o.isOnsitePaid(), o.isPickedUp(), o.getPickedUpAt(),
-                o.isRefundRequired(), o.getRefundedAt(), duplicateContact, o.getOrderedAt(), o.getCancelledAt());
+                o.isRefundRequired(), o.getRefundedAt(), duplicateContact, o.getOrderedAt(), o.getCancelledAt(),
+                o.getConfirmations().stream().map(c -> new PaymentRecord(c.getDepositorName(), c.getAmount(),
+                        c.isManual(), c.getConfirmedAt(), c.getCancelledAt())).toList());
     }
 }

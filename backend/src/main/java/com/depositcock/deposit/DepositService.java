@@ -38,7 +38,8 @@ import com.depositcock.groupbuy.GroupBuyService;
 import com.depositcock.order.CustomerOrder;
 import com.depositcock.order.CustomerOrderRepository;
 import com.depositcock.order.DisplayStatus;
-import com.depositcock.order.PaidAliasChange;
+import com.depositcock.order.DepositConfirmation;
+import com.depositcock.order.DepositConfirmationRepository;
 import com.depositcock.order.PhoneNumbers;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,13 +58,15 @@ public class DepositService {
     private final DepositRowRepository rowRepository;
     private final DepositorAliasRepository aliasRepository;
     private final AliasBook aliasBook;
+    private final DepositConfirmationRepository confirmationRepository;
     private final BankColumnPresetRepository presetRepository;
     private final BankStatementReader reader;
     private final Clock clock;
 
     public DepositService(GroupBuyService groupBuyService, CustomerOrderRepository orderRepository,
                           DepositUploadRepository uploadRepository, DepositRowRepository rowRepository,
-                          DepositorAliasRepository aliasRepository, AliasBook aliasBook, BankColumnPresetRepository presetRepository,
+                          DepositorAliasRepository aliasRepository, AliasBook aliasBook,
+                          DepositConfirmationRepository confirmationRepository, BankColumnPresetRepository presetRepository,
                           BankStatementReader reader, Clock clock) {
         this.groupBuyService = groupBuyService;
         this.orderRepository = orderRepository;
@@ -71,6 +74,7 @@ public class DepositService {
         this.rowRepository = rowRepository;
         this.aliasRepository = aliasRepository;
         this.aliasBook = aliasBook;
+        this.confirmationRepository = confirmationRepository;
         this.presetRepository = presetRepository;
         this.reader = reader;
         this.clock = clock;
@@ -147,9 +151,10 @@ public class DepositService {
 
     public List<UploadSummary> uploads(Long sellerId, Long groupBuyId) {
         GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        Set<Long> usedRows = usedRowIds(groupBuy.getId());
         return uploadRepository.findByGroupBuyIdOrderByIdDesc(groupBuy.getId()).stream().map(u -> {
             List<DepositRow> rows = rowRepository.findByUploadId(u.getId());
-            int used = (int) rows.stream().filter(r -> r.getUsedOrderId() != null).count();
+            int used = (int) rows.stream().filter(r -> usedRows.contains(r.getId())).count();
             return new UploadSummary(u.getId(), u.getSource(), u.getFileName(), u.getUploadedAt(), rows.size(), used);
         }).toList();
     }
@@ -159,7 +164,8 @@ public class DepositService {
         GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         DepositUpload upload = uploadRepository.findByIdAndGroupBuyId(uploadId, groupBuy.getId())
                 .orElseThrow(() -> ApiException.notFound("업로드를 찾을 수 없습니다."));
-        boolean used = rowRepository.findByUploadId(upload.getId()).stream().anyMatch(r -> r.getUsedOrderId() != null);
+        Set<Long> usedRows = usedRowIds(groupBuy.getId());
+        boolean used = rowRepository.findByUploadId(upload.getId()).stream().anyMatch(r -> usedRows.contains(r.getId()));
         if (used) {
             throw ApiException.badRequest("확정에 쓴 입금이 들어 있는 업로드는 지울 수 없습니다. 먼저 해당 입금 확정을 취소해 주세요.");
         }
@@ -178,7 +184,11 @@ public class DepositService {
                         o.getExpectedAmount(), o.getOrderedAt()))
                 .toList();
         List<DepositRow> rows = rowRepository.findByGroupBuyId(groupBuy.getId());
-        List<DepositRow> unused = rows.stream().filter(r -> r.getUsedOrderId() == null).toList();
+        Map<Long, Long> orderByRow = new HashMap<>();
+        confirmationRepository.findActiveByGroupBuyId(groupBuy.getId()).stream()
+                .filter(c -> c.getDepositRowId() != null)
+                .forEach(c -> orderByRow.put(c.getDepositRowId(), c.getOrder().getId()));
+        List<DepositRow> unused = rows.stream().filter(r -> !orderByRow.containsKey(r.getId())).toList();
         List<Deposit> deposits = unused.stream().map(r -> new Deposit(r.getId(), r.getDepositorName(), r.getAmount())).toList();
 
         // 대조 대상은 아니지만, 입금자가 이미 입금 확인된 주문·취소된 주문의 입금자인지 알려주는 데 쓴다
@@ -211,11 +221,12 @@ public class DepositService {
                     r.evidence() == null ? null : r.evidence().getLabel(), r.amountDiff(), candidates,
                     note(r.related(), orderById)));
         }
-        List<UsedRow> used = rows.stream().filter(r -> r.getUsedOrderId() != null)
+        List<UsedRow> used = rows.stream().filter(r -> orderByRow.containsKey(r.getId()))
                 .map(r -> {
-                    CustomerOrder o = orderById.get(r.getUsedOrderId());
+                    Long orderId = orderByRow.get(r.getId());
+                    CustomerOrder o = orderById.get(orderId);
                     return new UsedRow(r.getId(), r.getDepositorName(), r.getAmount(), r.getDatetimeText(),
-                            r.getUsedOrderId(), o == null ? 0 : o.getOrderNo());
+                            orderId, o == null ? 0 : o.getOrderNo());
                 }).toList();
         List<OrderBrief> unpaid = outcome.unpaid().stream().map(p -> brief(orderById.get(p.orderId()))).toList();
         // 판매자가 직접 고를 수 있는 주문: 다른 입금에 추천된 주문까지 포함한 모든 미입금 선입금 주문
@@ -261,7 +272,7 @@ public class DepositService {
                 errors.add("입금 또는 주문을 찾을 수 없습니다.");
                 continue;
             }
-            if (row.getUsedOrderId() != null) {
+            if (confirmationRepository.existsByActiveDepositRowId(row.getId())) {
                 errors.add("'" + row.getDepositorName() + " " + row.getAmount() + "원' 입금은 이미 다른 주문에 확정되었습니다.");
                 continue;
             }
@@ -269,9 +280,9 @@ public class DepositService {
                 errors.add(order.getOrderNo() + "번 주문은 입금 확정할 수 없는 상태입니다.");
                 continue;
             }
-            order.confirmPaid(row.getDepositorName(), row.getAmount(), row.getId(), now);
-            row.use(order.getId());
-            aliasBook.record(sellerId, order, row.getDepositorName(), now);
+            DepositConfirmation confirmation = order.confirmPaid(row.getDepositorName(), row.getAmount(), row.getId(), now);
+            aliasBook.record(sellerId, order, confirmation, now);
+            orderRepository.flush(); // 같은 요청 안의 다음 줄이 이 확정을 보도록 (입금 1건은 주문 1건에만)
             confirmed++;
         }
         return new ConfirmResponse(confirmed, errors);
@@ -287,8 +298,7 @@ public class DepositService {
             throw ApiException.badRequest("입금 확정된 주문이 아닙니다.");
         }
         aliasBook.undo(sellerId, order, Set.of(order.getId()));
-        rowRepository.findByUsedOrderId(order.getId()).ifPresent(DepositRow::release);
-        // 취소된 주문이면 "입금 확정"이 잘못이었다는 뜻이므로 "환불 필요"도 함께 거둔다
+        // 확정 기록은 지우지 않고 취소 시각만 남긴다. 취소된 주문이면 "입금 확정"이 잘못이었다는 뜻이므로 "환불 필요"도 함께 거둔다
         order.cancelPaid(LocalDateTime.now(clock));
     }
 
@@ -302,8 +312,19 @@ public class DepositService {
             throw ApiException.badRequest("입금 확정할 수 없는 상태입니다.");
         }
         LocalDateTime now = LocalDateTime.now(clock);
-        order.confirmPaid(depositorName.trim(), amount, null, now);
-        aliasBook.record(sellerId, order, depositorName, now);
+        DepositConfirmation confirmation = order.confirmPaid(depositorName.trim(), amount, null, now);
+        aliasBook.record(sellerId, order, confirmation, now);
+    }
+
+    /** 살아 있는 확정에 쓰인 입금 줄 id */
+    private Set<Long> usedRowIds(Long groupBuyId) {
+        Set<Long> ids = new HashSet<>();
+        confirmationRepository.findActiveByGroupBuyId(groupBuyId).forEach(c -> {
+            if (c.getDepositRowId() != null) {
+                ids.add(c.getDepositRowId());
+            }
+        });
+        return ids;
     }
 
     private Map<String, String> aliasMap(Long sellerId) {
