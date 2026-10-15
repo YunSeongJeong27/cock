@@ -17,6 +17,7 @@ import com.depositcock.groupbuy.GroupBuyDtos.GroupBuySummary;
 import com.depositcock.groupbuy.GroupBuyDtos.PickupPointRequest;
 import com.depositcock.groupbuy.GroupBuyDtos.ProductRequest;
 import com.depositcock.order.CustomerOrder;
+import com.depositcock.order.OrderSource;
 import com.depositcock.order.CustomerOrderRepository;
 import com.depositcock.order.DisplayStatus;
 import com.depositcock.seller.Seller;
@@ -173,13 +174,19 @@ public class GroupBuyService {
         if (r.deliveryEnabled() && r.shippingFeeType() == ShippingFeeType.FIXED && r.shippingFee() <= 0) {
             throw ApiException.badRequest("고정 배송비 금액을 입력해 주세요.");
         }
+        if (r.orderChannel() == OrderChannel.LINK_ONLY && groupBuy.getId() != null
+                && orderRepository.findByGroupBuyIdAndSource(groupBuy.getId(), OrderSource.COMMENT).stream()
+                .anyMatch(CustomerOrder::isActive)) {
+            // 링크만 쓰는 공구에서는 댓글 집계를 숨기므로, 이미 있는 댓글 주문을 관리할 수 없게 된다
+            throw ApiException.badRequest("댓글 주문이 있어 '주문 링크만'으로 바꿀 수 없습니다. 댓글 주문을 먼저 취소해 주세요.");
+        }
         groupBuy.updateSettings(new GroupBuySettings(
                 r.title().trim(), blankToNull(r.description()), r.closeAt(),
                 blankToNull(r.bankName()), blankToNull(r.accountNumber()), blankToNull(r.accountHolder()),
                 r.pickupEnabled(), r.pickupEnabled() && r.pickupPrepayEnabled(),
                 r.pickupEnabled() && r.pickupOnsiteEnabled(), r.deliveryEnabled(),
                 r.deliveryEnabled() ? r.shippingFeeType() : ShippingFeeType.NONE, r.shippingFee(),
-                r.nicknameFieldEnabled(), r.unitAddressFieldEnabled(), blankToNull(r.kakaoInquiryUrl()),
+                r.orderChannel(), r.unitAddressFieldEnabled(), blankToNull(r.kakaoInquiryUrl()),
                 blankToNull(r.adminNames())), now);
         syncProducts(groupBuy, r.products());
         syncPickupPoints(groupBuy, r.pickupEnabled() ? r.pickupPoints() : List.of());

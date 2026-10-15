@@ -99,7 +99,7 @@ public class PublicOrderService {
         String depositorName = r.depositorName().trim();
         String nickname = trimToNull(r.nickname());
         String unitAddress = trimToNull(r.unitAddress());
-        if (groupBuy.isNicknameFieldEnabled() && nickname == null) {
+        if (groupBuy.isNicknameRequired() && nickname == null) {
             throw ApiException.badRequest("닉네임을 입력해 주세요.");
         }
         if (groupBuy.isUnitAddressFieldEnabled() && unitAddress == null) {
@@ -407,7 +407,7 @@ public class PublicOrderService {
                         p.remaining(), p.getPerOrderLimit(), p.isSoldOut())).toList(),
                 g.sortedPickupPoints().stream().map(PickupPointResponse::of).toList(),
                 g.isPickupEnabled(), g.isPickupPrepayEnabled(), g.isPickupOnsiteEnabled(), g.isDeliveryEnabled(),
-                g.getShippingFeeType(), g.getShippingFee(), g.isNicknameFieldEnabled(), g.isUnitAddressFieldEnabled(),
+                g.getShippingFeeType(), g.getShippingFee(), g.isNicknameRequired(), g.isUnitAddressFieldEnabled(),
                 g.getKakaoInquiryUrl(), g.usesPrepay() ? account(g) : null, myOrders, prefill);
     }
 

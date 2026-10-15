@@ -11,6 +11,7 @@ import java.util.function.Function;
 import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 
+import com.depositcock.comment.CommentService;
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ExternalApiException;
 import com.depositcock.deposit.BankStatementReader;
@@ -128,7 +129,8 @@ public class ScreenshotService {
     }
 
     public CommentExtractResponse extractComments(Long sellerId, Long groupBuyId, List<MultipartFile> files) {
-        groupBuyService.getOwned(sellerId, groupBuyId);
+        // 캡처 장수를 쓰기 전에 막는다
+        CommentService.requireCommentOrders(groupBuyService.getOwned(sellerId, groupBuyId));
         if (!extractor.available()) {
             return new CommentExtractResponse(List.of(), extractor.provider(), notConfigured(), false, null);
         }

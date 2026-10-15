@@ -182,6 +182,7 @@ tr.dim td { color: var(--muted); }
   table.stack td.stack-title { font-size: 1rem; padding-bottom: 6px; }
   table.stack td.stack-action { padding-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
   table.stack td.stack-action:empty { display: none; }
+  table.stack td[data-label]:empty { display: none; }
   table.stack td input[type=text], table.stack td input[type=number], table.stack td input[type=date], table.stack td select { flex: 1; min-width: 0; width: auto !important; }
   table.stack td .edit-item input[type=number] { flex: 0 0 84px; width: 84px !important; }
   table.stack td .edit-fields input, table.stack td .edit-fields select { width: 100% !important; }

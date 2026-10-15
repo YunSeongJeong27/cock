@@ -9,10 +9,10 @@ VALUES ('demo@depositcock.local', '$2a$10$h/xuNp.ucRhLGho7oisjGuhm1AMSHuTIui2pK6
 
 INSERT INTO group_buy (seller_id, title, description, public_token, status, close_at, bank_name, account_number,
                        account_holder, pickup_enabled, pickup_prepay_enabled, pickup_onsite_enabled, delivery_enabled,
-                       shipping_fee_type, shipping_fee, nickname_field_enabled, unit_address_field_enabled,
+                       shipping_fee_type, shipping_fee, order_channel, unit_address_field_enabled,
                        kakao_inquiry_url, admin_names, created_at, updated_at)
 SELECT id, '파프리카 한봉지 (8일 목요일 오후 픽업)', '선착순 한정수량! 8일 목요일 오후 픽업하세요.', 'demo-paprika', 'OPEN', NULL,
-       '토스뱅크', '1000-0000-0000', '데모', TRUE, TRUE, TRUE, TRUE, 'FIXED', 4000, TRUE, FALSE, NULL, '공구장',
+       '토스뱅크', '1000-0000-0000', '데모', TRUE, TRUE, TRUE, TRUE, 'FIXED', 4000, 'LINK_AND_COMMENT', FALSE, NULL, '공구장',
        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM seller WHERE email = 'demo@depositcock.local';
 

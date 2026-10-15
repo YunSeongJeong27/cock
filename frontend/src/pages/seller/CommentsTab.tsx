@@ -236,12 +236,18 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
             <p className="muted small">캡처를 여러 번 올려도 됩니다. 반영하면 처음 보는 손님만 주문으로 추가하고, 이미 반영된 손님의 주문은 바꾸지 않습니다.</p>
             {groupBuy.products.length > 1 && <p className="small warn-box">상품이 여러 개인 공구의 댓글("간장1 양념1")을 상품별로 나누는 규칙은 아직 정해지지 않았습니다. 지금은 고른 상품 하나로 집계합니다.</p>}
             <div className="table-wrap">
-              <table>
+              <table className="stack">
                 <thead><tr><th>고객(닉네임)</th><th className="right">수량</th><th className="right">금액</th><th>메모</th><th>주문 반영</th></tr></thead>
                 <tbody>
                   {data.customers.map((c) => (
-                    <tr key={c.customerKey}><td>{c.authorName}{c.needsReview && <span className="chip">확인 필요 있음</span>}
-                      {c.linkOrderNos.length > 0 && <div className="small" style={{ color: 'var(--warn)' }}>⚠ 링크 주문 {c.linkOrderNos.join(', ')}번과 닉네임 같음 (같은 사람이면 중복)</div>}</td><td className="right">{c.quantity}</td><td className="right">{won(c.amount)}</td><td className="small">{c.memo}</td><td>{applyLabel(c)}</td></tr>
+                    <tr key={c.customerKey}>
+                      <td className="stack-title"><b>{c.authorName}</b>{c.needsReview && <span className="chip">확인 필요 있음</span>}
+                        {c.linkOrderNos.length > 0 && <div className="small" style={{ color: 'var(--warn)' }}>⚠ 링크 주문 {c.linkOrderNos.join(', ')}번과 닉네임 같음 (같은 사람이면 중복)</div>}</td>
+                      <td className="right" data-label="수량">{c.quantity}</td>
+                      <td className="right" data-label="금액">{won(c.amount)}</td>
+                      <td className="small" data-label="메모">{c.memo}</td>
+                      <td data-label="주문 반영">{applyLabel(c)}</td>
+                    </tr>
                   ))}
                 </tbody>
               </table>

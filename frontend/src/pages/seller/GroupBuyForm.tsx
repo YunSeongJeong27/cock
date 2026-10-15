@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, errorMessage } from '../../api'
 import { useAuth } from '../../auth'
 import { ErrorBox } from '../../components/Ui'
-import type { GroupBuy, ShippingFeeType } from '../../types'
+import type { GroupBuy, OrderChannel, ShippingFeeType } from '../../types'
 
 interface ProductInput { id?: number; name: string; unitPrice: string; stockLimit: string; perOrderLimit: string; sold?: number }
 interface PointInput { id?: number; name: string; info: string }
@@ -21,7 +21,8 @@ interface FormState {
   deliveryEnabled: boolean
   shippingFeeType: ShippingFeeType
   shippingFee: string
-  nicknameFieldEnabled: boolean
+  /** 새 공구는 비어 있음 → 판매자가 꼭 고른다 */
+  orderChannel: OrderChannel | ''
   unitAddressFieldEnabled: boolean
   kakaoInquiryUrl: string
   adminNames: string
@@ -32,7 +33,7 @@ interface FormState {
 const empty: FormState = {
   title: '', description: '', closeAt: '', bankName: '', accountNumber: '', accountHolder: '',
   pickupEnabled: true, pickupPrepayEnabled: false, pickupOnsiteEnabled: true, deliveryEnabled: false,
-  shippingFeeType: 'NONE', shippingFee: '', nicknameFieldEnabled: true, unitAddressFieldEnabled: false,
+  shippingFeeType: 'NONE', shippingFee: '', orderChannel: '', unitAddressFieldEnabled: false,
   kakaoInquiryUrl: '', adminNames: '', products: [{ name: '', unitPrice: '', stockLimit: '', perOrderLimit: '' }], pickupPoints: [],
 }
 
@@ -42,7 +43,7 @@ function toForm(g: GroupBuy): FormState {
     bankName: g.bankName ?? '', accountNumber: g.accountNumber ?? '', accountHolder: g.accountHolder ?? '',
     pickupEnabled: g.pickupEnabled, pickupPrepayEnabled: g.pickupPrepayEnabled, pickupOnsiteEnabled: g.pickupOnsiteEnabled,
     deliveryEnabled: g.deliveryEnabled, shippingFeeType: g.shippingFeeType, shippingFee: g.shippingFee ? String(g.shippingFee) : '',
-    nicknameFieldEnabled: g.nicknameFieldEnabled, unitAddressFieldEnabled: g.unitAddressFieldEnabled,
+    orderChannel: g.orderChannel, unitAddressFieldEnabled: g.unitAddressFieldEnabled,
     kakaoInquiryUrl: g.kakaoInquiryUrl ?? '', adminNames: g.adminNames ?? '',
     products: g.products.map((p) => ({ id: p.id, name: p.name, unitPrice: String(p.unitPrice), stockLimit: p.stockLimit ? String(p.stockLimit) : '', perOrderLimit: p.perOrderLimit ? String(p.perOrderLimit) : '', sold: p.sold })),
     pickupPoints: g.pickupPoints.map((p) => ({ id: p.id, name: p.name, info: p.info ?? '' })),
@@ -74,6 +75,11 @@ export default function GroupBuyForm() {
 
   async function submit(e: FormEvent, openAfter: boolean) {
     e.preventDefault()
+    if (!form.orderChannel) {
+      setError('맨 위에서 주문 받는 방법(주문 링크만 / 주문 링크 + 댓글)을 골라 주세요.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
     setBusy(true)
     setError(null)
     const body = {
@@ -113,6 +119,22 @@ export default function GroupBuyForm() {
         <div className="banner info mb" style={{ borderRadius: 8 }}>가입을 환영합니다! 먼저 주문서 링크를 만들어 보세요. 만든 링크를 밴드·카톡 글에 붙이면 고객이 주문합니다.</div>
       )}
       <h1>{editing ? '공구 수정' : '주문서 링크 만들기'}</h1>
+
+      <div className="card">
+        <h3>주문 받는 방법 *</h3>
+        <div className="segmented">
+          {([['LINK_ONLY', '주문 링크만'], ['LINK_AND_COMMENT', '주문 링크 + 댓글']] as const).map(([v, label]) => (
+            <label key={v} className={form.orderChannel === v ? 'on' : ''}>
+              <input type="radio" name="orderChannel" checked={form.orderChannel === v} onChange={() => set('orderChannel', v)} /> {label}
+            </label>
+          ))}
+        </div>
+        <p className="muted small">
+          {form.orderChannel === 'LINK_ONLY' && '고객이 주문서 링크로만 주문합니다. 닉네임은 선택 입력입니다 (칸은 보임).'}
+          {form.orderChannel === 'LINK_AND_COMMENT' && '주문서 링크 주문과 밴드·카톡 댓글 주문(댓글 집계)을 함께 받습니다. 같은 사람이 양쪽으로 주문했는지 닉네임으로 확인하므로, 주문서에서 닉네임이 필수입니다.'}
+          {!form.orderChannel && '고르면 설명이 나옵니다. 댓글로만 주문을 받는다면 "주문 링크 + 댓글"을 고르고 링크는 공유하지 않으면 됩니다.'}
+        </p>
+      </div>
 
       <div className="card">
         <h3>기본 정보</h3>
@@ -195,8 +217,6 @@ export default function GroupBuyForm() {
 
       <div className="card">
         <h3>고객 입력 항목·기타</h3>
-        <label className="check"><input type="checkbox" checked={form.nicknameFieldEnabled} onChange={(e) => set('nicknameFieldEnabled', e.target.checked)} /> 닉네임 받기 (밴드·카톡 닉네임)</label>
-        <p className="muted small" style={{ margin: '0 0 6px 26px' }}>켜면 고객이 주문서에 닉네임을 꼭 적어야 합니다. 끄면 댓글로 온 취소·변경 요청을 닉네임으로 찾을 수 없고, 같은 사람이 링크와 댓글로 두 번 주문해도 표시되지 않습니다.</p>
         <label className="check"><input type="checkbox" checked={form.unitAddressFieldEnabled} onChange={(e) => set('unitAddressFieldEnabled', e.target.checked)} /> 동·호수 받기 (아파트 공구)</label>
         <label className="field mt"><span>카톡 문의 링크 (선택, https:// 로 시작)</span>
           <input type="text" value={form.kakaoInquiryUrl} onChange={(e) => set('kakaoInquiryUrl', e.target.value)} placeholder="https://pf.kakao.com/..." />

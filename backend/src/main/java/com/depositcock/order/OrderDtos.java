@@ -102,7 +102,8 @@ public final class OrderDtos {
             boolean deliveryEnabled,
             ShippingFeeType shippingFeeType,
             int shippingFee,
-            boolean nicknameFieldEnabled,
+            /** 닉네임 칸은 항상 보이고, true 면 필수 (주문 링크 + 댓글 공구) */
+            boolean nicknameRequired,
             boolean unitAddressFieldEnabled,
             String kakaoInquiryUrl,
             AccountInfo account,

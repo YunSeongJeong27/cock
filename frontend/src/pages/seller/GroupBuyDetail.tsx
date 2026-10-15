@@ -66,6 +66,8 @@ export default function GroupBuyDetail() {
   }
 
   if (!groupBuy) return <div><ErrorBox message={error} />{!error && <div className="page-loading">불러오는 중…</div>}</div>
+  const comments = groupBuy.orderChannel === 'LINK_AND_COMMENT'
+  const shownTab: Tab = tab === 'comments' && !comments ? 'orders' : tab
   const link = `${window.location.origin}/g/${groupBuy.publicToken}`
 
   return (
@@ -117,18 +119,19 @@ export default function GroupBuyDetail() {
       )}
       <ErrorBox message={error} />
 
+      {/* 주문 링크만 쓰는 공구는 댓글 집계를 숨긴다 (저장된 탭이 댓글이었으면 주문 목록으로) */}
       <div className="tabs">
-        <button className={tab === 'orders' ? 'active' : ''} onClick={() => changeTab('orders')}>주문 목록</button>
-        <button className={tab === 'deposit' ? 'active' : ''} onClick={() => changeTab('deposit')}>입금 대조</button>
-        <button className={tab === 'pickup' ? 'active' : ''} onClick={() => changeTab('pickup')}>수령 체크</button>
-        <button className={tab === 'announce' ? 'active' : ''} onClick={() => changeTab('announce')}>입금 확인 문구·닉네임</button>
-        <button className={tab === 'comments' ? 'active' : ''} onClick={() => changeTab('comments')}>댓글 집계</button>
+        <button className={shownTab === 'orders' ? 'active' : ''} onClick={() => changeTab('orders')}>주문 목록</button>
+        <button className={shownTab === 'deposit' ? 'active' : ''} onClick={() => changeTab('deposit')}>입금 대조</button>
+        <button className={shownTab === 'pickup' ? 'active' : ''} onClick={() => changeTab('pickup')}>수령 체크</button>
+        <button className={shownTab === 'announce' ? 'active' : ''} onClick={() => changeTab('announce')}>입금 확인 문구·닉네임</button>
+        {comments && <button className={shownTab === 'comments' ? 'active' : ''} onClick={() => changeTab('comments')}>댓글 집계</button>}
       </div>
-      {tab === 'orders' && <OrdersTab groupBuy={groupBuy} orders={orders} reload={reload} />}
-      {tab === 'deposit' && <DepositTab groupBuy={groupBuy} reload={reload} />}
-      {tab === 'pickup' && <PickupTab groupBuy={groupBuy} orders={orders} reload={reload} />}
-      {tab === 'announce' && <AnnounceTab groupBuy={groupBuy} />}
-      {tab === 'comments' && <CommentsTab groupBuy={groupBuy} reload={reload} />}
+      {shownTab === 'orders' && <OrdersTab groupBuy={groupBuy} orders={orders} reload={reload} />}
+      {shownTab === 'deposit' && <DepositTab groupBuy={groupBuy} reload={reload} />}
+      {shownTab === 'pickup' && <PickupTab groupBuy={groupBuy} orders={orders} reload={reload} />}
+      {shownTab === 'announce' && <AnnounceTab groupBuy={groupBuy} />}
+      {shownTab === 'comments' && <CommentsTab groupBuy={groupBuy} reload={reload} />}
     </div>
   )
 }

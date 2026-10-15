@@ -20,6 +20,8 @@ export type GroupBuyStatus = 'DRAFT' | 'OPEN' | 'CLOSED'
 export type ShippingFeeType = 'NONE' | 'FIXED'
 export type ReceiveMethod = 'PICKUP' | 'DELIVERY'
 export type PaymentMethod = 'PREPAID' | 'ONSITE'
+/** 주문 받는 방법: 주문 링크만(닉네임 선택) / 주문 링크 + 댓글(닉네임 필수, 댓글 집계 사용) */
+export type OrderChannel = 'LINK_ONLY' | 'LINK_AND_COMMENT'
 
 export interface Product {
   id: number
@@ -55,7 +57,7 @@ export interface GroupBuy {
   deliveryEnabled: boolean
   shippingFeeType: ShippingFeeType
   shippingFee: number
-  nicknameFieldEnabled: boolean
+  orderChannel: OrderChannel
   unitAddressFieldEnabled: boolean
   kakaoInquiryUrl: string | null
   adminNames: string | null

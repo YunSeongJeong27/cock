@@ -18,7 +18,7 @@ public record GroupBuySettings(
         boolean deliveryEnabled,
         ShippingFeeType shippingFeeType,
         int shippingFee,
-        boolean nicknameFieldEnabled,
+        OrderChannel orderChannel,
         boolean unitAddressFieldEnabled,
         String kakaoInquiryUrl,
         String adminNames) {

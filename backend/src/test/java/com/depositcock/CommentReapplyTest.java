@@ -29,8 +29,10 @@ class CommentReapplyTest extends IntegrationTest {
     @Test
     void secondUploadAddsOnlyNewCustomersAndKeepsConfirmedOrders() throws Exception {
         Cookie seller = signup(uniqueEmail());
-        JsonNode created = read(mvc.perform(withJson(post("/api/seller/group-buys").cookie(seller),
-                groupBuyBody("파프리카", List.of(product("파프리카", 1900, null))))).andExpect(status().isOk()).andReturn());
+        Map<String, Object> body = groupBuyBody("파프리카", List.of(product("파프리카", 1900, null)));
+        body.put("orderChannel", "LINK_AND_COMMENT");
+        JsonNode created = read(mvc.perform(withJson(post("/api/seller/group-buys").cookie(seller), body))
+                .andExpect(status().isOk()).andReturn());
         long id = created.get("id").asLong();
         long productId = created.get("products").get(0).get("id").asLong();
         mvc.perform(post("/api/seller/group-buys/" + id + "/open").cookie(seller)).andExpect(status().isOk());
@@ -82,8 +84,10 @@ class CommentReapplyTest extends IntegrationTest {
     @Test
     void cancelledCommentOrderIsNotRecreated() throws Exception {
         Cookie seller = signup(uniqueEmail());
-        JsonNode created = read(mvc.perform(withJson(post("/api/seller/group-buys").cookie(seller),
-                groupBuyBody("파프리카", List.of(product("파프리카", 1900, null))))).andExpect(status().isOk()).andReturn());
+        Map<String, Object> body = groupBuyBody("파프리카", List.of(product("파프리카", 1900, null)));
+        body.put("orderChannel", "LINK_AND_COMMENT");
+        JsonNode created = read(mvc.perform(withJson(post("/api/seller/group-buys").cookie(seller), body))
+                .andExpect(status().isOk()).andReturn());
         long id = created.get("id").asLong();
         long productId = created.get("products").get(0).get("id").asLong();
         mvc.perform(post("/api/seller/group-buys/" + id + "/open").cookie(seller)).andExpect(status().isOk());

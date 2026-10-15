@@ -55,7 +55,8 @@ CREATE TABLE group_buy (
     delivery_enabled           BOOLEAN      NOT NULL,
     shipping_fee_type          VARCHAR(20)  NOT NULL,
     shipping_fee               INTEGER      NOT NULL DEFAULT 0,
-    nickname_field_enabled     BOOLEAN      NOT NULL,
+    -- 주문 받는 방법: LINK_ONLY(닉네임 선택) / LINK_AND_COMMENT(닉네임 필수, 댓글 집계 사용). 2026-10-15 사용자 결정
+    order_channel              VARCHAR(20)  NOT NULL,
     unit_address_field_enabled BOOLEAN      NOT NULL,
     kakao_inquiry_url          VARCHAR(500),
     admin_names                VARCHAR(500),

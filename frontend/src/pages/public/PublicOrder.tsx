@@ -36,7 +36,7 @@ interface View {
   title: string; description: string | null; sellerName: string; acceptingOrders: boolean; closedReason: string | null; closeAt: string | null
   products: PublicProduct[]; pickupPoints: { id: number; name: string; info: string | null }[]
   pickupEnabled: boolean; pickupPrepayEnabled: boolean; pickupOnsiteEnabled: boolean; deliveryEnabled: boolean
-  shippingFeeType: ShippingFeeType; shippingFee: number; nicknameFieldEnabled: boolean; unitAddressFieldEnabled: boolean
+  shippingFeeType: ShippingFeeType; shippingFee: number; nicknameRequired: boolean; unitAddressFieldEnabled: boolean
   kakaoInquiryUrl: string | null; account: Account | null; myOrders: MyOrder[]; prefill: Prefill | null
 }
 interface Placed { orderNo: number; expectedAmount: number; paymentMethod: PaymentMethod; depositorName: string; account: Account | null; myOrders: MyOrder[] }
@@ -360,7 +360,7 @@ export default function PublicOrder() {
             <label className="field"><span>입금자명 *</span><input type="text" value={form.depositorName} onChange={(e) => set('depositorName', e.target.value)} required placeholder="통장에 찍힐 이름" />
               <span className="muted small" style={{ fontWeight: 400 }}>{payment === 'ONSITE' ? '주문 확인용 이름입니다.' : '계좌이체할 때 받는 분 통장 표시에 이 이름을 적어주세요.'}</span>
             </label>
-            {view.nicknameFieldEnabled && <label className="field"><span>닉네임 (밴드·카톡) *</span><input type="text" value={form.nickname} onChange={(e) => set('nickname', e.target.value)} required /></label>}
+            <label className="field"><span>{view.nicknameRequired ? '닉네임 (밴드·카톡) *' : '닉네임 (밴드·카톡, 선택)'}</span><input type="text" value={form.nickname} onChange={(e) => set('nickname', e.target.value)} required={view.nicknameRequired} /></label>
             {view.unitAddressFieldEnabled && <label className="field"><span>동·호수 *</span><input type="text" value={form.unitAddress} onChange={(e) => set('unitAddress', e.target.value)} required placeholder="예: 101동 1203호" /></label>}
           </div>
 

@@ -38,8 +38,14 @@ class CustomerTableTest extends IntegrationTest {
     }
 
     private Opened open(Cookie seller, String title) throws Exception {
-        JsonNode created = read(mvc.perform(withJson(post("/api/seller/group-buys").cookie(seller),
-                groupBuyBody(title, List.of(product("상품", 1000, null))))).andExpect(status().isOk()).andReturn());
+        return open(seller, title, "LINK_ONLY");
+    }
+
+    private Opened open(Cookie seller, String title, String orderChannel) throws Exception {
+        Map<String, Object> body = groupBuyBody(title, List.of(product("상품", 1000, null)));
+        body.put("orderChannel", orderChannel);
+        JsonNode created = read(mvc.perform(withJson(post("/api/seller/group-buys").cookie(seller), body))
+                .andExpect(status().isOk()).andReturn());
         long id = created.get("id").asLong();
         mvc.perform(post("/api/seller/group-buys/" + id + "/open").cookie(seller)).andExpect(status().isOk());
         return new Opened(id, created.get("publicToken").asText(), created.get("products").get(0).get("id").asLong());
@@ -135,7 +141,7 @@ class CustomerTableTest extends IntegrationTest {
     @Test
     void commentCustomersAreKeptByNicknameAcrossReapply() throws Exception {
         Cookie seller = signup(uniqueEmail());
-        Opened g = open(seller, "댓글");
+        Opened g = open(seller, "댓글", "LINK_AND_COMMENT");
         String base = "/api/seller/group-buys/" + g.id() + "/comments";
         mvc.perform(withJson(post(base).cookie(seller), Map.of("source", "TEXT", "comments",
                 List.of(Map.of("author", "꼭지맘", "content", "1"), Map.of("author", "망고맘", "content", "2")))))

@@ -55,6 +55,7 @@ class AuditFixesTest extends IntegrationTest {
     @Test
     void commentOrdersFollowPickupPaymentSetting() throws Exception {
         Map<String, Object> body = groupBuyBody("현장결제 공구", List.of(product("상품", 1000, null)));
+        body.put("orderChannel", "LINK_AND_COMMENT");
         body.put("pickupPrepayEnabled", false);
         body.put("pickupOnsiteEnabled", true);
         body.put("deliveryEnabled", true);

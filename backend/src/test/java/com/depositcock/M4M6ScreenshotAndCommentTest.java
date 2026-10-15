@@ -98,6 +98,7 @@ class M4M6ScreenshotAndCommentTest extends IntegrationTest {
 
         Cookie seller = signup(uniqueEmail());
         Map<String, Object> body = groupBuyBody("파프리카 공구", List.of(product("파프리카 한봉지", 1900, null)));
+        body.put("orderChannel", "LINK_AND_COMMENT");
         body.put("adminNames", "공구장");
         long id = openGroupBuy(seller, body);
         String base = "/api/seller/group-buys/" + id + "/comments";

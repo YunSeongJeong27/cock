@@ -76,8 +76,10 @@ public class GroupBuy {
     @Column(nullable = false)
     private int shippingFee;
 
-    @Column(nullable = false)
-    private boolean nicknameFieldEnabled;
+    /** 주문 받는 방법 (링크만이면 닉네임 선택, 링크 + 댓글이면 닉네임 필수) */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private OrderChannel orderChannel;
 
     @Column(nullable = false)
     private boolean unitAddressFieldEnabled;
@@ -126,7 +128,7 @@ public class GroupBuy {
         this.deliveryEnabled = s.deliveryEnabled();
         this.shippingFeeType = s.shippingFeeType();
         this.shippingFee = s.shippingFeeType() == ShippingFeeType.FIXED ? s.shippingFee() : 0;
-        this.nicknameFieldEnabled = s.nicknameFieldEnabled();
+        this.orderChannel = s.orderChannel();
         this.unitAddressFieldEnabled = s.unitAddressFieldEnabled();
         this.kakaoInquiryUrl = s.kakaoInquiryUrl();
         this.adminNames = s.adminNames();
@@ -229,8 +231,17 @@ public class GroupBuy {
         return shippingFee;
     }
 
-    public boolean isNicknameFieldEnabled() {
-        return nicknameFieldEnabled;
+    public OrderChannel getOrderChannel() {
+        return orderChannel;
+    }
+
+    /** 고객 주문서의 닉네임 필수 여부 (칸은 항상 보이고, 링크만 쓰는 공구에서는 선택) */
+    public boolean isNicknameRequired() {
+        return orderChannel == OrderChannel.LINK_AND_COMMENT;
+    }
+
+    public boolean isCommentOrdersEnabled() {
+        return orderChannel == OrderChannel.LINK_AND_COMMENT;
     }
 
     public boolean isUnitAddressFieldEnabled() {

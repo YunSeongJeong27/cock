@@ -84,7 +84,7 @@ public abstract class IntegrationTest {
         body.put("deliveryEnabled", false);
         body.put("shippingFeeType", "NONE");
         body.put("shippingFee", 0);
-        body.put("nicknameFieldEnabled", false);
+        body.put("orderChannel", "LINK_ONLY"); // 닉네임 선택. 댓글 주문 테스트는 LINK_AND_COMMENT 로 바꾼다
         body.put("unitAddressFieldEnabled", false);
         body.put("kakaoInquiryUrl", null);
         body.put("adminNames", null);

@@ -236,6 +236,7 @@ public class CommentService {
     @Transactional
     public ApplyResult apply(Long sellerId, Long groupBuyId, Long productId) {
         GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
+        requireCommentOrders(groupBuy);
         Product product = resolveProduct(groupBuy, productId, true);
         Map<String, List<CustomerOrder>> appliedOrders = appliedByNickname(groupBuy.getId());
 
@@ -275,6 +276,14 @@ public class CommentService {
         }
         entityManager.refresh(product);
         return new ApplyResult(created, review + staleOrders(appliedOrders, totals).size());
+    }
+
+    /** 주문 링크만 쓰는 공구는 링크 주문에 닉네임이 없을 수 있어 댓글 주문과 같은 사람인지 비교할 수 없다 → 댓글 주문을 만들지 않는다 */
+    public static void requireCommentOrders(GroupBuy groupBuy) {
+        if (!groupBuy.isCommentOrdersEnabled()) {
+            throw ApiException.badRequest("'주문 링크만' 쓰는 공구입니다. 댓글 주문도 받으려면 공구 수정에서 주문 받는 방법을 "
+                    + "'주문 링크 + 댓글'로 바꿔 주세요.");
+        }
     }
 
     private List<CustomerTotal> aggregate(GroupBuy groupBuy, List<ImportedComment> comments) {
