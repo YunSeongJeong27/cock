@@ -5,9 +5,11 @@ import java.util.List;
 import com.depositcock.order.OrderDtos.PickedUpRequest;
 import com.depositcock.order.OrderDtos.SellerOrder;
 import com.depositcock.security.CurrentSeller;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +33,13 @@ public class SellerOrderController {
     public SellerOrder pickedUp(@PathVariable Long groupBuyId, @PathVariable Long orderId,
                                 @RequestBody PickedUpRequest request) {
         return service.setPickedUp(CurrentSeller.id(), groupBuyId, orderId, request.pickedUp());
+    }
+
+    /** 판매자가 고객의 변경 요청을 대신 반영 */
+    @PutMapping("/{orderId}")
+    public SellerOrder edit(@PathVariable Long groupBuyId, @PathVariable Long orderId,
+                            @Valid @RequestBody OrderDtos.SellerEditRequest request) {
+        return service.edit(CurrentSeller.id(), groupBuyId, orderId, request);
     }
 
     @PostMapping("/{orderId}/cancel")

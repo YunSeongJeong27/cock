@@ -106,9 +106,9 @@ public class PublicOrderService {
             throw ApiException.badRequest("동·호수를 입력해 주세요.");
         }
 
-        ReceiveMethod receiveMethod = resolveReceiveMethod(groupBuy, r.receiveMethod());
-        PaymentMethod paymentMethod = resolvePaymentMethod(groupBuy, receiveMethod, r.paymentMethod());
-        PickupPoint pickupPoint = receiveMethod == ReceiveMethod.PICKUP ? resolvePickupPoint(groupBuy, r.pickupPointId()) : null;
+        ReceiveMethod receiveMethod = OrderRules.receiveMethod(groupBuy, r.receiveMethod());
+        PaymentMethod paymentMethod = OrderRules.paymentMethod(groupBuy, receiveMethod, r.paymentMethod());
+        PickupPoint pickupPoint = receiveMethod == ReceiveMethod.PICKUP ? OrderRules.pickupPoint(groupBuy, r.pickupPointId()) : null;
 
         Map<Long, Product> products = new HashMap<>();
         groupBuy.getProducts().forEach(p -> products.put(p.getId(), p));
@@ -394,52 +394,6 @@ public class PublicOrderService {
                     + "붙여주세요. (예: 김민지1505)");
         }
         return warnings;
-    }
-
-    private ReceiveMethod resolveReceiveMethod(GroupBuy groupBuy, ReceiveMethod requested) {
-        if (groupBuy.isPickupEnabled() && groupBuy.isDeliveryEnabled()) {
-            if (requested == null) {
-                throw ApiException.badRequest("수령 방법(픽업/배송)을 선택해 주세요.");
-            }
-            return requested;
-        }
-        ReceiveMethod only = groupBuy.isPickupEnabled() ? ReceiveMethod.PICKUP : ReceiveMethod.DELIVERY;
-        if (requested != null && requested != only) {
-            throw ApiException.badRequest("선택할 수 없는 수령 방법입니다.");
-        }
-        return only;
-    }
-
-    private PaymentMethod resolvePaymentMethod(GroupBuy groupBuy, ReceiveMethod receiveMethod, PaymentMethod requested) {
-        if (receiveMethod == ReceiveMethod.DELIVERY) {
-            return PaymentMethod.PREPAID; // 배송은 선입금만
-        }
-        if (groupBuy.isPickupPrepayEnabled() && groupBuy.isPickupOnsiteEnabled()) {
-            if (requested == null) {
-                throw ApiException.badRequest("결제 방식(선입금/현장결제)을 선택해 주세요.");
-            }
-            return requested;
-        }
-        PaymentMethod only = groupBuy.isPickupPrepayEnabled() ? PaymentMethod.PREPAID : PaymentMethod.ONSITE;
-        if (requested != null && requested != only) {
-            throw ApiException.badRequest("선택할 수 없는 결제 방식입니다.");
-        }
-        return only;
-    }
-
-    private PickupPoint resolvePickupPoint(GroupBuy groupBuy, Long pickupPointId) {
-        List<PickupPoint> points = groupBuy.sortedPickupPoints();
-        if (points.isEmpty()) {
-            return null;
-        }
-        if (points.size() == 1) {
-            return points.get(0);
-        }
-        if (pickupPointId == null) {
-            throw ApiException.badRequest("픽업 지점을 선택해 주세요.");
-        }
-        return points.stream().filter(p -> p.getId().equals(pickupPointId)).findFirst()
-                .orElseThrow(() -> ApiException.badRequest("픽업 지점을 찾을 수 없습니다."));
     }
 
     private PublicGroupBuy toPublic(GroupBuy g, CustomerDevice device, LocalDateTime now) {

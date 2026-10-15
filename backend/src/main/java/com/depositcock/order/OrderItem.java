@@ -47,6 +47,11 @@ public class OrderItem {
         this.unitPriceSnapshot = product.getUnitPrice();
     }
 
+    /** 판매자가 주문을 바꿀 때 수량만 바꾼다 (단가는 주문 당시 그대로) */
+    void changeQuantity(int quantity) {
+        this.quantity = quantity;
+    }
+
     public int amount() {
         return quantity * unitPriceSnapshot;
     }

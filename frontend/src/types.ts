@@ -132,6 +132,8 @@ export interface SellerOrder {
   cancelledAt: string | null
   /** 입금 확정 이력 (취소된 확정 포함, 오래된 순) */
   payments: PaymentRecord[]
+  /** 판매자가 주문을 바꾼 기록 (오래된 순) */
+  changes: { summary: string; changedAt: string }[]
 }
 
 export interface ColumnMapping {

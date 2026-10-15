@@ -167,9 +167,14 @@ public class CommentService {
         GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         Product product = resolveProduct(groupBuy, productId, true);
         List<CustomerOrder> existing = orderRepository.findByGroupBuyIdAndSource(groupBuy.getId(), OrderSource.COMMENT);
+        if (existing.stream().anyMatch(o -> !o.getChanges().isEmpty())) {
+            // 다시 반영하면 댓글 주문을 새로 만들어서 판매자가 바꾼 내용이 사라진다
+            throw ApiException.badRequest("판매자가 직접 바꾼 댓글 주문이 있어 다시 반영할 수 없습니다. "
+                    + "바뀐 댓글은 주문 목록에서 해당 주문을 직접 바꿔 주세요.");
+        }
         if (existing.stream().anyMatch(o -> o.isPaid() || o.isPickedUp() || o.isRefundRequired())) {
             throw ApiException.badRequest("입금 확정·수령 처리한 댓글 주문이 있어 다시 반영할 수 없습니다. "
-                    + "바뀐 내용이 있으면 주문 목록에서 해당 주문을 취소하는 등 직접 처리해 주세요.");
+                    + "바뀐 내용이 있으면 주문 목록에서 해당 주문을 직접 바꾸거나 취소해 주세요.");
         }
         for (CustomerOrder o : existing) {
             if (o.isActive()) {

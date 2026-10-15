@@ -90,6 +90,11 @@ public class CustomerOrder {
     /** 고객이 "입금했어요"를 누른 시각 (확정 아님) */
     private LocalDateTime depositReportedAt;
 
+    /** 판매자가 주문 내용을 바꾼 기록 (오래된 순) */
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
+    @OrderBy("id")
+    private List<OrderChange> changes = new ArrayList<>();
+
     /** 입금 확정 이력 (확정 취소도 지우지 않고 남김). 살아 있는 확정은 최대 1건 */
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     @OrderBy("id")
@@ -159,6 +164,21 @@ public class CustomerOrder {
         this.zipcode = zipcode;
         this.address = address;
         this.addressDetail = addressDetail;
+    }
+
+    /** 판매자가 주문 내용을 바꿨다는 기록을 남긴다 */
+    public void recordChange(String summary, LocalDateTime now) {
+        changes.add(new OrderChange(this, summary, now));
+        this.updatedAt = now;
+    }
+
+    public List<OrderChange> getChanges() {
+        return changes;
+    }
+
+    /** 수량이 0 이 된 상품 줄은 지운다 (orphanRemoval) */
+    void removeItem(OrderItem item) {
+        items.remove(item);
     }
 
     public void addItem(OrderItem item) {

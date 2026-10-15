@@ -73,7 +73,9 @@ public final class OrderDtos {
             boolean canReportDeposit,
             boolean cancellable,
             boolean refundRequired,
-            LocalDateTime orderedAt) {
+            LocalDateTime orderedAt,
+            /** 판매자가 주문을 마지막으로 바꾼 시각 (안 바꿨으면 null) */
+            LocalDateTime changedAt) {
     }
 
     /**
@@ -163,7 +165,31 @@ public final class OrderDtos {
             LocalDateTime orderedAt,
             LocalDateTime cancelledAt,
             /** 입금 확정 이력 (취소된 확정 포함, 오래된 순) */
-            List<PaymentRecord> payments) {
+            List<PaymentRecord> payments,
+            /** 판매자가 주문을 바꾼 기록 (오래된 순) */
+            List<ChangeRecord> changes) {
+    }
+
+    public record ChangeRecord(String summary, LocalDateTime changedAt) {
+    }
+
+    /**
+     * 판매자가 고객의 변경 요청을 대신 반영한다 (고객 화면에는 수정 기능 없음, 인터뷰 결과 4번).
+     * 휴대폰 번호(고객)는 바꿀 수 없다. 번호를 바꾸려면 취소 후 다시 주문.
+     */
+    public record SellerEditRequest(
+            @Valid @NotEmpty List<OrderItemRequest> items,
+            ReceiveMethod receiveMethod,
+            Long pickupPointId,
+            PaymentMethod paymentMethod,
+            @Size(max = 50) String depositorName,
+            @Size(max = 200) String nickname,
+            @Size(max = 50) String unitAddress,
+            @Size(max = 50) String recipientName,
+            @Size(max = 20) String recipientPhone,
+            @Size(max = 10) String zipcode,
+            @Size(max = 300) String address,
+            @Size(max = 300) String addressDetail) {
     }
 
     /** 입금 확정 1건. manual = 거래내역 없이 수동 확정, cancelledAt 이 있으면 취소된 확정 */

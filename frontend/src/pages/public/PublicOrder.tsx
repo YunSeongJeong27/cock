@@ -22,6 +22,8 @@ interface MyOrder {
   cancellable: boolean
   refundRequired: boolean
   orderedAt: string
+  /** 판매자가 주문을 마지막으로 바꾼 시각 */
+  changedAt: string | null
 }
 interface Prefill {
   phone: string; depositorName: string; nickname: string | null; unitAddress: string | null; receiveMethod: ReceiveMethod
@@ -248,6 +250,7 @@ export default function PublicOrder() {
               </div>
               <div className="small">{o.items.map((i) => `${i.productName} ${i.quantity}개`).join(', ')}</div>
               <div className="small muted">{o.receiveMethod === 'DELIVERY' ? '배송' : `픽업${o.pickupPointName ? ' · ' + o.pickupPointName : ''}`} · {o.paymentMethod === 'PREPAID' ? `선입금 (입금자명 ${o.depositorName})` : '현장결제'} · {dateTime(o.orderedAt)}</div>
+              {o.changedAt && <div className="small" style={{ color: 'var(--warn)' }}>판매자가 주문을 변경했어요 ({dateTime(o.changedAt)}). 위 내용·금액을 확인해 주세요.</div>}
               {o.refundRequired && <div className="small" style={{ color: 'var(--danger)' }}>취소됨 · 판매자가 환불할 예정입니다.</div>}
               {o.canReportDeposit && view.account && (
                 <div className="small mt">입금 계좌: {view.account.bankName} {view.account.accountNumber} ({view.account.accountHolder}) <CopyButton text={view.account.accountNumber} label="복사" /></div>

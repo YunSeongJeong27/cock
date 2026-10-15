@@ -196,6 +196,7 @@ export default function GroupBuyForm() {
       <div className="card">
         <h3>고객 입력 항목·기타</h3>
         <label className="check"><input type="checkbox" checked={form.nicknameFieldEnabled} onChange={(e) => set('nicknameFieldEnabled', e.target.checked)} /> 닉네임 받기 (밴드·카톡 닉네임)</label>
+        <p className="muted small" style={{ margin: '0 0 6px 26px' }}>밴드·카톡에 올리는 공구라면 켜 두는 걸 권장합니다. 댓글로 취소·변경 요청이 오면 주문 목록에서 닉네임으로 바로 찾을 수 있습니다.</p>
         <label className="check"><input type="checkbox" checked={form.unitAddressFieldEnabled} onChange={(e) => set('unitAddressFieldEnabled', e.target.checked)} /> 동·호수 받기 (아파트 공구)</label>
         <label className="field mt"><span>카톡 문의 링크 (선택, https:// 로 시작)</span>
           <input type="text" value={form.kakaoInquiryUrl} onChange={(e) => set('kakaoInquiryUrl', e.target.value)} placeholder="https://pf.kakao.com/..." />
