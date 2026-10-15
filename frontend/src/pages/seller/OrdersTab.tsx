@@ -20,6 +20,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
     if (filter === 'unpaid' && !(o.active && o.paymentMethod === 'PREPAID' && !o.paid)) return false
     if (filter === 'refund' && !(o.refundRequired && !o.refundedAt)) return false
     if (filter === 'cancelled' && o.active) return false
+    if (filter === 'samenick' && o.sameNicknameOrderNos.length === 0) return false
     const q = query.trim()
     if (q && ![o.depositorName, o.nickname, o.phone, o.recipientName, String(o.orderNo)].some((v) => v?.includes(q))
       && !(/^[\d-]+$/.test(q) && o.phone?.replace(/\D/g, '').includes(q.replace(/\D/g, '')))) return false
@@ -61,8 +62,16 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
     post(`${o.id}/manual-paid`, { depositorName: name, amount: Number(amount.replace(/,/g, '')) })
   }
 
+  const sameNick = orders.filter((o) => o.sameNicknameOrderNos.length > 0).length
+
   return (
     <div>
+      {sameNick > 0 && filter !== 'samenick' && (
+        <div className="warn-box row between mb">
+          <span className="small">⚠ 링크 주문과 댓글 주문의 닉네임이 같은 주문이 {sameNick}건 있습니다. 같은 사람이 두 번 주문한 것이면 하나를 취소하거나 바꿔 주세요.</span>
+          <button className="btn small" onClick={() => setFilter('samenick')}>모아 보기</button>
+        </div>
+      )}
       <div className="row mb">
         <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: 170 }}>
           <option value="all">전체 ({orders.length})</option>
@@ -70,6 +79,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
           <option value="unpaid">미입금 (선입금)</option>
           <option value="refund">환불 필요</option>
           <option value="cancelled">취소됨</option>
+          {(sameNick > 0 || filter === 'samenick') && <option value="samenick">링크·댓글 닉네임 같음 ({sameNick})</option>}
         </select>
         <input type="text" placeholder="닉네임·입금자명·전화 뒷자리·주문번호 검색" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1, minWidth: 180 }} />
       </div>
