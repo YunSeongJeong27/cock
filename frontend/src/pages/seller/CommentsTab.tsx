@@ -167,7 +167,7 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
       <div className="card">
         <h3>댓글 집계</h3>
         <p className="warn-box">
-          상품이 여러 개인 공구는 아직 댓글 주문을 받을 수 없습니다. 댓글("간장1 양념1" 등)을 상품별로 나눠 세는 기능을 준비 중입니다.
+          상품이 여러 개인 공구는 아직 댓글 주문을 받을 수 없습니다. 댓글을 상품별로 나눠 세는 기능을 준비 중입니다.
           <b> 이 공구는 주문 링크로 주문을 받아 주세요.</b>
         </p>
         {data && data.appliedOrderCount > 0 && <p className="small muted">이전에 반영한 댓글 주문 {data.appliedOrderCount}건은 주문 목록에 그대로 있습니다.</p>}
