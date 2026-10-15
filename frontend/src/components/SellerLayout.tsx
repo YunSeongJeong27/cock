@@ -5,7 +5,9 @@ export default function SellerLayout() {
   const { me, logout } = useAuth()
   const navigate = useNavigate()
   // 관리자 표는 열이 많아 PC 에서 더 넓게 쓴다
-  const wider = useLocation().pathname.startsWith('/admin')
+  const path = useLocation().pathname
+  // 관리자 화면과 공구 상세(주문 그리드)는 PC 에서 더 넓게
+  const wider = path.startsWith('/admin') || /^\/seller\/group-buys\/\d+$/.test(path)
   return (
     <div>
       <header className={`topbar${wider ? ' wider' : ''}`}>

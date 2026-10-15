@@ -117,7 +117,7 @@ class ReviewFixesOrderTest extends IntegrationTest {
     }
 
     @Test
-    void identifyByLast4DoesNotExposePersonalInfo() throws Exception {
+    void identifyFromAnotherDeviceDoesNotExposePersonalInfo() throws Exception {
         Map<String, Object> body = groupBuyBody("개인정보", List.of(product("상품", 1000, null)));
         body.put("deliveryEnabled", true);
         body.put("unitAddressFieldEnabled", true);
@@ -138,8 +138,11 @@ class ReviewFixesOrderTest extends IntegrationTest {
                 .andExpect(jsonPath("$.prefill.limited").value(false))
                 .andExpect(jsonPath("$.prefill.address").value("서울시 비밀구 1"));
 
-        // 남의 기기에서 입금자명 + 뒷4자리: 주문 상태는 보이지만 휴대폰·동호수·주소는 안 보임
-        MvcResult weak = mvc.perform(withJson(post(url + "/identify"), Map.of("depositorName", "박서준", "phone", "1234")))
+        // 뒷4자리만으로는 본인 확인 불가 (2026-10-15 사용자 결정: 휴대폰 전체 번호)
+        mvc.perform(withJson(post(url + "/identify"), Map.of("depositorName", "박서준", "phone", "1234")))
+                .andExpect(status().isBadRequest());
+        // 다른 기기에서 입금자명 + 전체 번호: 주문 상태는 보이지만 휴대폰·동호수·주소는 안 보임
+        MvcResult weak = mvc.perform(withJson(post(url + "/identify"), Map.of("depositorName", "박서준", "phone", "010-5300-1234")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.myOrders.length()").value(1))
                 .andExpect(jsonPath("$.prefill.limited").value(true))
@@ -152,11 +155,6 @@ class ReviewFixesOrderTest extends IntegrationTest {
                 .andExpect(jsonPath("$.prefill.limited").value(true))
                 .andExpect(jsonPath("$.prefill.address").doesNotExist());
 
-        // 휴대폰 전체 번호로 확인해도 다른 기기에서 넣은 주문의 개인정보는 채우지 않는다 (2026-10-14 보안 점검)
-        mvc.perform(withJson(post(url + "/identify"), Map.of("depositorName", "박서준", "phone", "010-5300-1234")))
-                .andExpect(jsonPath("$.myOrders.length()").value(1))
-                .andExpect(jsonPath("$.prefill.limited").value(true))
-                .andExpect(jsonPath("$.prefill.address").doesNotExist());
     }
 
     @Test

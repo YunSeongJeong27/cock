@@ -273,10 +273,17 @@ export default function PublicOrder() {
               <h3>내 주문 찾기</h3>
               <div className="row">
                 <input type="text" placeholder="입금자명" value={identify.depositorName} onChange={(e) => setIdentify({ ...identify, depositorName: e.target.value })} required style={{ flex: 1 }} />
-                <input type="tel" placeholder="휴대폰 뒷 4자리" value={identify.phone} onChange={(e) => setIdentify({ ...identify, phone: e.target.value })} required style={{ flex: 1 }} />
+                <input type="tel" placeholder="휴대폰 번호 (010-0000-0000)" value={identify.phone} onChange={(e) => setIdentify({ ...identify, phone: e.target.value })} required style={{ flex: 1, minWidth: 160 }} />
                 <button className="btn primary">찾기</button>
               </div>
+              <p className="small muted">주문할 때 적은 입금자명과 휴대폰 번호 전체를 입력해 주세요.</p>
               <ErrorBox message={identify.error} />
+              {identify.error && (
+                <p className="small muted">
+                  주문서 링크로 주문하지 않은 분(밴드·카톡 댓글로 주문 등)은 여기서 조회되지 않습니다. 판매자에게 문의해 주세요.
+                  {view.kakaoInquiryUrl && <> <a href={view.kakaoInquiryUrl} target="_blank" rel="noreferrer">💬 카톡 문의</a></>}
+                </p>
+              )}
             </form>
           )}
         </div>

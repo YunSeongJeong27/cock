@@ -101,15 +101,17 @@ class M2OrderFormTest extends IntegrationTest {
         // 쿠키 없이 입금 신고 불가
         mvc.perform(post("/api/public/g/" + token + "/orders/2/report-deposit")).andExpect(status().isForbidden());
 
-        // 다른 기기: 입금자명 + 뒷4자리로 본인 확인
+        // 다른 기기: 입금자명 + 휴대폰 전체 번호로 본인 확인 (뒷4자리만은 불가)
+        mvc.perform(withJson(post("/api/public/g/" + token + "/identify"),
+                Map.of("depositorName", "김지영", "phone", "5678"))).andExpect(status().isBadRequest());
         MvcResult identified = mvc.perform(withJson(post("/api/public/g/" + token + "/identify"),
-                        Map.of("depositorName", "김지영", "phone", "5678")))
+                        Map.of("depositorName", "김 지영", "phone", "01012345678")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.myOrders.length()").value(2))
                 .andReturn();
         assertThat(identified.getResponse().getCookie("dcg_" + token)).isNotNull();
         mvc.perform(withJson(post("/api/public/g/" + token + "/identify"),
-                Map.of("depositorName", "김지영", "phone", "0000"))).andExpect(status().isNotFound());
+                Map.of("depositorName", "김지영", "phone", "010-1234-0000"))).andExpect(status().isNotFound());
 
         // 취소: 주문번호 + 휴대폰 + 입금자명이 맞아야 함, 재고 복구
         mvc.perform(withJson(post("/api/public/g/" + token + "/cancel"),

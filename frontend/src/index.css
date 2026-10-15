@@ -150,6 +150,26 @@ tr.dim td { color: var(--muted); }
 .edit-fields label.field { margin-bottom: 8px; }
 .edit-fields .wide-field { grid-column: 1 / -1; }
 .reply-text { font-family: inherit; font-size: 0.95rem; min-height: 64px; }
+/* 주문 목록 그리드 (PC). 머리줄·합계줄 고정, 가로가 넘치면 가로 스크롤 */
+.grid-wrap { max-height: calc(100vh - 190px); min-height: 240px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+table.grid { font-size: 0.86rem; white-space: nowrap; }
+table.grid th, table.grid td { padding: 7px 10px; vertical-align: middle; }
+table.grid thead th { position: sticky; top: 0; z-index: 2; background: #f3f4f6; }
+table.grid th.sortable { cursor: pointer; user-select: none; }
+table.grid th.sortable:hover { background: #e5e7eb; }
+table.grid .num { text-align: right; }
+table.grid tbody tr.grid-row:hover td { background: #f9fafb; }
+table.grid tbody tr.open td { background: var(--primary-weak); }
+table.grid tr.detail td { white-space: normal; background: #fafafa; }
+table.grid tfoot td { position: sticky; bottom: 0; z-index: 2; background: #f3f4f6; font-weight: 700; border-top: 1px solid var(--line); }
+table.grid .sub { display: block; font-size: 0.78rem; color: var(--muted); }
+/* 가로로 넘칠 때 주문번호 열은 왼쪽에 고정, 펼친 상세는 보이는 폭 안에 */
+table.grid .pin-1, table.grid .pin-2 { position: sticky; z-index: 1; background: var(--card); }
+table.grid .pin-1 { left: 0; width: 48px; min-width: 48px; max-width: 48px; }
+table.grid .pin-2 { left: 48px; box-shadow: 1px 0 0 var(--line); }
+table.grid thead th.pin-1, table.grid thead th.pin-2 { z-index: 3; background: #f3f4f6; }
+table.grid tr.detail .detail-inner { position: sticky; left: 10px; max-width: min(1360px, calc(100vw - 80px)); }
+table.grid .warn { color: var(--warn); }
 .change-log { border-left: 3px solid var(--warn); padding-left: 8px; margin-top: 4px; }
 .mapping-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
 .preview-table td { font-size: 0.8rem; white-space: nowrap; }

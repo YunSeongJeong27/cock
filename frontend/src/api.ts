@@ -71,6 +71,15 @@ export function dateTime(s: string | null | undefined): string {
   return d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+/** 표용 짧은 시각: "10/15 16:42" */
+export function shortTime(s: string | null | undefined): string {
+  if (!s) return '-'
+  const d = new Date(s)
+  if (isNaN(d.getTime())) return s
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
 export async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text)

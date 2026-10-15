@@ -164,6 +164,8 @@ public final class OrderDtos {
             /** 같은 공구에 같은 연락처의 다른 주문이 있음 (경고 표시용) */
             boolean duplicateContact,
             LocalDateTime orderedAt,
+            /** 마지막으로 바뀐 시각 (입금 신고·확정·확정 취소·수령·취소·환불·판매자 변경 때 갱신) */
+            LocalDateTime updatedAt,
             LocalDateTime cancelledAt,
             /** 입금 확정 이력 (취소된 확정 포함, 오래된 순) */
             List<PaymentRecord> payments,
