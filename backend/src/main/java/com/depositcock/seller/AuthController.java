@@ -23,25 +23,27 @@ public class AuthController {
     private final SellerService sellerService;
     private final TokenService tokenService;
     private final Clock clock;
+    private final FeatureAccess featureAccess;
 
-    public AuthController(SellerService sellerService, TokenService tokenService, Clock clock) {
+    public AuthController(SellerService sellerService, TokenService tokenService, Clock clock, FeatureAccess featureAccess) {
         this.sellerService = sellerService;
         this.tokenService = tokenService;
         this.clock = clock;
+        this.featureAccess = featureAccess;
     }
 
     @PostMapping("/api/auth/signup")
     public MeResponse signup(@Valid @RequestBody SignupRequest request, HttpServletResponse response) {
         Seller seller = sellerService.signup(request);
         tokenService.writeCookie(response, tokenService.issue(seller));
-        return MeResponse.of(seller, LocalDateTime.now(clock));
+        return MeResponse.of(seller, LocalDateTime.now(clock), featureAccess.commentsAllowed(seller));
     }
 
     @PostMapping("/api/auth/login")
     public MeResponse login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
         Seller seller = sellerService.login(request.email(), request.password());
         tokenService.writeCookie(response, tokenService.issue(seller));
-        return MeResponse.of(seller, LocalDateTime.now(clock));
+        return MeResponse.of(seller, LocalDateTime.now(clock), featureAccess.commentsAllowed(seller));
     }
 
     @PostMapping("/api/auth/logout")
@@ -51,7 +53,7 @@ public class AuthController {
 
     @GetMapping("/api/me")
     public MeResponse me() {
-        return MeResponse.of(sellerService.get(CurrentSeller.id()), LocalDateTime.now(clock));
+        return toMe(sellerService.get(CurrentSeller.id()));
     }
 
     public record WithdrawRequest(String password) {
@@ -65,6 +67,10 @@ public class AuthController {
 
     @PutMapping("/api/seller/profile")
     public MeResponse updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
-        return MeResponse.of(sellerService.updateProfile(CurrentSeller.id(), request), LocalDateTime.now(clock));
+        return toMe(sellerService.updateProfile(CurrentSeller.id(), request));
+    }
+
+    private MeResponse toMe(Seller seller) {
+        return MeResponse.of(seller, LocalDateTime.now(clock), featureAccess.commentsAllowed(seller));
     }
 }

@@ -3,10 +3,11 @@
 -- 고객 주문서 링크: http://localhost:8080/g/demo-paprika (프론트 개발 서버면 http://localhost:5173/g/demo-paprika)
 -- 댓글 집계 시험용: "사과 1박스 (댓글 주문 데모)" 공구 (상품이 1개라 댓글 주문 가능. 상품이 여러 개면 댓글 주문을 막음)
 
+-- 데모 판매자는 댓글 주문 기능을 허용해 둔다 (실제 판매자는 관리자가 열어 줘야 함)
 INSERT INTO seller (email, password_hash, display_name, role, plan, trial_ends_at, suspended,
-                    default_bank_name, default_account_number, default_account_holder, created_at)
+                    default_bank_name, default_account_number, default_account_holder, comment_feature_enabled, created_at)
 VALUES ('demo@depositcock.local', '$2a$10$h/xuNp.ucRhLGho7oisjGuhm1AMSHuTIui2pK6SC6kb5JbDWS9yUy', '공구하는 데모', 'SELLER',
-        'TRIAL', TIMESTAMP '2099-12-31 23:59:59', FALSE, '토스뱅크', '1000-0000-0000', '데모', CURRENT_TIMESTAMP);
+        'TRIAL', TIMESTAMP '2099-12-31 23:59:59', FALSE, '토스뱅크', '1000-0000-0000', '데모', TRUE, CURRENT_TIMESTAMP);
 
 INSERT INTO group_buy (seller_id, title, description, public_token, status, close_at, bank_name, account_number,
                        account_holder, pickup_enabled, pickup_prepay_enabled, pickup_onsite_enabled, delivery_enabled,

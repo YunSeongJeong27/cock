@@ -34,6 +34,26 @@ public abstract class IntegrationTest {
     @Autowired
     protected ObjectMapper objectMapper;
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate settingsJdbc;
+
+    /**
+     * 댓글 주문 기능은 관리자가 열어야 쓸 수 있다 (2026-10-15). 기존 테스트는 열린 상태를 가정하므로 매번 전체 공개로 둔다.
+     * 닫힌 상태는 CommentFeatureAccessTest 가 직접 바꿔서 확인한다.
+     */
+    @org.junit.jupiter.api.BeforeEach
+    void openCommentFeature() {
+        setCommentFeatureOpen(true);
+    }
+
+    protected void setCommentFeatureOpen(boolean open) {
+        if (settingsJdbc.update("update app_setting set setting_value = ? where setting_key = 'comment_feature_open'",
+                String.valueOf(open)) == 0) {
+            settingsJdbc.update("insert into app_setting (setting_key, setting_value, updated_at) "
+                    + "values ('comment_feature_open', ?, CURRENT_TIMESTAMP)", String.valueOf(open));
+        }
+    }
+
     private static int sequence = 0;
 
     protected static synchronized String uniqueEmail() {

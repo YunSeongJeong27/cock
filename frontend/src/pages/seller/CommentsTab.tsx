@@ -69,6 +69,8 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
   const [drafts, setDrafts] = useState<Draft[] | null>(null)
   /** 이미 저장된 댓글과 똑같아서 검수 목록에서 뺀 것 */
   const [skipped, setSkipped] = useState<Draft[]>([])
+  /** 저장한 댓글의 작성자·내용 고치기 */
+  const [editRow, setEditRow] = useState<{ id: number; author: string; content: string } | null>(null)
   const [text, setText] = useState('')
   const [files, setFiles] = useState<FileList | null>(null)
   // 댓글 주문은 상품이 1개인 공구에서만 받으므로 그 상품으로 집계한다
@@ -280,8 +282,17 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
                   {data.comments.map((c) => (
                     <tr key={c.id} className={c.excludedAsAdmin || c.type === 'NOT_ORDER' ? 'dim' : ''} style={{ background: c.type === 'REVIEW' && c.manualQuantity === null ? 'var(--warn-weak)' : undefined }}>
                       <td className="hide-mobile">{c.seq}</td>
-                      <td className="stack-title"><span className="show-mobile muted">{c.seq}. </span>{c.authorName}{c.excludedAsAdmin && <div className="small">관리자 제외</div>}</td>
-                      <td data-label="내용">{c.content}{c.duplicateSuspected && <div className="small" style={{ color: 'var(--warn)' }}>중복 의심</div>}</td>
+                      {editRow?.id === c.id ? (
+                        <>
+                          <td className="stack-title"><input type="text" value={editRow.author} aria-label="작성자" onChange={(e) => setEditRow({ ...editRow, author: e.target.value })} /></td>
+                          <td data-label="내용"><input type="text" value={editRow.content} aria-label="내용" onChange={(e) => setEditRow({ ...editRow, content: e.target.value })} /></td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="stack-title"><span className="show-mobile muted">{c.seq}. </span>{c.authorName}{c.excludedAsAdmin && <div className="small">관리자 제외</div>}</td>
+                          <td data-label="내용">{c.content}{c.duplicateSuspected && <div className="small" style={{ color: 'var(--warn)' }}>중복 의심</div>}</td>
+                        </>
+                      )}
                       <td className="small" data-label="해석">
                         {TYPE_LABEL[c.type]}{c.quantity !== null && ` ${c.quantity}개`}
                         {c.reviewReason && <div className="muted">{c.reviewReason}</div>}
@@ -294,7 +305,18 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
                             if (v !== c.manualQuantity) updateComment(c, { manualQuantity: v })
                           }} />
                       </td>
-                      <td className="stack-action"><button className="btn small danger" onClick={() => run(() => api.del(`${base}/${c.id}`), load)}>삭제</button></td>
+                      <td className="stack-action">
+                        {editRow?.id === c.id ? (
+                          <>
+                            <button className="btn small primary" disabled={busy || !editRow.author.trim()}
+                              onClick={() => { updateComment(c, { authorName: editRow.author, content: editRow.content }); setEditRow(null) }}>저장</button>
+                            <button className="btn small" onClick={() => setEditRow(null)}>취소</button>
+                          </>
+                        ) : (
+                          <button className="btn small" onClick={() => setEditRow({ id: c.id, author: c.authorName, content: c.content })}>수정</button>
+                        )}
+                        <button className="btn small danger" onClick={() => run(() => api.del(`${base}/${c.id}`), load)}>삭제</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

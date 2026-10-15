@@ -82,7 +82,7 @@ public class SellerService {
                     return new AdminSellerRow(s.getId(), s.getEmail(), s.getDisplayName(), s.getRole(), s.getPlan(),
                             s.getTrialEndsAt(), s.getPaidUntil(), s.isExpired(now), s.isSuspended(), s.getAdminMemo(),
                             s.getCreatedAt(), groupBuyRepository.countBySellerId(s.getId()), usage.usedToday(),
-                            usage.usedThisMonth(), usage.dailyLimit(), usage.customLimit());
+                            usage.usedThisMonth(), usage.dailyLimit(), usage.customLimit(), s.isCommentFeatureEnabled());
                 })
                 .toList();
     }
@@ -97,6 +97,9 @@ public class SellerService {
         seller.updateByAdmin(request.plan(), request.paidUntil(), request.trialEndsAt(), request.suspended(),
                 blankToNull(request.adminMemo()));
         seller.changeDailyCaptureLimit(request.dailyCaptureLimit());
+        if (request.commentFeatureEnabled() != null) {
+            seller.changeCommentFeature(request.commentFeatureEnabled());
+        }
     }
 
     /**

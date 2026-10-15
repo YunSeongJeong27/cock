@@ -18,7 +18,16 @@ CREATE TABLE seller (
     default_account_holder VARCHAR(50),
     -- 스크린샷(비전 AI) 하루 제한 장수. NULL 이면 설정 기본값(app.vision.daily-capture-limit, 기본 30)
     daily_capture_limit    INTEGER,
+    -- 판매자별 댓글 주문 기능 허용 (관리자가 켬). 전체 공개(app_setting comment_feature_open)면 이 값과 상관없이 쓸 수 있다
+    comment_feature_enabled BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at             TIMESTAMP    NOT NULL
+);
+
+-- 서비스 전체 설정 (관리자가 바꿈). 예: comment_feature_open = true/false (댓글 주문 기능 전체 공개, 없으면 꺼짐)
+CREATE TABLE app_setting (
+    setting_key   VARCHAR(100) PRIMARY KEY,
+    setting_value VARCHAR(500) NOT NULL,
+    updated_at    TIMESTAMP    NOT NULL
 );
 
 -- 판매자별 고객. 같은 사람이 다른 판매자에게 주문하면 판매자마다 따로 생긴다 (판매자 사이에 고객 정보를 공유하지 않음).

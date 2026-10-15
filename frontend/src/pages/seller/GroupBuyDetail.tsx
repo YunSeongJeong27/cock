@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, dateTime, errorMessage, won } from '../../api'
+import { useAuth } from '../../auth'
 import { CopyButton, ErrorBox, Stat, StatusBadge } from '../../components/Ui'
 import type { Dashboard, GroupBuy, SellerOrder } from '../../types'
 import OrdersTab from './OrdersTab'
@@ -14,6 +15,7 @@ type Tab = 'orders' | 'deposit' | 'pickup' | 'announce' | 'comments'
 export default function GroupBuyDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { me } = useAuth()
   const [groupBuy, setGroupBuy] = useState<GroupBuy | null>(null)
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
   const [orders, setOrders] = useState<SellerOrder[]>([])
@@ -66,7 +68,8 @@ export default function GroupBuyDetail() {
   }
 
   if (!groupBuy) return <div><ErrorBox message={error} />{!error && <div className="page-loading">불러오는 중…</div>}</div>
-  const comments = groupBuy.orderChannel === 'LINK_AND_COMMENT'
+  // 댓글 집계는 관리자가 댓글 주문 기능을 연 판매자의 "주문 링크 + 댓글" 공구에서만
+  const comments = Boolean(me?.commentFeatureEnabled) && groupBuy.orderChannel === 'LINK_AND_COMMENT'
   const shownTab: Tab = tab === 'comments' && !comments ? 'orders' : tab
   const link = `${window.location.origin}/g/${groupBuy.publicToken}`
 

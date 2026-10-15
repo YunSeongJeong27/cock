@@ -28,6 +28,7 @@ import com.depositcock.order.OrderItem;
 import com.depositcock.order.OrderSource;
 import com.depositcock.order.PaymentMethod;
 import com.depositcock.order.ReceiveMethod;
+import com.depositcock.seller.FeatureAccess;
 import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,11 +48,13 @@ public class CommentService {
     private final Customers customers;
     private final EntityManager entityManager;
     private final Clock clock;
+    private final FeatureAccess featureAccess;
 
     public CommentService(GroupBuyService groupBuyService, GroupBuyRepository groupBuyRepository,
                           ImportedCommentRepository commentRepository, CustomerOrderRepository orderRepository,
                           ProductRepository productRepository, Customers customers, EntityManager entityManager,
-                          Clock clock) {
+                          Clock clock, FeatureAccess featureAccess) {
+        this.featureAccess = featureAccess;
         this.customers = customers;
         this.groupBuyService = groupBuyService;
         this.groupBuyRepository = groupBuyRepository;
@@ -101,19 +104,22 @@ public class CommentService {
     private record Applied(ApplyState state, Integer orderNo, Integer orderQuantity) {
     }
 
-    public void checkOwned(Long sellerId, Long groupBuyId) {
-        groupBuyService.getOwned(sellerId, groupBuyId);
+    /** 내 공구인지 확인한 뒤, 관리자가 이 판매자에게 댓글 주문 기능을 열었는지 확인한다 (2026-10-15 사용자 결정) */
+    private GroupBuy owned(Long sellerId, Long groupBuyId) {
+        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        featureAccess.requireComments(sellerId);
+        return groupBuy;
     }
 
     /** 댓글을 올리기 전 검사 (캡처 읽기·텍스트 나누기). 트랜잭션 안에서 상품 목록을 읽는다 */
     public void checkCommentUpload(Long sellerId, Long groupBuyId) {
-        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        GroupBuy groupBuy = owned(sellerId, groupBuyId);
         requireCommentOrders(groupBuy);
         requireSingleProduct(groupBuy);
     }
 
     public CommentsResponse list(Long sellerId, Long groupBuyId, Long productId) {
-        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        GroupBuy groupBuy = owned(sellerId, groupBuyId);
         Product product = resolveProduct(groupBuy, productId, false);
         List<String> admins = groupBuy.adminNameList();
         List<ImportedComment> comments = commentRepository.findByGroupBuyIdOrderBySeqAsc(groupBuy.getId());
@@ -182,7 +188,7 @@ public class CommentService {
 
     @Transactional
     public int save(Long sellerId, Long groupBuyId, CommentSource source, List<CommentInput> inputs) {
-        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        GroupBuy groupBuy = owned(sellerId, groupBuyId);
         requireSingleProduct(groupBuy);
         int seq = commentRepository.maxSeq(groupBuy.getId());
         LocalDateTime now = LocalDateTime.now(clock);
@@ -210,7 +216,7 @@ public class CommentService {
     @Transactional
     public void update(Long sellerId, Long groupBuyId, Long commentId, String authorName, String content,
                        Integer manualQuantity) {
-        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        GroupBuy groupBuy = owned(sellerId, groupBuyId);
         ImportedComment comment = commentRepository.findByIdAndGroupBuyId(commentId, groupBuy.getId())
                 .orElseThrow(() -> ApiException.notFound("댓글을 찾을 수 없습니다."));
         if (manualQuantity != null && (manualQuantity < 0 || manualQuantity > 999)) {
@@ -224,14 +230,14 @@ public class CommentService {
 
     @Transactional
     public void delete(Long sellerId, Long groupBuyId, Long commentId) {
-        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        GroupBuy groupBuy = owned(sellerId, groupBuyId);
         commentRepository.delete(commentRepository.findByIdAndGroupBuyId(commentId, groupBuy.getId())
                 .orElseThrow(() -> ApiException.notFound("댓글을 찾을 수 없습니다.")));
     }
 
     @Transactional
     public void deleteAll(Long sellerId, Long groupBuyId) {
-        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        GroupBuy groupBuy = owned(sellerId, groupBuyId);
         commentRepository.deleteByGroupBuyId(groupBuy.getId());
     }
 
@@ -244,6 +250,7 @@ public class CommentService {
     @Transactional
     public ApplyResult apply(Long sellerId, Long groupBuyId, Long productId) {
         GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
+        featureAccess.requireComments(sellerId);
         requireCommentOrders(groupBuy);
         requireSingleProduct(groupBuy);
         Product product = resolveProduct(groupBuy, productId, true);

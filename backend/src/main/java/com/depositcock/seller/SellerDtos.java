@@ -43,12 +43,14 @@ public final class SellerDtos {
             boolean suspended,
             String defaultBankName,
             String defaultAccountNumber,
-            String defaultAccountHolder) {
+            String defaultAccountHolder,
+            /** 댓글 주문 기능을 쓸 수 있는지 (전체 공개 또는 판매자별 허용) */
+            boolean commentFeatureEnabled) {
 
-        public static MeResponse of(Seller s, LocalDateTime now) {
+        public static MeResponse of(Seller s, LocalDateTime now, boolean commentFeatureEnabled) {
             return new MeResponse(s.getId(), s.getEmail(), s.getDisplayName(), s.getRole(), s.getPlan(),
                     s.getTrialEndsAt(), s.getPaidUntil(), s.isExpired(now), s.isSuspended(),
-                    s.getDefaultBankName(), s.getDefaultAccountNumber(), s.getDefaultAccountHolder());
+                    s.getDefaultBankName(), s.getDefaultAccountNumber(), s.getDefaultAccountHolder(), commentFeatureEnabled);
         }
     }
 
@@ -68,7 +70,9 @@ public final class SellerDtos {
             int captureToday,
             int captureThisMonth,
             int dailyCaptureLimit,
-            boolean customCaptureLimit) {
+            boolean customCaptureLimit,
+            /** 판매자별 댓글 주문 기능 허용 (전체 공개와 별개) */
+            boolean commentFeatureEnabled) {
     }
 
     public record AdminUpdateRequest(
@@ -78,6 +82,12 @@ public final class SellerDtos {
             boolean suspended,
             @Size(max = 1000) String adminMemo,
             /** 하루 캡처 제한 장수. null 이면 기본값(설정) 사용 */
-            @Min(0) @Max(10000) Integer dailyCaptureLimit) {
+            @Min(0) @Max(10000) Integer dailyCaptureLimit,
+            /** 판매자별 댓글 주문 기능 허용. null 이면 그대로 둔다 */
+            Boolean commentFeatureEnabled) {
+    }
+
+    /** 서비스 전체 설정 (관리자) */
+    public record AdminSettings(boolean commentFeatureOpen) {
     }
 }

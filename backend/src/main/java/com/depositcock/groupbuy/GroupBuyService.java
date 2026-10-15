@@ -21,6 +21,7 @@ import com.depositcock.order.OrderSource;
 import com.depositcock.order.CustomerOrderRepository;
 import com.depositcock.order.DisplayStatus;
 import com.depositcock.seller.Seller;
+import com.depositcock.seller.FeatureAccess;
 import com.depositcock.seller.SellerRepository;
 import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Service;
@@ -38,10 +39,12 @@ public class GroupBuyService {
     private final AliasBook aliasBook;
     private final Customers customers;
     private final Clock clock;
+    private final FeatureAccess featureAccess;
 
     public GroupBuyService(GroupBuyRepository groupBuyRepository, SellerRepository sellerRepository,
                            CustomerOrderRepository orderRepository, EntityManager entityManager, AliasBook aliasBook,
-                           Customers customers, Clock clock) {
+                           Customers customers, Clock clock, FeatureAccess featureAccess) {
+        this.featureAccess = featureAccess;
         this.aliasBook = aliasBook;
         this.customers = customers;
         this.groupBuyRepository = groupBuyRepository;
@@ -173,6 +176,11 @@ public class GroupBuyService {
         }
         if (r.deliveryEnabled() && r.shippingFeeType() == ShippingFeeType.FIXED && r.shippingFee() <= 0) {
             throw ApiException.badRequest("고정 배송비 금액을 입력해 주세요.");
+        }
+        if (r.orderChannel() == OrderChannel.LINK_AND_COMMENT && groupBuy.getOrderChannel() != OrderChannel.LINK_AND_COMMENT
+                && !featureAccess.commentsAllowed(groupBuy.getSeller())) {
+            // 관리자가 댓글 주문 기능을 열지 않은 판매자 (이미 "링크 + 댓글"인 공구는 그대로 둘 수 있게 바꾸는 경우만 막는다)
+            throw ApiException.badRequest("댓글 주문 기능이 아직 열려 있지 않아 '주문 링크 + 댓글'을 고를 수 없습니다.");
         }
         if (r.orderChannel() == OrderChannel.LINK_ONLY && groupBuy.getId() != null
                 && orderRepository.findByGroupBuyIdAndSource(groupBuy.getId(), OrderSource.COMMENT).stream()

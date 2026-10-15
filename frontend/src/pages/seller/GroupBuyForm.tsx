@@ -61,6 +61,9 @@ export default function GroupBuyForm() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const editing = Boolean(id)
+  // 댓글 주문 기능이 닫힌 판매자는 "주문 받는 방법"을 고르지 않고 주문 링크만 쓴다 (관리자가 연다, 2026-10-15).
+  // 이미 "링크 + 댓글"인 공구를 고칠 때는 선택을 보여 준다 (그대로 두거나 링크만으로 바꿀 수 있게)
+  const showChannel = Boolean(me?.commentFeatureEnabled) || form.orderChannel === 'LINK_AND_COMMENT'
 
   useEffect(() => {
     if (id) {
@@ -75,7 +78,7 @@ export default function GroupBuyForm() {
 
   async function submit(e: FormEvent, openAfter: boolean) {
     e.preventDefault()
-    if (!form.orderChannel) {
+    if (showChannel && !form.orderChannel) {
       setError('맨 위에서 주문 받는 방법(주문 링크만 / 주문 링크 + 댓글)을 골라 주세요.')
       window.scrollTo({ top: 0, behavior: 'smooth' })
       return
@@ -84,6 +87,7 @@ export default function GroupBuyForm() {
     setError(null)
     const body = {
       ...form,
+      orderChannel: showChannel ? form.orderChannel : 'LINK_ONLY',
       closeAt: form.closeAt ? form.closeAt + ':00' : null,
       shippingFee: num(form.shippingFee) ?? 0,
       products: form.products.filter((p) => p.name.trim()).map((p) => ({
@@ -120,21 +124,23 @@ export default function GroupBuyForm() {
       )}
       <h1>{editing ? '공구 수정' : '주문서 링크 만들기'}</h1>
 
-      <div className="card">
-        <h3>주문 받는 방법 *</h3>
-        <div className="segmented">
-          {([['LINK_ONLY', '주문 링크만'], ['LINK_AND_COMMENT', '주문 링크 + 댓글']] as const).map(([v, label]) => (
-            <label key={v} className={form.orderChannel === v ? 'on' : ''}>
-              <input type="radio" name="orderChannel" checked={form.orderChannel === v} onChange={() => set('orderChannel', v)} /> {label}
-            </label>
-          ))}
+      {showChannel && (
+        <div className="card">
+          <h3>주문 받는 방법 *</h3>
+          <div className="segmented">
+            {([['LINK_ONLY', '주문 링크만'], ['LINK_AND_COMMENT', '주문 링크 + 댓글']] as const).map(([v, label]) => (
+              <label key={v} className={form.orderChannel === v ? 'on' : ''}>
+                <input type="radio" name="orderChannel" checked={form.orderChannel === v} onChange={() => set('orderChannel', v)} /> {label}
+              </label>
+            ))}
+          </div>
+          <p className="muted small">
+            {form.orderChannel === 'LINK_ONLY' && '고객이 주문서 링크로만 주문합니다. 닉네임은 선택 입력입니다 (칸은 보임).'}
+            {form.orderChannel === 'LINK_AND_COMMENT' && '주문서 링크 주문과 밴드·카톡 댓글 주문(댓글 집계)을 함께 받습니다. 같은 사람이 양쪽으로 주문했는지 닉네임으로 확인하므로, 주문서에서 닉네임이 필수입니다.'}
+            {!form.orderChannel && '고르면 설명이 나옵니다. 댓글로만 주문을 받는다면 "주문 링크 + 댓글"을 고르고 링크는 공유하지 않으면 됩니다.'}
+          </p>
         </div>
-        <p className="muted small">
-          {form.orderChannel === 'LINK_ONLY' && '고객이 주문서 링크로만 주문합니다. 닉네임은 선택 입력입니다 (칸은 보임).'}
-          {form.orderChannel === 'LINK_AND_COMMENT' && '주문서 링크 주문과 밴드·카톡 댓글 주문(댓글 집계)을 함께 받습니다. 같은 사람이 양쪽으로 주문했는지 닉네임으로 확인하므로, 주문서에서 닉네임이 필수입니다.'}
-          {!form.orderChannel && '고르면 설명이 나옵니다. 댓글로만 주문을 받는다면 "주문 링크 + 댓글"을 고르고 링크는 공유하지 않으면 됩니다.'}
-        </p>
-      </div>
+      )}
 
       <div className="card">
         <h3>기본 정보</h3>

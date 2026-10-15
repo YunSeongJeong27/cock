@@ -51,6 +51,10 @@ public class Seller {
     /** 하루 캡처(비전 AI) 제한 장수. null 이면 설정 기본값 */
     private Integer dailyCaptureLimit;
 
+    /** 판매자별 댓글 주문 기능 허용 (관리자가 켬). 전체 공개 여부는 FeatureAccess */
+    @Column(nullable = false)
+    private boolean commentFeatureEnabled;
+
     private String defaultBankName;
     private String defaultAccountNumber;
     private String defaultAccountHolder;
@@ -98,6 +102,14 @@ public class Seller {
 
     public Integer getDailyCaptureLimit() {
         return dailyCaptureLimit;
+    }
+
+    public boolean isCommentFeatureEnabled() {
+        return commentFeatureEnabled;
+    }
+
+    public void changeCommentFeature(boolean enabled) {
+        this.commentFeatureEnabled = enabled;
     }
 
     public void updateByAdmin(Plan plan, LocalDate paidUntil, LocalDateTime trialEndsAt, boolean suspended, String adminMemo) {

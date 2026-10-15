@@ -20,6 +20,8 @@ interface Row {
   captureThisMonth: number
   dailyCaptureLimit: number
   customCaptureLimit: boolean
+  /** 판매자별 댓글 주문 기능 허용 */
+  commentFeatureEnabled: boolean
 }
 
 /** 슈퍼 관리자: 판매자 목록, 플랜(무료 체험/유료)·유료 만료일·사용 제한 수동 변경 */
@@ -28,11 +30,28 @@ export default function AdminSellers() {
   const [editing, setEditing] = useState<Record<number, Row>>({})
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'expired' | 'suspended'>('all')
+  /** 댓글 주문 기능 전체 공개 (꺼져 있으면 아래에서 허용한 판매자만 씀) */
+  const [commentOpen, setCommentOpen] = useState<boolean | null>(null)
 
   const load = () => api.get<Row[]>('/api/admin/sellers').then(setRows).catch((e) => setError(errorMessage(e)))
   useEffect(() => {
     load()
+    api.get<{ commentFeatureOpen: boolean }>('/api/admin/settings').then((s) => setCommentOpen(s.commentFeatureOpen)).catch((e) => setError(errorMessage(e)))
   }, [])
+
+  async function toggleCommentOpen(open: boolean) {
+    const text = open
+      ? '댓글 주문 기능을 모든 판매자에게 엽니다. 계속할까요?'
+      : '댓글 주문 기능 전체 공개를 끕니다. 아래에서 따로 허용한 판매자만 쓸 수 있습니다. 계속할까요?'
+    if (!confirm(text)) return
+    setError(null)
+    try {
+      const s = await api.put<{ commentFeatureOpen: boolean }>('/api/admin/settings', { commentFeatureOpen: open })
+      setCommentOpen(s.commentFeatureOpen)
+    } catch (e) {
+      setError(errorMessage(e))
+    }
+  }
 
   async function save(r: Row) {
     setError(null)
@@ -41,6 +60,7 @@ export default function AdminSellers() {
         plan: r.plan, paidUntil: r.paidUntil || null, trialEndsAt: r.trialEndsAt || null, suspended: r.suspended, adminMemo: r.adminMemo,
         // 기본값을 쓰던 판매자는 제한을 바꾸지 않았으면 그대로 기본값(null) 유지
         dailyCaptureLimit: r.customCaptureLimit ? r.dailyCaptureLimit : null,
+        commentFeatureEnabled: r.commentFeatureEnabled,
       })
       setEditing((e) => {
         const next = { ...e }
@@ -70,6 +90,23 @@ export default function AdminSellers() {
       <h1>판매자 관리</h1>
       <p className="muted small">캡처(비전 AI) 하루 제한: 판매자별로 바꿀 수 있습니다. 비우면 기본값을 씁니다. 날짜는 한국 시간 기준입니다.</p>
       <p className="muted small">판매자가 이용료를 입금하면 플랜을 "유료"로 바꾸고 유료 만료일을 넣으세요. 기간이 끝나도 자동으로 막지 않습니다. 막아야 하면 "사용 제한"을 켜세요 (조회만 가능, 고객 주문은 계속 받음).</p>
+      <div className="card">
+        <div className="row between">
+          <div>
+            <b>댓글 주문 기능</b> <span className="small muted">(댓글 캡처·집계·주문 반영, 공구의 "주문 링크 + 댓글")</span>
+            <div className="small muted">
+              {commentOpen === null ? '불러오는 중…' : commentOpen
+                ? '모든 판매자에게 열려 있습니다.'
+                : '닫혀 있습니다. 아래 표에서 "댓글 기능"을 체크한 판매자만 씁니다. 주문 링크·입금 대조는 상관없이 씁니다.'}
+            </div>
+          </div>
+          {commentOpen !== null && (
+            <label className="check" style={{ whiteSpace: 'nowrap' }}>
+              <input type="checkbox" checked={commentOpen} onChange={(e) => toggleCommentOpen(e.target.checked)} /> 전체 공개
+            </label>
+          )}
+        </div>
+      </div>
       <div className="row mb">
         <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} style={{ width: 200 }}>
           <option value="all">전체 ({rows.length})</option>
@@ -106,6 +143,9 @@ export default function AdminSellers() {
                   <td data-label="상태">
                     {row.expired && <div className="badge badge-CLOSED">만료</div>}
                     <label className="check small" style={{ whiteSpace: 'nowrap' }}><input type="checkbox" checked={r.suspended} onChange={(e) => update({ suspended: e.target.checked })} disabled={row.role === 'ADMIN'} /> 사용 제한</label>
+                    <label className="check small" style={{ whiteSpace: 'nowrap' }} title="전체 공개가 꺼져 있을 때 이 판매자만 댓글 주문 기능을 쓰게 함">
+                      <input type="checkbox" checked={r.commentFeatureEnabled} onChange={(e) => update({ commentFeatureEnabled: e.target.checked })} disabled={row.role === 'ADMIN'} /> 댓글 기능
+                    </label>
                   </td>
                   <td data-label="캡처">
                     <div className="small" style={{ whiteSpace: 'nowrap' }}>오늘 {row.captureToday} / 이번 달 {row.captureThisMonth}장</div>

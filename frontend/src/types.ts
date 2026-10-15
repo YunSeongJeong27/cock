@@ -14,6 +14,8 @@ export interface Me {
   defaultBankName: string | null
   defaultAccountNumber: string | null
   defaultAccountHolder: string | null
+  /** 댓글 주문 기능을 쓸 수 있는지 (관리자가 전체 공개했거나 이 판매자에게 허용) */
+  commentFeatureEnabled: boolean
 }
 
 export type GroupBuyStatus = 'DRAFT' | 'OPEN' | 'CLOSED'
