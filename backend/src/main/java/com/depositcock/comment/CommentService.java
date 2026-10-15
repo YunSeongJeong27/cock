@@ -3,8 +3,10 @@ package com.depositcock.comment;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -68,13 +70,35 @@ public class CommentService {
                               String reviewReason, boolean excludedAsAdmin) {
     }
 
-    /** linkOrderNos: 닉네임이 같은 링크(주문서) 주문 번호. 같은 사람이면 반영 시 주문이 두 번 잡힌다 (경고만) */
+    /**
+     * 댓글 손님이 주문으로 반영됐는지 (2026-10-15 사용자 결정: 다시 반영해도 이미 반영된 손님은 건드리지 않는다).
+     * NEW = 아직 주문 없음(반영하면 만듦), SAME = 주문 있음·수량 같음, DIFFERENT = 주문 있음·수량 다름(판매자 확인),
+     * CANCELLED = 반영했던 주문을 취소함(다시 만들지 않음)
+     */
+    public enum ApplyState { NEW, SAME, DIFFERENT, CANCELLED }
+
+    /**
+     * linkOrderNos: 닉네임이 같은 링크(주문서) 주문 번호. 같은 사람이면 반영 시 주문이 두 번 잡힌다 (경고만)
+     * orderNo·orderQuantity: 이미 반영된 댓글 주문 (없으면 null)
+     */
     public record CustomerView(String customerKey, String authorName, int quantity, long amount, String memo,
-                               boolean needsReview, List<Integer> linkOrderNos) {
+                               boolean needsReview, List<Integer> linkOrderNos, ApplyState applyState, Integer orderNo,
+                               Integer orderQuantity) {
+    }
+
+    /** 반영된 댓글 주문 중 지금 집계에 없는 것 (댓글로 취소했거나 댓글을 지움). 자동으로 취소하지 않는다 */
+    public record StaleOrder(int orderNo, String nickname, int quantity) {
     }
 
     public record CommentsResponse(List<CommentView> comments, List<CustomerView> customers, int totalQuantity,
-                                   int reviewCount, int appliedOrderCount, Long productId) {
+                                   int reviewCount, int appliedOrderCount, Long productId, List<StaleOrder> staleOrders) {
+    }
+
+    /** createdCount: 새로 만든 주문, reviewCount: 이미 반영된 주문과 댓글이 달라 판매자가 확인할 것 */
+    public record ApplyResult(int createdCount, int reviewCount) {
+    }
+
+    private record Applied(ApplyState state, Integer orderNo, Integer orderQuantity) {
     }
 
     public void checkOwned(Long sellerId, Long groupBuyId) {
@@ -103,14 +127,50 @@ public class CommentService {
                 .stream().filter(CustomerOrder::isActive).filter(o -> Nicknames.key(o.getNickname()) != null)
                 .collect(Collectors.groupingBy(o -> Nicknames.key(o.getNickname()),
                         Collectors.mapping(CustomerOrder::getOrderNo, Collectors.toList())));
-        List<CustomerView> customers = aggregate(groupBuy, comments).stream()
-                .map(t -> new CustomerView(t.customerKey(), t.authorName(), t.quantity(), (long) t.quantity() * unitPrice,
-                        t.memo(), t.needsReview(), linkOrders.getOrDefault(Nicknames.key(t.authorName()), List.of())))
+        Map<String, List<CustomerOrder>> appliedOrders = appliedByNickname(groupBuy.getId());
+        List<CustomerTotal> totals = aggregate(groupBuy, comments);
+        List<CustomerView> customers = totals.stream()
+                .map(t -> {
+                    Applied a = applied(appliedOrders.get(t.authorName().trim()), t.quantity());
+                    return new CustomerView(t.customerKey(), t.authorName(), t.quantity(), (long) t.quantity() * unitPrice,
+                            t.memo(), t.needsReview(), linkOrders.getOrDefault(Nicknames.key(t.authorName()), List.of()),
+                            a.state(), a.orderNo(), a.orderQuantity());
+                })
                 .toList();
         int total = customers.stream().mapToInt(CustomerView::quantity).sum();
-        int applied = orderRepository.findByGroupBuyIdAndSource(groupBuy.getId(), OrderSource.COMMENT).stream()
-                .filter(CustomerOrder::isActive).toList().size();
-        return new CommentsResponse(views, customers, total, reviewCount, applied, product == null ? null : product.getId());
+        int applied = (int) appliedOrders.values().stream().flatMap(List::stream).filter(CustomerOrder::isActive).count();
+        return new CommentsResponse(views, customers, total, reviewCount, applied, product == null ? null : product.getId(),
+                staleOrders(appliedOrders, totals));
+    }
+
+    /** 이미 반영한 댓글 주문(취소 포함)을 댓글 닉네임별로. 판매자가 주문의 닉네임 칸을 바꿔도 고객은 그대로라 고객 기준으로 찾는다 */
+    private Map<String, List<CustomerOrder>> appliedByNickname(Long groupBuyId) {
+        return orderRepository.findByGroupBuyIdAndSource(groupBuyId, OrderSource.COMMENT).stream()
+                .collect(Collectors.groupingBy(o -> o.getCustomer().getCommentNickname(), LinkedHashMap::new,
+                        Collectors.toList()));
+    }
+
+    private static Applied applied(List<CustomerOrder> orders, int quantity) {
+        if (orders == null || orders.isEmpty()) {
+            return new Applied(ApplyState.NEW, null, null);
+        }
+        List<CustomerOrder> active = orders.stream().filter(CustomerOrder::isActive).toList();
+        if (active.isEmpty()) {
+            CustomerOrder last = orders.get(orders.size() - 1);
+            return new Applied(ApplyState.CANCELLED, last.getOrderNo(), last.totalQuantity());
+        }
+        int ordered = active.stream().mapToInt(CustomerOrder::totalQuantity).sum();
+        return new Applied(ordered == quantity ? ApplyState.SAME : ApplyState.DIFFERENT, active.get(0).getOrderNo(), ordered);
+    }
+
+    private static List<StaleOrder> staleOrders(Map<String, List<CustomerOrder>> appliedOrders, List<CustomerTotal> totals) {
+        Set<String> inTotals = totals.stream().map(t -> t.authorName().trim()).collect(Collectors.toSet());
+        return appliedOrders.entrySet().stream()
+                .filter(e -> !inTotals.contains(e.getKey()))
+                .flatMap(e -> e.getValue().stream())
+                .filter(CustomerOrder::isActive)
+                .map(o -> new StaleOrder(o.getOrderNo(), o.getCustomer().getCommentNickname(), o.totalQuantity()))
+                .toList();
     }
 
     @Transactional
@@ -168,32 +228,16 @@ public class CommentService {
     }
 
     /**
-     * 집계 결과를 주문(source=COMMENT)으로 만든다. 이전에 만든 댓글 주문은 지우고 새로 만든다.
-     * 이미 입금 확정·수령 처리한 댓글 주문이 있으면 덮어쓰지 않는다 (판매자가 한 작업이 사라지므로).
+     * 집계 결과를 주문(source=COMMENT)으로 만든다 (2026-10-15 사용자 결정).
+     * 이미 반영된 손님(취소한 주문 포함)은 건드리지 않고, 처음 보는 닉네임만 주문으로 만든다.
+     * 이미 반영된 손님의 댓글 합계가 주문과 다르면 자동으로 바꾸지 않고 판매자가 확인하게 한다 (reviewCount).
+     * 그래서 입금 확정·수령·판매자 변경이 된 댓글 주문이 있어도 다시 반영할 수 있다.
      */
     @Transactional
-    public int apply(Long sellerId, Long groupBuyId, Long productId) {
+    public ApplyResult apply(Long sellerId, Long groupBuyId, Long productId) {
         GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         Product product = resolveProduct(groupBuy, productId, true);
-        List<CustomerOrder> existing = orderRepository.findByGroupBuyIdAndSource(groupBuy.getId(), OrderSource.COMMENT);
-        if (existing.stream().anyMatch(o -> !o.getChanges().isEmpty())) {
-            // 다시 반영하면 댓글 주문을 새로 만들어서 판매자가 바꾼 내용이 사라진다
-            throw ApiException.badRequest("판매자가 직접 바꾼 댓글 주문이 있어 다시 반영할 수 없습니다. "
-                    + "바뀐 댓글은 주문 목록에서 해당 주문을 직접 바꿔 주세요.");
-        }
-        if (existing.stream().anyMatch(o -> o.isPaid() || o.isPickedUp() || o.isRefundRequired())) {
-            throw ApiException.badRequest("입금 확정·수령 처리한 댓글 주문이 있어 다시 반영할 수 없습니다. "
-                    + "바뀐 내용이 있으면 주문 목록에서 해당 주문을 직접 바꾸거나 취소해 주세요.");
-        }
-        for (CustomerOrder o : existing) {
-            if (o.isActive()) {
-                for (OrderItem item : o.getItems()) {
-                    productRepository.decreaseSold(item.getProduct().getId(), item.getQuantity());
-                }
-            }
-            orderRepository.delete(o);
-        }
-        orderRepository.flush();
+        Map<String, List<CustomerOrder>> appliedOrders = appliedByNickname(groupBuy.getId());
 
         List<CustomerTotal> totals = aggregate(groupBuy, commentRepository.findByGroupBuyIdOrderBySeqAsc(groupBuy.getId()));
         LocalDateTime now = LocalDateTime.now(clock);
@@ -205,7 +249,15 @@ public class CommentService {
         PaymentMethod payment = receive == ReceiveMethod.DELIVERY || groupBuy.isPickupPrepayEnabled()
                 ? PaymentMethod.PREPAID : PaymentMethod.ONSITE;
         int created = 0;
+        int review = 0;
         for (CustomerTotal t : totals) {
+            List<CustomerOrder> existing = appliedOrders.get(t.authorName().trim());
+            if (existing != null) {
+                if (applied(existing, t.quantity()).state() == ApplyState.DIFFERENT) {
+                    review++;
+                }
+                continue; // 이미 반영된 손님은 그대로 둔다
+            }
             if (t.quantity() <= 0) {
                 continue; // 확인 필요만 있고 수량 미정인 고객은 판매자가 수량을 정한 뒤 다시 반영
             }
@@ -222,9 +274,7 @@ public class CommentService {
             created++;
         }
         entityManager.refresh(product);
-        // 다시 반영으로 주문이 하나도 남지 않은 댓글 고객은 지운다
-        customers.deleteWithoutOrders(groupBuy.getSeller().getId());
-        return created;
+        return new ApplyResult(created, review + staleOrders(appliedOrders, totals).size());
     }
 
     private List<CustomerTotal> aggregate(GroupBuy groupBuy, List<ImportedComment> comments) {

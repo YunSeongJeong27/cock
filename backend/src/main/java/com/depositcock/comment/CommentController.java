@@ -76,7 +76,7 @@ public class CommentController {
     }
 
     @PostMapping("/apply")
-    public Map<String, Integer> apply(@PathVariable Long groupBuyId, @Valid @RequestBody ApplyRequest request) {
-        return Map.of("createdCount", service.apply(CurrentSeller.id(), groupBuyId, request.productId()));
+    public CommentService.ApplyResult apply(@PathVariable Long groupBuyId, @Valid @RequestBody ApplyRequest request) {
+        return service.apply(CurrentSeller.id(), groupBuyId, request.productId());
     }
 }

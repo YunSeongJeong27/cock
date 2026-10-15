@@ -17,12 +17,48 @@ interface CommentView {
   reviewReason: string | null
   excludedAsAdmin: boolean
 }
-/** linkOrderNos: 닉네임이 같은 링크 주문 번호 (댓글엔 휴대폰 번호가 없어 닉네임으로만 비교. 경고만) */
-interface CustomerTotal { customerKey: string; authorName: string; quantity: number; amount: number; memo: string; needsReview: boolean; linkOrderNos: number[] }
-interface CommentsResponse { comments: CommentView[]; customers: CustomerTotal[]; totalQuantity: number; reviewCount: number; appliedOrderCount: number; productId: number | null }
+/**
+ * linkOrderNos: 닉네임이 같은 링크 주문 번호 (댓글엔 휴대폰 번호가 없어 닉네임으로만 비교. 경고만)
+ * applyState: 이미 주문으로 반영됐는지. 다시 반영해도 이미 반영된 손님은 그대로 두고 NEW 만 추가한다
+ */
+interface CustomerTotal {
+  customerKey: string; authorName: string; quantity: number; amount: number; memo: string; needsReview: boolean; linkOrderNos: number[]
+  applyState: 'NEW' | 'SAME' | 'DIFFERENT' | 'CANCELLED'; orderNo: number | null; orderQuantity: number | null
+}
+/** 반영된 댓글 주문 중 지금 집계에 없는 것 (댓글로 취소했거나 댓글을 지움) */
+interface StaleOrder { orderNo: number; nickname: string; quantity: number }
+interface CommentsResponse { comments: CommentView[]; customers: CustomerTotal[]; totalQuantity: number; reviewCount: number; appliedOrderCount: number; productId: number | null; staleOrders: StaleOrder[] }
 interface Draft { author: string; content: string; duplicateSuspected: boolean }
 
 const TYPE_LABEL = { ORDER: '주문', CANCEL: '취소', NOT_ORDER: '주문 아님', REVIEW: '확인 필요' } as const
+
+/** 비교용: 띄어쓰기 무시 */
+const squash = (v: string) => v.replace(/\s+/g, '')
+
+/**
+ * 캡처를 다시 올리면(처음부터 다시 찍은 경우 등) 이미 저장한 댓글이 또 들어온다 → 똑같은 댓글(작성자·내용)은 빼 둔다.
+ * 같은 댓글이 저장된 개수만큼만 뺀다 (같은 손님이 같은 댓글을 두 번 단 경우 두 번째는 남김).
+ */
+function splitAlreadySaved(drafts: Draft[], saved: CommentView[]): { fresh: Draft[]; skipped: Draft[] } {
+  const count = new Map<string, number>()
+  for (const c of saved) {
+    const k = squash(c.authorName) + '|' + squash(c.content)
+    count.set(k, (count.get(k) ?? 0) + 1)
+  }
+  const fresh: Draft[] = []
+  const skipped: Draft[] = []
+  for (const d of drafts) {
+    const k = squash(d.author) + '|' + squash(d.content)
+    const n = count.get(k) ?? 0
+    if (n > 0) {
+      count.set(k, n - 1)
+      skipped.push(d)
+    } else {
+      fresh.push(d)
+    }
+  }
+  return { fresh, skipped }
+}
 
 /**
  * 2단계: 밴드 댓글 스크린샷·텍스트 → 검수 → 주문 집계 (정리본 8장, M6)
@@ -31,6 +67,8 @@ const TYPE_LABEL = { ORDER: '주문', CANCEL: '취소', NOT_ORDER: '주문 아�
 export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; reload: () => void }) {
   const [data, setData] = useState<CommentsResponse | null>(null)
   const [drafts, setDrafts] = useState<Draft[] | null>(null)
+  /** 이미 저장된 댓글과 똑같아서 검수 목록에서 뺀 것 */
+  const [skipped, setSkipped] = useState<Draft[]>([])
   const [text, setText] = useState('')
   const [files, setFiles] = useState<FileList | null>(null)
   const [productId, setProductId] = useState<string>(String(groupBuy.products[0]?.id ?? ''))
@@ -72,15 +110,22 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
       setUsageKey((k) => k + 1)
     }
   }, (r) => {
-    setDrafts(r.comments.length ? r.comments : [{ author: '', content: '', duplicateSuspected: false }])
+    showDrafts(r.comments)
     if (r.limitExceeded) setError(r.notice)
     else if (r.notice) setNotice(r.notice)
   })
 
-  const parseText = () => run(() => api.post<{ comments: Draft[] }>(`${base}/parse-text`, { text }), (r) => setDrafts(r.comments))
+  function showDrafts(read: Draft[]) {
+    const { fresh, skipped: same } = splitAlreadySaved(read, data?.comments ?? [])
+    setSkipped(same)
+    setDrafts(fresh.length || same.length ? fresh : [{ author: '', content: '', duplicateSuspected: false }])
+  }
+
+  const parseText = () => run(() => api.post<{ comments: Draft[] }>(`${base}/parse-text`, { text }), (r) => showDrafts(r.comments))
 
   const saveDrafts = (source: 'SCREENSHOT' | 'TEXT') => run(() => api.post(`${base}`, { source, comments: drafts }), () => {
     setDrafts(null)
+    setSkipped([])
     setText('')
     setFiles(null)
     load()
@@ -89,15 +134,28 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
   const updateComment = (c: CommentView, patch: Partial<{ authorName: string; content: string; manualQuantity: number | null }>) =>
     run(() => api.put(`${base}/${c.id}`, { authorName: c.authorName, content: c.content, manualQuantity: c.manualQuantity, ...patch }), load)
 
+  const newCustomers = data?.customers.filter((c) => c.applyState === 'NEW' && c.quantity > 0) ?? []
+  const toCheck = (data?.customers.filter((c) => c.applyState === 'DIFFERENT').length ?? 0) + (data?.staleOrders.length ?? 0)
+
   const apply = () => {
-    const same = data?.customers.filter((c) => c.quantity > 0 && c.linkOrderNos.length > 0).length ?? 0
-    const warn = same > 0 ? `\n\n⚠ 링크 주문과 닉네임이 같은 고객이 ${same}명 있습니다. 같은 사람이면 주문이 두 번 잡히니, 반영 후 주문 목록에서 확인해 주세요.` : ''
-    if (!confirm(`집계 결과를 주문으로 반영합니다. (이전에 반영한 댓글 주문은 새 결과로 바뀝니다) 계속할까요?${warn}`)) return
-    run(() => api.post<{ createdCount: number }>(`${base}/apply`, { productId: Number(productId) }), (r) => {
-      setNotice(`댓글 주문 ${r.createdCount}건을 만들었습니다. 주문 목록·입금 대조·수령 체크에서 확인하세요.`)
+    const same = newCustomers.filter((c) => c.linkOrderNos.length > 0).length
+    const warn = same > 0 ? `\n\n⚠ 그중 링크 주문과 닉네임이 같은 손님이 ${same}명 있습니다. 같은 사람이면 주문이 두 번 잡히니, 반영 후 주문 목록에서 확인해 주세요.` : ''
+    if (!confirm(`새 손님 ${newCustomers.length}명을 주문으로 추가합니다. 이미 반영된 손님의 주문은 그대로 둡니다. 계속할까요?${warn}`)) return
+    run(() => api.post<{ createdCount: number; reviewCount: number }>(`${base}/apply`, { productId: Number(productId) }), (r) => {
+      setNotice(`새 댓글 주문 ${r.createdCount}건을 만들었습니다.`
+        + (r.reviewCount > 0 ? ` 이미 반영된 주문과 댓글이 다른 ${r.reviewCount}건은 표의 ⚠ 표시를 보고 주문 목록에서 직접 바꾸거나 취소해 주세요.` : ''))
       load()
       reload()
     })
+  }
+
+  function applyLabel(c: CustomerTotal) {
+    switch (c.applyState) {
+      case 'NEW': return c.quantity > 0 ? <span className="chip">새로 추가</span> : <span className="small muted">수량을 정하면 추가</span>
+      case 'SAME': return <span className="small muted">주문 {c.orderNo}번 ✓</span>
+      case 'DIFFERENT': return <span className="small" style={{ color: 'var(--warn)' }}>⚠ 주문 {c.orderNo}번은 {c.orderQuantity}개 (댓글 합계와 다름, 직접 확인)</span>
+      case 'CANCELLED': return <span className="small muted">주문 {c.orderNo}번 취소됨 (다시 안 만듦)</span>
+    }
   }
 
   const product = groupBuy.products.find((p) => String(p.id) === productId)
@@ -124,6 +182,12 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
       {drafts && (
         <div className="card">
           <h3>검수 ({drafts.length}개)</h3>
+          {skipped.length > 0 && (
+            <div className="warn-box row between">
+              <span className="small">이미 저장된 댓글과 똑같은 {skipped.length}개는 뺐습니다. (같은 손님이 같은 댓글을 또 단 거라면 다시 넣으세요)</span>
+              <button className="btn small" onClick={() => { setDrafts([...drafts, ...skipped]); setSkipped([]) }}>다시 넣기</button>
+            </div>
+          )}
           <p className="muted small">작성자·내용을 고치거나 지울 수 있습니다. 노란 줄은 캡처가 겹쳐서 생긴 중복으로 의심되는 댓글입니다. 읽지 못한 글자([?])는 고친 뒤 저장할 수 있습니다.</p>
           <div className="table-wrap">
             <table className="stack">
@@ -142,7 +206,7 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
           <div className="row mt">
             <button className="btn small" onClick={() => setDrafts([...drafts, { author: '', content: '', duplicateSuspected: false }])}>+ 줄 추가</button>
             <button className="btn primary" disabled={busy || drafts.some((d) => d.author.includes('[?]') || d.content.includes('[?]'))} onClick={() => saveDrafts(files ? 'SCREENSHOT' : 'TEXT')}>검수 완료, 댓글 저장</button>
-            <button className="btn" onClick={() => setDrafts(null)}>취소</button>
+            <button className="btn" onClick={() => { setDrafts(null); setSkipped([]) }}>취소</button>
           </div>
         </div>
       )}
@@ -158,26 +222,36 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
                     {groupBuy.products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 )}
-                <button className="btn primary" disabled={busy || !productId} onClick={apply}>주문으로 반영</button>
+                <button className="btn primary" disabled={busy || !productId || newCustomers.length === 0} onClick={apply}>
+                  {newCustomers.length > 0 ? `새 손님 ${newCustomers.length}명 주문으로 반영` : '새로 반영할 손님 없음'}
+                </button>
               </div>
             </div>
             <p className="muted small">
               {product ? `${product.name} ${won(product.unitPrice)} 기준` : ''} · 고객 {data.customers.length}명 · {data.totalQuantity}개
               {data.reviewCount > 0 && <b style={{ color: 'var(--warn)' }}> · 확인 필요 {data.reviewCount}개 (수량을 정하기 전까지 합계에서 빠짐)</b>}
               {data.appliedOrderCount > 0 && ` · 반영된 댓글 주문 ${data.appliedOrderCount}건`}
+              {toCheck > 0 && <b style={{ color: 'var(--warn)' }}> · 반영된 주문과 다른 손님 {toCheck}명</b>}
             </p>
+            <p className="muted small">캡처를 여러 번 올려도 됩니다. 반영하면 처음 보는 손님만 주문으로 추가하고, 이미 반영된 손님의 주문은 바꾸지 않습니다.</p>
             {groupBuy.products.length > 1 && <p className="small warn-box">상품이 여러 개인 공구의 댓글("간장1 양념1")을 상품별로 나누는 규칙은 아직 정해지지 않았습니다. 지금은 고른 상품 하나로 집계합니다.</p>}
             <div className="table-wrap">
               <table>
-                <thead><tr><th>고객(닉네임)</th><th className="right">수량</th><th className="right">금액</th><th>메모</th></tr></thead>
+                <thead><tr><th>고객(닉네임)</th><th className="right">수량</th><th className="right">금액</th><th>메모</th><th>주문 반영</th></tr></thead>
                 <tbody>
                   {data.customers.map((c) => (
                     <tr key={c.customerKey}><td>{c.authorName}{c.needsReview && <span className="chip">확인 필요 있음</span>}
-                      {c.linkOrderNos.length > 0 && <div className="small" style={{ color: 'var(--warn)' }}>⚠ 링크 주문 {c.linkOrderNos.join(', ')}번과 닉네임 같음 (같은 사람이면 중복)</div>}</td><td className="right">{c.quantity}</td><td className="right">{won(c.amount)}</td><td className="small">{c.memo}</td></tr>
+                      {c.linkOrderNos.length > 0 && <div className="small" style={{ color: 'var(--warn)' }}>⚠ 링크 주문 {c.linkOrderNos.join(', ')}번과 닉네임 같음 (같은 사람이면 중복)</div>}</td><td className="right">{c.quantity}</td><td className="right">{won(c.amount)}</td><td className="small">{c.memo}</td><td>{applyLabel(c)}</td></tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            {data.staleOrders.length > 0 && (
+              <div className="warn-box">
+                <div className="small"><b>집계에 없는 댓글 주문</b> (댓글로 취소했거나 댓글을 지운 손님). 자동으로 취소하지 않으니 주문 목록에서 확인해 주세요.</div>
+                {data.staleOrders.map((o) => <div key={o.orderNo} className="small">· 주문 {o.orderNo}번 {o.nickname} {o.quantity}개</div>)}
+              </div>
+            )}
           </div>
           <div className="card">
             <div className="row between">

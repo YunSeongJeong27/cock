@@ -122,9 +122,10 @@ class M4M6ScreenshotAndCommentTest extends IntegrationTest {
 
         mvc.perform(withJson(post(base + "/apply").cookie(seller), Map.of("productId", productId)))
                 .andExpect(jsonPath("$.createdCount").value(7));
-        // 다시 반영해도 중복되지 않는다
+        // 다시 반영해도 중복되지 않는다 (이미 반영된 손님은 그대로)
         mvc.perform(withJson(post(base + "/apply").cookie(seller), Map.of("productId", productId)))
-                .andExpect(jsonPath("$.createdCount").value(7));
+                .andExpect(jsonPath("$.createdCount").value(0))
+                .andExpect(jsonPath("$.reviewCount").value(0));
         mvc.perform(get("/api/seller/group-buys/" + id + "/dashboard").cookie(seller))
                 .andExpect(jsonPath("$.orderCount").value(7))
                 .andExpect(jsonPath("$.totalAmount").value(13300));

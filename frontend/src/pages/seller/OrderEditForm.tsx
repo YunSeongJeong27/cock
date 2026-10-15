@@ -166,7 +166,7 @@ export default function OrderEditForm({ groupBuy, order, onSaved, onClose }: Pro
       </div>
       <p className="small muted">
         휴대폰 번호는 바꿀 수 없습니다(바꾸려면 주문 취소 후 다시 주문). 고객 화면에는 "판매자가 주문을 변경했어요"가 표시됩니다.
-        {order.source === 'COMMENT' && ' 댓글 주문을 바꾸면 이 공구의 댓글 집계를 다시 반영할 수 없게 됩니다.'}
+        {order.source === 'COMMENT' && ' 댓글 집계를 다시 반영해도 바꾼 내용은 그대로 남습니다.'}
       </p>
       <ErrorBox message={error} />
       <div className="row">

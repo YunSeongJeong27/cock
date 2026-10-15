@@ -137,8 +137,9 @@ class SellerOrderEditTest extends IntegrationTest {
         assertThat(firstOrder(g).get("totalQuantity").asInt()).isEqualTo(1);
     }
 
+    /** 판매자가 바꾼 댓글 주문은 다시 반영해도 그대로 남는다 (다시 반영은 처음 보는 손님만 추가) */
     @Test
-    void editedCommentOrdersBlockReapplying() throws Exception {
+    void editedCommentOrdersSurviveReapplying() throws Exception {
         Opened g = open();
         String comments = g.base() + "/comments";
         mvc.perform(withJson(post(comments).cookie(g.seller()),
@@ -150,9 +151,11 @@ class SellerOrderEditTest extends IntegrationTest {
         e.put("nickname", "망고맘");
         mvc.perform(withJson(put(g.base() + "/orders/" + commentOrder.get("id").asLong()).cookie(g.seller()), e))
                 .andExpect(status().isOk());
-        // 다시 반영하면 판매자가 바꾼 내용이 사라지므로 막는다
+        // 다시 반영해도 판매자가 바꾼 3개는 그대로, 댓글(2개)과 다르니 확인 필요로만 알려 준다
         mvc.perform(withJson(post(comments + "/apply").cookie(g.seller()), Map.of("productId", g.productA())))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdCount").value(0))
+                .andExpect(jsonPath("$.reviewCount").value(1));
         assertThat(firstOrder(g).get("totalQuantity").asInt()).isEqualTo(3);
     }
 

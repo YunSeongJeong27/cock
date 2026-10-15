@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -130,8 +131,9 @@ class CustomerTableTest extends IntegrationTest {
                 + "values (?, NULL, NULL, CURRENT_TIMESTAMP)", sellerId)).isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    /** 댓글 고객은 닉네임으로 하나만 생긴다. 다시 반영해도 이미 반영된 손님은 건드리지 않는다 (2026-10-15 사용자 결정) */
     @Test
-    void commentCustomersAreKeptByNicknameAndRemovedWhenNoLongerOrdered() throws Exception {
+    void commentCustomersAreKeptByNicknameAcrossReapply() throws Exception {
         Cookie seller = signup(uniqueEmail());
         Opened g = open(seller, "댓글");
         String base = "/api/seller/group-buys/" + g.id() + "/comments";
@@ -139,20 +141,23 @@ class CustomerTableTest extends IntegrationTest {
                 List.of(Map.of("author", "꼭지맘", "content", "1"), Map.of("author", "망고맘", "content", "2")))))
                 .andExpect(status().isOk());
         mvc.perform(withJson(post(base + "/apply").cookie(seller), Map.of("productId", g.productId()))).andExpect(status().isOk());
-        assertThat(jdbc.queryForObject("select count(*) from customer where comment_nickname in ('꼭지맘', '망고맘')", Integer.class))
-                .isGreaterThanOrEqualTo(2);
-        // 망고맘 댓글을 지우고 다시 반영 → 망고맘은 주문이 없으니 고객도 지움
+        // 망고맘 댓글을 지우고 다시 반영 → 망고맘 주문은 자동으로 지우지 않고 "집계에 없는 주문"으로 알려 준다
         JsonNode comments = read(mvc.perform(get(base).cookie(seller)).andReturn()).get("comments");
         for (JsonNode c : comments) {
             if (c.get("authorName").asText().equals("망고맘")) {
                 mvc.perform(delete(base + "/" + c.get("id").asLong()).cookie(seller)).andExpect(status().isOk());
             }
         }
-        mvc.perform(withJson(post(base + "/apply").cookie(seller), Map.of("productId", g.productId()))).andExpect(status().isOk());
+        mvc.perform(withJson(post(base + "/apply").cookie(seller), Map.of("productId", g.productId())))
+                .andExpect(jsonPath("$.createdCount").value(0))
+                .andExpect(jsonPath("$.reviewCount").value(1));
+        JsonNode stale = read(mvc.perform(get(base).cookie(seller)).andReturn()).get("staleOrders");
+        assertThat(stale).hasSize(1);
+        assertThat(stale.get(0).get("nickname").asText()).isEqualTo("망고맘");
         long sellerId = read(mvc.perform(get("/api/me").cookie(seller)).andReturn()).get("id").asLong();
-        assertThat(jdbc.queryForObject("select count(*) from customer where seller_id = ? and comment_nickname = '망고맘'",
-                Integer.class, sellerId)).isZero();
-        assertThat(jdbc.queryForObject("select count(*) from customer where seller_id = ? and comment_nickname = '꼭지맘'",
-                Integer.class, sellerId)).isEqualTo(1);
+        for (String nick : List.of("꼭지맘", "망고맘")) {
+            assertThat(jdbc.queryForObject("select count(*) from customer where seller_id = ? and comment_nickname = ?",
+                    Integer.class, sellerId, nick)).isEqualTo(1);
+        }
     }
 }
