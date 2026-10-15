@@ -279,7 +279,7 @@ export default function PublicOrder() {
               <ErrorBox message={identify.error} />
               {identify.error && (
                 <p className="small muted">
-                  주문서 링크로 주문하지 않은 분(밴드·카톡 댓글로 주문 등)은 여기서 조회되지 않습니다. 판매자에게 문의해 주세요.
+                  주문서 링크로 주문하지 않은 분은 여기서 조회되지 않습니다. 판매자에게 문의해 주세요.
                   {view.kakaoInquiryUrl && <> <a href={view.kakaoInquiryUrl} target="_blank" rel="noreferrer">💬 카톡 문의</a></>}
                 </p>
               )}
