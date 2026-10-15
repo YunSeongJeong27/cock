@@ -134,6 +134,8 @@ export interface SellerOrder {
   payments: PaymentRecord[]
   /** 판매자가 주문을 바꾼 기록 (오래된 순) */
   changes: { summary: string; changedAt: string }[]
+  /** 닉네임이 같은 다른 경로(링크↔댓글) 주문 번호. 같은 사람이 양쪽으로 주문했을 수 있음 (경고만) */
+  sameNicknameOrderNos: number[]
 }
 
 export interface ColumnMapping {

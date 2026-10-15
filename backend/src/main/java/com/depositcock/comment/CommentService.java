@@ -4,8 +4,10 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import com.depositcock.comment.OrderAggregator.CustomerTotal;
 import com.depositcock.common.ApiException;
@@ -19,6 +21,7 @@ import com.depositcock.groupbuy.Product;
 import com.depositcock.groupbuy.ProductRepository;
 import com.depositcock.order.CustomerOrder;
 import com.depositcock.order.CustomerOrderRepository;
+import com.depositcock.order.Nicknames;
 import com.depositcock.order.OrderItem;
 import com.depositcock.order.OrderSource;
 import com.depositcock.order.PaymentMethod;
@@ -65,8 +68,9 @@ public class CommentService {
                               String reviewReason, boolean excludedAsAdmin) {
     }
 
+    /** linkOrderNos: 닉네임이 같은 링크(주문서) 주문 번호. 같은 사람이면 반영 시 주문이 두 번 잡힌다 (경고만) */
     public record CustomerView(String customerKey, String authorName, int quantity, long amount, String memo,
-                               boolean needsReview) {
+                               boolean needsReview, List<Integer> linkOrderNos) {
     }
 
     public record CommentsResponse(List<CommentView> comments, List<CustomerView> customers, int totalQuantity,
@@ -94,9 +98,14 @@ public class CommentService {
                     c.getManualQuantity(), r.type(), r.quantity(), r.memo(), r.reviewReason(), admin));
         }
         int unitPrice = product == null ? 0 : product.getUnitPrice();
+        // 댓글에는 휴대폰 번호가 없어 링크 주문과는 닉네임으로만 비교할 수 있다
+        Map<String, List<Integer>> linkOrders = orderRepository.findByGroupBuyIdAndSource(groupBuy.getId(), OrderSource.FORM)
+                .stream().filter(CustomerOrder::isActive).filter(o -> Nicknames.key(o.getNickname()) != null)
+                .collect(Collectors.groupingBy(o -> Nicknames.key(o.getNickname()),
+                        Collectors.mapping(CustomerOrder::getOrderNo, Collectors.toList())));
         List<CustomerView> customers = aggregate(groupBuy, comments).stream()
                 .map(t -> new CustomerView(t.customerKey(), t.authorName(), t.quantity(), (long) t.quantity() * unitPrice,
-                        t.memo(), t.needsReview()))
+                        t.memo(), t.needsReview(), linkOrders.getOrDefault(Nicknames.key(t.authorName()), List.of())))
                 .toList();
         int total = customers.stream().mapToInt(CustomerView::quantity).sum();
         int applied = orderRepository.findByGroupBuyIdAndSource(groupBuy.getId(), OrderSource.COMMENT).stream()

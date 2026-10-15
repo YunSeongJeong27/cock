@@ -90,6 +90,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
                     {o.nickname && o.depositorName && <div className="small muted">입금자 {o.depositorName}</div>}
                     {o.phone && <div className="small muted">{o.phone}</div>}
                     {o.duplicateContact && <div className="small" style={{ color: 'var(--warn)' }}>⚠ 같은 연락처 주문 여러 건</div>}
+                    {o.sameNicknameOrderNos.length > 0 && <div className="small" style={{ color: 'var(--warn)' }}>⚠ 닉네임 같은 {o.source === 'COMMENT' ? '링크' : '댓글'} 주문 {o.sameNicknameOrderNos.join(', ')}번 (같은 사람이면 중복)</div>}
                     {o.source === 'COMMENT' && <span className="chip">댓글</span>}
                     {o.changes.length > 0 && <span className="chip">변경됨</span>}
                   </td>

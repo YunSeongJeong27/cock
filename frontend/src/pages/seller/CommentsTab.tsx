@@ -17,7 +17,8 @@ interface CommentView {
   reviewReason: string | null
   excludedAsAdmin: boolean
 }
-interface CustomerTotal { customerKey: string; authorName: string; quantity: number; amount: number; memo: string; needsReview: boolean }
+/** linkOrderNos: 닉네임이 같은 링크 주문 번호 (댓글엔 휴대폰 번호가 없어 닉네임으로만 비교. 경고만) */
+interface CustomerTotal { customerKey: string; authorName: string; quantity: number; amount: number; memo: string; needsReview: boolean; linkOrderNos: number[] }
 interface CommentsResponse { comments: CommentView[]; customers: CustomerTotal[]; totalQuantity: number; reviewCount: number; appliedOrderCount: number; productId: number | null }
 interface Draft { author: string; content: string; duplicateSuspected: boolean }
 
@@ -89,7 +90,9 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
     run(() => api.put(`${base}/${c.id}`, { authorName: c.authorName, content: c.content, manualQuantity: c.manualQuantity, ...patch }), load)
 
   const apply = () => {
-    if (!confirm('집계 결과를 주문으로 반영합니다. (이전에 반영한 댓글 주문은 새 결과로 바뀝니다) 계속할까요?')) return
+    const same = data?.customers.filter((c) => c.quantity > 0 && c.linkOrderNos.length > 0).length ?? 0
+    const warn = same > 0 ? `\n\n⚠ 링크 주문과 닉네임이 같은 고객이 ${same}명 있습니다. 같은 사람이면 주문이 두 번 잡히니, 반영 후 주문 목록에서 확인해 주세요.` : ''
+    if (!confirm(`집계 결과를 주문으로 반영합니다. (이전에 반영한 댓글 주문은 새 결과로 바뀝니다) 계속할까요?${warn}`)) return
     run(() => api.post<{ createdCount: number }>(`${base}/apply`, { productId: Number(productId) }), (r) => {
       setNotice(`댓글 주문 ${r.createdCount}건을 만들었습니다. 주문 목록·입금 대조·수령 체크에서 확인하세요.`)
       load()
@@ -169,7 +172,8 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
                 <thead><tr><th>고객(닉네임)</th><th className="right">수량</th><th className="right">금액</th><th>메모</th></tr></thead>
                 <tbody>
                   {data.customers.map((c) => (
-                    <tr key={c.customerKey}><td>{c.authorName}{c.needsReview && <span className="chip">확인 필요 있음</span>}</td><td className="right">{c.quantity}</td><td className="right">{won(c.amount)}</td><td className="small">{c.memo}</td></tr>
+                    <tr key={c.customerKey}><td>{c.authorName}{c.needsReview && <span className="chip">확인 필요 있음</span>}
+                      {c.linkOrderNos.length > 0 && <div className="small" style={{ color: 'var(--warn)' }}>⚠ 링크 주문 {c.linkOrderNos.join(', ')}번과 닉네임 같음 (같은 사람이면 중복)</div>}</td><td className="right">{c.quantity}</td><td className="right">{won(c.amount)}</td><td className="small">{c.memo}</td></tr>
                   ))}
                 </tbody>
               </table>

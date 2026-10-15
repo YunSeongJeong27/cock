@@ -167,7 +167,9 @@ public final class OrderDtos {
             /** 입금 확정 이력 (취소된 확정 포함, 오래된 순) */
             List<PaymentRecord> payments,
             /** 판매자가 주문을 바꾼 기록 (오래된 순) */
-            List<ChangeRecord> changes) {
+            List<ChangeRecord> changes,
+            /** 닉네임이 같은 다른 경로(링크↔댓글) 주문 번호. 같은 사람이 양쪽으로 주문했을 수 있음 (경고만) */
+            List<Integer> sameNicknameOrderNos) {
     }
 
     public record ChangeRecord(String summary, LocalDateTime changedAt) {

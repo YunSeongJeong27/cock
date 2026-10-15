@@ -35,10 +35,28 @@ final class OrderMapper {
         Map<Long, Long> activeByKey = orders.stream().filter(CustomerOrder::isActive)
                 .filter(o -> o.getSource() == OrderSource.FORM)
                 .collect(Collectors.groupingBy(CustomerOrder::getCustomerId, Collectors.counting()));
-        return orders.stream().map(o -> toSellerOrder(o, activeByKey.getOrDefault(o.getCustomerId(), 0L) > 1)).toList();
+        // 같은 닉네임의 링크 주문·댓글 주문 (같은 사람이 양쪽으로 주문했을 수 있음. 경고만)
+        Map<String, List<CustomerOrder>> byNickname = orders.stream().filter(CustomerOrder::isActive)
+                .filter(o -> Nicknames.key(o.getNickname()) != null)
+                .collect(Collectors.groupingBy(o -> Nicknames.key(o.getNickname())));
+        return orders.stream().map(o -> toSellerOrder(o, activeByKey.getOrDefault(o.getCustomerId(), 0L) > 1,
+                sameNicknameOtherSource(o, byNickname))).toList();
+    }
+
+    private static List<Integer> sameNicknameOtherSource(CustomerOrder o, Map<String, List<CustomerOrder>> byNickname) {
+        String key = Nicknames.key(o.getNickname());
+        if (!o.isActive() || key == null) {
+            return List.of();
+        }
+        return byNickname.getOrDefault(key, List.of()).stream().filter(x -> x.getSource() != o.getSource())
+                .map(CustomerOrder::getOrderNo).toList();
     }
 
     static SellerOrder toSellerOrder(CustomerOrder o, boolean duplicateContact) {
+        return toSellerOrder(o, duplicateContact, List.of());
+    }
+
+    static SellerOrder toSellerOrder(CustomerOrder o, boolean duplicateContact, List<Integer> sameNicknameOrderNos) {
         DisplayStatus status = o.displayStatus();
         return new SellerOrder(o.getId(), o.getOrderNo(), o.getSource(), o.getCustomerId(),
                 PhoneNumbers.format(o.getPhone()), o.getDepositorName(), o.getNickname(), o.getUnitAddress(),
@@ -54,6 +72,7 @@ final class OrderMapper {
                 o.isRefundRequired(), o.getRefundedAt(), duplicateContact, o.getOrderedAt(), o.getCancelledAt(),
                 o.getConfirmations().stream().map(c -> new PaymentRecord(c.getDepositorName(), c.getAmount(),
                         c.isManual(), c.getConfirmedAt(), c.getCancelledAt())).toList(),
-                o.getChanges().stream().map(c -> new ChangeRecord(c.getSummary(), c.getChangedAt())).toList());
+                o.getChanges().stream().map(c -> new ChangeRecord(c.getSummary(), c.getChangedAt())).toList(),
+                sameNicknameOrderNos);
     }
 }

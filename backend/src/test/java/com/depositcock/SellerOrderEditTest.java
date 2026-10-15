@@ -155,4 +155,28 @@ class SellerOrderEditTest extends IntegrationTest {
                 .andExpect(status().isBadRequest());
         assertThat(firstOrder(g).get("totalQuantity").asInt()).isEqualTo(3);
     }
+
+    /** 댓글에는 휴대폰 번호가 없어 링크 주문과 같은 사람인지는 닉네임으로만 의심할 수 있다 → 경고만 (2026-10-15 사용자 결정) */
+    @Test
+    void sameNicknameOnLinkAndCommentOrdersIsFlagged() throws Exception {
+        Opened g = open();
+        order(g, "010-9500-6001", 1); // 링크 주문 1번, 닉네임 "꼭지맘"
+        String comments = g.base() + "/comments";
+        mvc.perform(withJson(post(comments).cookie(g.seller()), Map.of("source", "TEXT", "comments", List.of(
+                Map.of("author", "꼭지 맘", "content", "2"), Map.of("author", "망고맘", "content", "1"))))).andExpect(status().isOk());
+
+        // 반영 전: 댓글 집계 화면에서 경고
+        JsonNode customers = read(mvc.perform(get(comments + "?productId=" + g.productA()).cookie(g.seller())).andReturn())
+                .get("customers");
+        Map<String, String> linkOrders = new HashMap<>();
+        customers.forEach(c -> linkOrders.put(c.get("authorName").asText(), c.get("linkOrderNos").toString()));
+        assertThat(linkOrders).containsEntry("꼭지 맘", "[1]").containsEntry("망고맘", "[]");
+
+        // 반영 후: 자동으로 합치지 않고 2건 그대로, 주문 목록에서 서로를 가리킨다
+        mvc.perform(withJson(post(comments + "/apply").cookie(g.seller()), Map.of("productId", g.productA()))).andExpect(status().isOk());
+        Map<String, String> same = new HashMap<>();
+        read(mvc.perform(get(g.base() + "/orders").cookie(g.seller())).andReturn())
+                .forEach(o -> same.put(o.get("source").asText() + o.get("orderNo").asInt(), o.get("sameNicknameOrderNos").toString()));
+        assertThat(same).containsEntry("FORM1", "[2]").containsEntry("COMMENT2", "[1]").containsEntry("COMMENT3", "[]");
+    }
 }
