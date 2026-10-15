@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
-import { api, dateTime, errorMessage, shortTime, won } from '../../api'
+import { api, dateTime, errorMessage, maskPhone, shortTime, won } from '../../api'
 import { CopyButton, ErrorBox, StatusBadge, useIsMobile } from '../../components/Ui'
 import type { GroupBuy, SellerOrder } from '../../types'
 import OrderEditForm, { changeReply } from './OrderEditForm'
@@ -100,6 +100,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
       <>
         <div className="small">
           주문 {dateTime(o.orderedAt)} · 최종 변경 {dateTime(o.updatedAt)}
+          {o.phone && <> · 휴대폰 {o.phone}</>}
           {o.unitAddress && <> · 동·호수 {o.unitAddress}</>}
           {o.receiveMethod === 'DELIVERY' && <div>배송: {o.recipientName} / {o.recipientPhone} / ({o.zipcode}) {o.address} {o.addressDetail}</div>}
           {o.shippingFee > 0 && <div>상품 {won(o.itemsAmount)} + 배송비 {won(o.shippingFee)}</div>}
@@ -193,7 +194,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
                 <td className="pin-2"><b>{o.nickname || '-'}</b>{o.changes.length > 0 && <span className="chip">변경됨</span>}{warnings(o)}</td>
                 <td>{o.source === 'COMMENT' ? <span className="chip">댓글</span> : <span className="muted">링크</span>}</td>
                 <td>{o.depositorName || '-'}</td>
-                <td>{o.phone || <span className="muted">-</span>}</td>
+                <td>{o.phone ? maskPhone(o.phone) : <span className="muted">-</span>}</td>
                 {products.map((p) => <td key={p.id} className="num">{qtyOf(o, p.id) || ''}</td>)}
                 <td className="num">{won(o.expectedAmount)}</td>
                 <td>{o.paymentMethod === 'PREPAID' ? '선입금' : '현장결제'}<span className="sub">{o.receiveMethod === 'DELIVERY' ? '배송' : `픽업${o.pickupPointName ? ' · ' + o.pickupPointName : ''}`}</span></td>
@@ -237,7 +238,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
                   <span className="muted">{o.orderNo}번 · </span>
                   <b>{o.nickname || o.depositorName}</b>
                   {o.nickname && o.depositorName && <div className="small muted">입금자 {o.depositorName}</div>}
-                  {o.phone && <div className="small muted">{o.phone}</div>}
+                  {o.phone && <div className="small muted">{maskPhone(o.phone)}</div>}
                   {warnings(o)}
                   {o.source === 'COMMENT' && <span className="chip">댓글</span>}
                   {o.changes.length > 0 && <span className="chip">변경됨</span>}

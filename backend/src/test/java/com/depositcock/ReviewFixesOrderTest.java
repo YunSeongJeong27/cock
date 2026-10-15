@@ -139,10 +139,10 @@ class ReviewFixesOrderTest extends IntegrationTest {
                 .andExpect(jsonPath("$.prefill.address").value("서울시 비밀구 1"));
 
         // 뒷4자리만으로는 본인 확인 불가 (2026-10-15 사용자 결정: 휴대폰 전체 번호)
-        mvc.perform(withJson(post(url + "/identify"), Map.of("depositorName", "박서준", "phone", "1234")))
+        mvc.perform(withJson(post(url + "/identify"), Map.of("phone", "1234")))
                 .andExpect(status().isBadRequest());
-        // 다른 기기에서 입금자명 + 전체 번호: 주문 상태는 보이지만 휴대폰·동호수·주소는 안 보임
-        MvcResult weak = mvc.perform(withJson(post(url + "/identify"), Map.of("depositorName", "박서준", "phone", "010-5300-1234")))
+        // 다른 기기에서 휴대폰 전체 번호로 확인: 주문 상태는 보이지만 휴대폰·동호수·주소는 안 보임
+        MvcResult weak = mvc.perform(withJson(post(url + "/identify"), Map.of("phone", "010-5300-1234")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.myOrders.length()").value(1))
                 .andExpect(jsonPath("$.prefill.limited").value(true))

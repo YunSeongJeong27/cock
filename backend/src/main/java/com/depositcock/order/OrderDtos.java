@@ -41,7 +41,8 @@ public final class OrderDtos {
             boolean acknowledgeWarnings) {
     }
 
-    public record IdentifyRequest(@NotBlank String depositorName, @NotBlank String phone) {
+    /** 내 주문 찾기: 휴대폰 번호 전체만 (2026-10-15 사용자 결정) */
+    public record IdentifyRequest(@NotBlank String phone) {
     }
 
     /** orderNo 는 같은 정보의 주문이 여러 건일 때만 필요 */

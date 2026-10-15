@@ -71,6 +71,18 @@ export function dateTime(s: string | null | undefined): string {
   return d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+/**
+ * 목록 화면용 휴대폰 가림: "010-1234-5678" → "010-****-5678".
+ * 개인정보의 안전성 확보조치 기준 "출력(화면표시) 시 용도에 따라 출력 항목 최소화" 때문에, 목록에서는 가리고
+ * 연락이 필요한 주문 상세에서만 전체를 보인다 (2026-10-15). 검색은 전체 번호로도 된다.
+ */
+export function maskPhone(phone: string | null | undefined): string {
+  if (!phone) return ''
+  const d = phone.replace(/\D/g, '')
+  if (d.length < 8) return phone
+  return `${d.slice(0, 3)}-****-${d.slice(-4)}`
+}
+
 /** 표용 짧은 시각: "10/15 16:42" */
 export function shortTime(s: string | null | undefined): string {
   if (!s) return '-'

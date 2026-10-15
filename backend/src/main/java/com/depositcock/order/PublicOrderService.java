@@ -192,29 +192,27 @@ public class PublicOrderService {
     }
 
     /**
-     * 쿠키로 못 알아볼 때 "입금자명 + 휴대폰 번호 전체"로 본인 확인 후 그 기기를 기억한다.
-     * 2026-10-15 사용자 결정으로 뒷4자리 확인은 없앰: 뒷4자리는 겹칠 수 있고, 밴드 닉네임에 뒷자리를 붙이는 경우
-     * ("은정4885")가 있어 남이 입금자명과 함께 맞혀 주문 상태를 보거나 "입금했어요"를 누를 수 있었다.
+     * 쿠키로 못 알아볼 때 "휴대폰 번호 전체"로 본인 확인 후 그 기기를 기억한다 (2026-10-15 사용자 결정).
+     * 전에는 "입금자명 + 휴대폰 뒷4자리"였다. 뒷4자리는 겹칠 수 있고 밴드 닉네임에 뒷자리를 붙이는 경우("은정4885")가 있어
+     * 전체 번호로 바꿨고, 입금자명은 빼고 휴대폰 번호만으로 찾는다. 휴대폰 번호 = 고객 하나 (판매자별 고객 유일 제약).
+     * 남는 위험: 번호를 아는 사람은 그 고객의 이 공구 주문 상태를 볼 수 있다 (휴대폰·주소 자동 채움은 주문한 기기에서만).
      */
     @Transactional
     public WithCookie<PublicGroupBuy> identify(String publicToken, String cookieToken, IdentifyRequest r) {
         GroupBuy groupBuy = findVisible(publicToken);
         LocalDateTime now = LocalDateTime.now(clock);
-        String depositorName = squash(r.depositorName());
         String phone = PhoneNumbers.normalize(r.phone());
         if (phone == null) {
             throw ApiException.badRequest("휴대폰 번호 전체를 입력해 주세요. (예: 010-1234-5678)");
         }
-        // 휴대폰 번호 = 고객 하나 (판매자별 고객 테이블의 유일 제약)
         List<Long> customerIds = orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()).stream()
                 .filter(o -> o.getSource() == OrderSource.FORM)
-                .filter(o -> depositorName.equals(squash(o.getDepositorName())))
                 .filter(o -> phone.equals(o.getPhone()))
                 .map(CustomerOrder::getCustomerId)
                 .distinct()
                 .toList();
         if (customerIds.isEmpty()) {
-            throw ApiException.notFound("일치하는 주문이 없습니다. 입금자명과 휴대폰 번호를 확인해 주세요.");
+            throw ApiException.notFound("일치하는 주문이 없습니다. 휴대폰 번호를 확인해 주세요.");
         }
         // 본인 확인을 거친 기기는 이 고객의 주문 상태를 볼 수 있다. 개인정보(휴대폰 전체·동호수·배송지) 자동 채움은
         // 그 기기에서 넣은 주문에서만 가져오므로, 다른 기기 주문의 개인정보는 여기서도 나가지 않는다.

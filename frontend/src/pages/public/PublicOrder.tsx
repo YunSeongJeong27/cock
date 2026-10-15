@@ -73,7 +73,7 @@ export default function PublicOrder() {
   const [error, setError] = useState<string | null>(null)
   const [placed, setPlaced] = useState<Placed | null>(null)
   const [busy, setBusy] = useState(false)
-  const [identify, setIdentify] = useState({ open: false, depositorName: '', phone: '', error: '' })
+  const [identify, setIdentify] = useState({ open: false, phone: '', error: '' })
   const [cancel, setCancel] = useState<{ orderNo: string; phone: string; depositorName: string; open: boolean; error: string; choices: MyOrder[] }>(
     { orderNo: '', phone: '', depositorName: '', open: false, error: '', choices: [] })
 
@@ -145,8 +145,8 @@ export default function PublicOrder() {
   async function doIdentify(e: FormEvent) {
     e.preventDefault()
     try {
-      applyView(await api.post<View>(`${base}/identify`, { depositorName: identify.depositorName, phone: identify.phone }))
-      setIdentify({ open: false, depositorName: '', phone: '', error: '' })
+      applyView(await api.post<View>(`${base}/identify`, { phone: identify.phone }))
+      setIdentify({ open: false, phone: '', error: '' })
     } catch (err) {
       setIdentify({ ...identify, error: errorMessage(err) })
     }
@@ -272,11 +272,10 @@ export default function PublicOrder() {
             <form onSubmit={doIdentify}>
               <h3>내 주문 찾기</h3>
               <div className="row">
-                <input type="text" placeholder="입금자명" value={identify.depositorName} onChange={(e) => setIdentify({ ...identify, depositorName: e.target.value })} required style={{ flex: 1 }} />
                 <input type="tel" placeholder="휴대폰 번호 (010-0000-0000)" value={identify.phone} onChange={(e) => setIdentify({ ...identify, phone: e.target.value })} required style={{ flex: 1, minWidth: 160 }} />
                 <button className="btn primary">찾기</button>
               </div>
-              <p className="small muted">주문할 때 적은 입금자명과 휴대폰 번호 전체를 입력해 주세요.</p>
+              <p className="small muted">주문할 때 적은 휴대폰 번호 전체를 입력해 주세요.</p>
               <ErrorBox message={identify.error} />
               {identify.error && (
                 <p className="small muted">
