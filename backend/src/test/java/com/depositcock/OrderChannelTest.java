@@ -97,4 +97,26 @@ class OrderChannelTest extends IntegrationTest {
         mvc.perform(withJson(put("/api/seller/group-buys/" + g.id()).cookie(g.seller()), edit)).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value(containsString("댓글 주문이 있어")));
     }
+
+    /** 상품이 여러 개인 공구는 댓글을 상품별로 나눠 세는 규칙이 없어 댓글 올리기·반영을 막는다 (2026-10-15 사용자 결정) */
+    @Test
+    void multiProductGroupBuyBlocksCommentOrders() throws Exception {
+        Cookie seller = signup(uniqueEmail());
+        Map<String, Object> body = groupBuyBody("두 상품", List.of(product("간장", 18000, null), product("양념", 18000, null)));
+        body.put("orderChannel", "LINK_AND_COMMENT");
+        JsonNode created = read(mvc.perform(withJson(post("/api/seller/group-buys").cookie(seller), body))
+                .andExpect(status().isOk()).andReturn());
+        String comments = "/api/seller/group-buys/" + created.get("id").asLong() + "/comments";
+        mvc.perform(withJson(post(comments).cookie(seller),
+                        Map.of("source", "TEXT", "comments", List.of(Map.of("author", "꼭지맘", "content", "간장1 양념1")))))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.detail").value(containsString("상품이 여러 개")));
+        mvc.perform(withJson(post(comments + "/parse-text").cookie(seller), Map.of("text", "꼭지맘 | 1")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(multipart(comments + "/extract")
+                        .file(new MockMultipartFile("files", "a.png", "image/png", new byte[]{1})).cookie(seller))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.detail").value(containsString("상품이 여러 개")));
+        mvc.perform(withJson(post(comments + "/apply").cookie(seller),
+                        Map.of("productId", created.get("products").get(0).get("id").asLong())))
+                .andExpect(status().isBadRequest());
+    }
 }

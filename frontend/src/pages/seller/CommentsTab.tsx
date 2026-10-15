@@ -71,7 +71,8 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
   const [skipped, setSkipped] = useState<Draft[]>([])
   const [text, setText] = useState('')
   const [files, setFiles] = useState<FileList | null>(null)
-  const [productId, setProductId] = useState<string>(String(groupBuy.products[0]?.id ?? ''))
+  // 댓글 주문은 상품이 1개인 공구에서만 받으므로 그 상품으로 집계한다
+  const productId = String(groupBuy.products[0]?.id ?? '')
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -140,8 +141,7 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
   const apply = () => {
     const same = newCustomers.filter((c) => c.linkOrderNos.length > 0).length
     const warn = same > 0 ? `\n\n⚠ 그중 링크 주문과 닉네임이 같은 손님이 ${same}명 있습니다. 같은 사람이면 주문이 두 번 잡히니, 반영 후 주문 목록에서 확인해 주세요.` : ''
-    const multi = groupBuy.products.length > 1 ? `\n\n⚠ 상품이 여러 개인 공구입니다. 모든 주문이 "${product?.name ?? ''}" 하나로 만들어집니다.` : ''
-    if (!confirm(`새 손님 ${newCustomers.length}명을 주문으로 추가합니다. 이미 반영된 손님의 주문은 그대로 둡니다. 계속할까요?${warn}${multi}`)) return
+    if (!confirm(`새 손님 ${newCustomers.length}명을 주문으로 추가합니다. 이미 반영된 손님의 주문은 그대로 둡니다. 계속할까요?${warn}`)) return
     run(() => api.post<{ createdCount: number; reviewCount: number }>(`${base}/apply`, { productId: Number(productId) }), (r) => {
       setNotice(`새 댓글 주문 ${r.createdCount}건을 만들었습니다.`
         + (r.reviewCount > 0 ? ` 이미 반영된 주문과 댓글이 다른 ${r.reviewCount}건은 표의 ⚠ 표시를 보고 주문 목록에서 직접 바꾸거나 취소해 주세요.` : ''))
@@ -160,6 +160,20 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
   }
 
   const product = groupBuy.products.find((p) => String(p.id) === productId)
+
+  // 상품이 여러 개인 공구는 댓글을 상품별로 나눠 세는 규칙이 없어 댓글 올리기·반영을 막는다 (2026-10-15 사용자 결정, 규칙은 추후)
+  if (groupBuy.products.length > 1) {
+    return (
+      <div className="card">
+        <h3>댓글 집계</h3>
+        <p className="warn-box">
+          상품이 여러 개인 공구는 아직 댓글 주문을 받을 수 없습니다. 댓글("간장1 양념1" 등)을 상품별로 나눠 세는 기능을 준비 중입니다.
+          <b> 이 공구는 주문 링크로 주문을 받아 주세요.</b>
+        </p>
+        {data && data.appliedOrderCount > 0 && <p className="small muted">이전에 반영한 댓글 주문 {data.appliedOrderCount}건은 주문 목록에 그대로 있습니다.</p>}
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -218,11 +232,6 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
             <div className="row between">
               <h3>고객별 집계</h3>
               <div className="row">
-                {groupBuy.products.length > 1 && (
-                  <select value={productId} onChange={(e) => setProductId(e.target.value)} style={{ width: 180 }}>
-                    {groupBuy.products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                )}
                 <button className="btn primary" disabled={busy || !productId || newCustomers.length === 0} onClick={apply}>
                   {newCustomers.length > 0 ? `새 손님 ${newCustomers.length}명 주문으로 반영` : '새로 반영할 손님 없음'}
                 </button>
@@ -235,7 +244,6 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
               {toCheck > 0 && <b style={{ color: 'var(--warn)' }}> · 반영된 주문과 다른 손님 {toCheck}명</b>}
             </p>
             <p className="muted small">캡처를 여러 번 올려도 됩니다. 반영하면 처음 보는 손님만 주문으로 추가하고, 이미 반영된 손님의 주문은 바꾸지 않습니다.</p>
-            {groupBuy.products.length > 1 && <p className="small warn-box">상품이 여러 개인 공구는 댓글을 상품별로 나눠 세지 못합니다 ("간장1 양념1" 등). 반영하면 모든 손님의 주문이 위에서 고른 상품 하나로 만들어집니다. <b>상품이 여러 개면 주문 링크로 받으세요.</b></p>}
             <div className="table-wrap">
               <table className="stack">
                 <thead><tr><th>고객(닉네임)</th><th className="right">수량</th><th className="right">금액</th><th>메모</th><th>주문 반영</th></tr></thead>

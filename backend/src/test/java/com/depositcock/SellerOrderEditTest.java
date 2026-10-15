@@ -30,15 +30,25 @@ class SellerOrderEditTest extends IntegrationTest {
     }
 
     private Opened open() throws Exception {
+        return open(List.of(product("파프리카", 1900, 10), product("한우", 8900, null)));
+    }
+
+    /** 댓글 주문 테스트용: 상품이 여러 개인 공구는 댓글 주문을 막으므로(2026-10-15) 상품 1개. productB 는 productA 와 같음 */
+    private Opened openSingle() throws Exception {
+        return open(List.of(product("파프리카", 1900, 10)));
+    }
+
+    private Opened open(List<Map<String, Object>> products) throws Exception {
         Cookie seller = signup(uniqueEmail());
-        Map<String, Object> body = groupBuyBody("변경", List.of(product("파프리카", 1900, 10), product("한우", 8900, null)));
+        Map<String, Object> body = groupBuyBody("변경", products);
         body.put("orderChannel", "LINK_AND_COMMENT");
         JsonNode created = read(mvc.perform(withJson(post("/api/seller/group-buys").cookie(seller), body))
                 .andExpect(status().isOk()).andReturn());
         long id = created.get("id").asLong();
         mvc.perform(post("/api/seller/group-buys/" + id + "/open").cookie(seller)).andExpect(status().isOk());
         return new Opened(seller, id, created.get("publicToken").asText(),
-                created.get("products").get(0).get("id").asLong(), created.get("products").get(1).get("id").asLong());
+                created.get("products").get(0).get("id").asLong(),
+                created.get("products").get(created.get("products").size() - 1).get("id").asLong());
     }
 
     private MvcResult order(Opened g, String phone, int qtyA) throws Exception {
@@ -142,7 +152,7 @@ class SellerOrderEditTest extends IntegrationTest {
     /** 판매자가 바꾼 댓글 주문은 다시 반영해도 그대로 남는다 (다시 반영은 처음 보는 손님만 추가) */
     @Test
     void editedCommentOrdersSurviveReapplying() throws Exception {
-        Opened g = open();
+        Opened g = openSingle();
         String comments = g.base() + "/comments";
         mvc.perform(withJson(post(comments).cookie(g.seller()),
                 Map.of("source", "TEXT", "comments", List.of(Map.of("author", "망고맘", "content", "2"))))).andExpect(status().isOk());
@@ -164,7 +174,7 @@ class SellerOrderEditTest extends IntegrationTest {
     /** 댓글에는 휴대폰 번호가 없어 링크 주문과 같은 사람인지는 닉네임으로만 의심할 수 있다 → 경고만 (2026-10-15 사용자 결정) */
     @Test
     void sameNicknameOnLinkAndCommentOrdersIsFlagged() throws Exception {
-        Opened g = open();
+        Opened g = openSingle();
         order(g, "010-9500-6001", 1); // 링크 주문 1번, 닉네임 "꼭지맘"
         String comments = g.base() + "/comments";
         mvc.perform(withJson(post(comments).cookie(g.seller()), Map.of("source", "TEXT", "comments", List.of(

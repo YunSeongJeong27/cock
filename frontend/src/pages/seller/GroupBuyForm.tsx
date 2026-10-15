@@ -152,7 +152,7 @@ export default function GroupBuyForm() {
       <div className="card">
         <h3>상품</h3>
         {form.orderChannel === 'LINK_AND_COMMENT' && form.products.filter((p) => p.name.trim()).length > 1 && (
-          <p className="small warn-box">댓글 집계는 상품을 하나로만 셉니다 (댓글을 상품별로 나누지 못함). 상품이 여러 개면 주문 링크로 받는 걸 권장합니다.</p>
+          <p className="small warn-box">상품이 여러 개인 공구는 아직 댓글 주문을 받을 수 없습니다 (댓글을 상품별로 나눠 세는 기능 준비 중). 주문 링크로만 받게 됩니다.</p>
         )}
         {form.products.map((p, i) => (
           <div key={i} className="row mb" style={{ alignItems: 'flex-end' }}>

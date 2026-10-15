@@ -38,13 +38,15 @@ public class ScreenshotService {
     private final GroupBuyService groupBuyService;
     private final DepositService depositService;
     private final CaptureUsageService usageService;
+    private final CommentService commentService;
 
     public ScreenshotService(VisionExtractor extractor, GroupBuyService groupBuyService, DepositService depositService,
-                             CaptureUsageService usageService) {
+                             CaptureUsageService usageService, CommentService commentService) {
         this.extractor = extractor;
         this.groupBuyService = groupBuyService;
         this.depositService = depositService;
         this.usageService = usageService;
+        this.commentService = commentService;
     }
 
     public record DepositDraft(String name, long amount, String datetime, String type, boolean duplicateSuspected,
@@ -130,7 +132,7 @@ public class ScreenshotService {
 
     public CommentExtractResponse extractComments(Long sellerId, Long groupBuyId, List<MultipartFile> files) {
         // 캡처 장수를 쓰기 전에 막는다
-        CommentService.requireCommentOrders(groupBuyService.getOwned(sellerId, groupBuyId));
+        commentService.checkCommentUpload(sellerId, groupBuyId);
         if (!extractor.available()) {
             return new CommentExtractResponse(List.of(), extractor.provider(), notConfigured(), false, null);
         }

@@ -105,6 +105,13 @@ public class CommentService {
         groupBuyService.getOwned(sellerId, groupBuyId);
     }
 
+    /** 댓글을 올리기 전 검사 (캡처 읽기·텍스트 나누기). 트랜잭션 안에서 상품 목록을 읽는다 */
+    public void checkCommentUpload(Long sellerId, Long groupBuyId) {
+        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        requireCommentOrders(groupBuy);
+        requireSingleProduct(groupBuy);
+    }
+
     public CommentsResponse list(Long sellerId, Long groupBuyId, Long productId) {
         GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
         Product product = resolveProduct(groupBuy, productId, false);
@@ -176,6 +183,7 @@ public class CommentService {
     @Transactional
     public int save(Long sellerId, Long groupBuyId, CommentSource source, List<CommentInput> inputs) {
         GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        requireSingleProduct(groupBuy);
         int seq = commentRepository.maxSeq(groupBuy.getId());
         LocalDateTime now = LocalDateTime.now(clock);
         int saved = 0;
@@ -237,6 +245,7 @@ public class CommentService {
     public ApplyResult apply(Long sellerId, Long groupBuyId, Long productId) {
         GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         requireCommentOrders(groupBuy);
+        requireSingleProduct(groupBuy);
         Product product = resolveProduct(groupBuy, productId, true);
         Map<String, List<CustomerOrder>> appliedOrders = appliedByNickname(groupBuy.getId());
 
@@ -283,6 +292,17 @@ public class CommentService {
         if (!groupBuy.isCommentOrdersEnabled()) {
             throw ApiException.badRequest("'주문 링크만' 쓰는 공구입니다. 댓글 주문도 받으려면 공구 수정에서 주문 받는 방법을 "
                     + "'주문 링크 + 댓글'로 바꿔 주세요.");
+        }
+    }
+
+    /**
+     * 상품이 여러 개인 공구는 댓글("간장1 양념1")을 상품별로 나눠 세는 규칙이 아직 없어 댓글 올리기·반영을 막는다
+     * (2026-10-15 사용자 결정. 상품 앞에 기호를 붙이는 등 규칙을 정한 뒤 추가할 예정). 주문 링크는 여러 상품을 받는다.
+     */
+    public static void requireSingleProduct(GroupBuy groupBuy) {
+        if (groupBuy.getProducts().size() > 1) {
+            throw ApiException.badRequest("상품이 여러 개인 공구는 아직 댓글 주문을 받을 수 없습니다 "
+                    + "(댓글을 상품별로 나눠 세는 기능 준비 중). 주문 링크로 받아 주세요.");
         }
     }
 
