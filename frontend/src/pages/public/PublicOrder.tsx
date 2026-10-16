@@ -181,6 +181,13 @@ export default function PublicOrder() {
     setTimeout(() => document.getElementById('cancel-form')?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
 
+  /** 고객 화면에는 주문 변경 기능이 없다 (판매자만 변경 가능) → 취소 후 다시 주문 안내 (2026-10-16 사용자 요청) */
+  const changeNote = (
+    <p className="small mt" style={{ marginBottom: 0 }}>
+      <b style={{ fontWeight: 800 }}>주문 변경</b> 희망 시 주문 취소 후 다시 주문해 주시면 감사하겠습니다.
+    </p>
+  )
+
   /** 수량 상한: 남은 재고와 1인 최대 수량 중 작은 값 (1인 최대는 이미 주문한 수량을 서버가 합쳐서 다시 확인) */
   function maxQty(p: PublicProduct): number {
     const limits = [p.remaining, p.perOrderLimit].filter((n): n is number => n !== null && n !== undefined)
@@ -394,10 +401,14 @@ export default function PublicOrder() {
         {!view.acceptingOrders ? (
           <div className="small muted">주문이 마감되어 여기서는 취소할 수 없습니다. 취소가 필요하면 판매자에게 문의해 주세요.</div>
         ) : !cancel.open ? (
-          <div className="row between"><span className="small">주문을 취소하시려면</span><button className="btn small danger" onClick={() => openCancel()}>주문 취소</button></div>
+          <>
+            <div className="row between"><span className="small">주문을 취소하시려면</span><button className="btn small danger" onClick={() => openCancel()}>주문 취소</button></div>
+            {changeNote}
+          </>
         ) : (
           <form onSubmit={(e) => doCancel(e)}>
             <h3>주문 취소</h3>
+            {changeNote}
             <p className="small muted">주문할 때 적은 휴대폰 번호와 입금자명을 입력하세요. 주문이 여러 건이면 취소할 주문을 고르게 됩니다. 입금 확인된 주문은 취소 후 판매자가 환불합니다.</p>
             <label className="field"><span>휴대폰 번호</span><input type="tel" value={cancel.phone} onChange={(e) => setCancel({ ...cancel, phone: e.target.value, choices: [] })} required /></label>
             <label className="field"><span>입금자명</span><input type="text" value={cancel.depositorName} onChange={(e) => setCancel({ ...cancel, depositorName: e.target.value, choices: [] })} required /></label>
