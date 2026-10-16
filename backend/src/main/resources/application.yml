@@ -22,6 +22,16 @@ spring:
       max-request-size: 50MB
   jackson:
     time-zone: Asia/Seoul
+  # 재고 알림 메일 (SMTP). 호스트는 환경 변수 SPRING_MAIL_HOST 로만 켠다 (없으면 메일을 보내지 않음).
+  # Gmail 예: SPRING_MAIL_HOST=smtp.gmail.com, SPRING_MAIL_USERNAME=보내는@gmail.com, SPRING_MAIL_PASSWORD=앱 비밀번호
+  mail:
+    port: ${SPRING_MAIL_PORT:587}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
 
 server:
   error:
@@ -43,6 +53,9 @@ app:
   public-rate-limit-per-minute: 60
   # 본인 확인·주문 취소: (IP + 공구)마다 10분에 허용하는 요청 수 (뒷4자리 대입 방지)
   sensitive-rate-limit-per-10-minutes: 20
+  # 메일 보내는 사람 (비우면 SPRING_MAIL_USERNAME), 메일 속 링크용 서비스 주소 (예: https://입금콕.kr)
+  mail-from: ${APP_MAIL_FROM:}
+  public-base-url: ${APP_PUBLIC_BASE_URL:}
   vision:
     # fake | anthropic
     provider: ${APP_VISION_PROVIDER:fake}

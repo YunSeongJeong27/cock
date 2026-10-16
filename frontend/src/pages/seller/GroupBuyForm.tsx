@@ -5,7 +5,7 @@ import { useAuth } from '../../auth'
 import { ErrorBox } from '../../components/Ui'
 import type { GroupBuy, OrderChannel, ShippingFeeType } from '../../types'
 
-interface ProductInput { id?: number; name: string; unitPrice: string; stockLimit: string; perOrderLimit: string; sold?: number }
+interface ProductInput { id?: number; name: string; unitPrice: string; stockLimit: string; perOrderLimit: string; stockAlertThreshold: string; sold?: number }
 interface PointInput { id?: number; name: string; info: string }
 
 interface FormState {
@@ -34,7 +34,7 @@ const empty: FormState = {
   title: '', description: '', closeAt: '', bankName: '', accountNumber: '', accountHolder: '',
   pickupEnabled: true, pickupPrepayEnabled: false, pickupOnsiteEnabled: true, deliveryEnabled: false,
   shippingFeeType: 'NONE', shippingFee: '', orderChannel: '', unitAddressFieldEnabled: false,
-  kakaoInquiryUrl: '', adminNames: '', products: [{ name: '', unitPrice: '', stockLimit: '', perOrderLimit: '' }], pickupPoints: [],
+  kakaoInquiryUrl: '', adminNames: '', products: [{ name: '', unitPrice: '', stockLimit: '', perOrderLimit: '', stockAlertThreshold: '' }], pickupPoints: [],
 }
 
 function toForm(g: GroupBuy): FormState {
@@ -45,7 +45,7 @@ function toForm(g: GroupBuy): FormState {
     deliveryEnabled: g.deliveryEnabled, shippingFeeType: g.shippingFeeType, shippingFee: g.shippingFee ? String(g.shippingFee) : '',
     orderChannel: g.orderChannel, unitAddressFieldEnabled: g.unitAddressFieldEnabled,
     kakaoInquiryUrl: g.kakaoInquiryUrl ?? '', adminNames: g.adminNames ?? '',
-    products: g.products.map((p) => ({ id: p.id, name: p.name, unitPrice: String(p.unitPrice), stockLimit: p.stockLimit ? String(p.stockLimit) : '', perOrderLimit: p.perOrderLimit ? String(p.perOrderLimit) : '', sold: p.sold })),
+    products: g.products.map((p) => ({ id: p.id, name: p.name, unitPrice: String(p.unitPrice), stockLimit: p.stockLimit ? String(p.stockLimit) : '', perOrderLimit: p.perOrderLimit ? String(p.perOrderLimit) : '', stockAlertThreshold: p.stockAlertThreshold != null ? String(p.stockAlertThreshold) : '', sold: p.sold })),
     pickupPoints: g.pickupPoints.map((p) => ({ id: p.id, name: p.name, info: p.info ?? '' })),
   }
 }
@@ -92,6 +92,7 @@ export default function GroupBuyForm() {
       shippingFee: num(form.shippingFee) ?? 0,
       products: form.products.filter((p) => p.name.trim()).map((p) => ({
         id: p.id ?? null, name: p.name, unitPrice: num(p.unitPrice) ?? 0, stockLimit: num(p.stockLimit), perOrderLimit: num(p.perOrderLimit),
+        stockAlertThreshold: num(p.stockLimit) == null ? null : num(p.stockAlertThreshold),
       })),
       pickupPoints: form.pickupPoints.filter((p) => p.name.trim()).map((p) => ({ id: p.id ?? null, name: p.name, info: p.info })),
     }
@@ -168,17 +169,22 @@ export default function GroupBuyForm() {
             <label className="field" style={{ width: 110, marginBottom: 0 }}><span>단가(원)</span>
               <input type="number" min={0} value={p.unitPrice} onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, unitPrice: e.target.value } : x)))} />
             </label>
-            <label className="field" style={{ width: 100, marginBottom: 0 }}><span>재고 한도</span>
+            <label className="field" style={{ width: 100, marginBottom: 0 }}><span>준비 수량</span>
               <input type="number" min={1} value={p.stockLimit} placeholder="무제한" onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, stockLimit: e.target.value } : x)))} />
+            </label>
+            <label className="field" style={{ width: 110, marginBottom: 0 }} title="남은 수량이 이 값 이하가 되면 화면과 메일로 알려 드립니다"><span>알림 (남은 수량)</span>
+              <input type="number" min={0} value={p.stockAlertThreshold} placeholder={p.stockLimit ? '알림 없음' : '준비 수량 먼저'} disabled={!p.stockLimit}
+                onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, stockAlertThreshold: e.target.value } : x)))} />
             </label>
             <label className="field" style={{ width: 100, marginBottom: 0 }}><span>1인 최대</span>
               <input type="number" min={1} value={p.perOrderLimit} placeholder="제한없음" onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, perOrderLimit: e.target.value } : x)))} />
             </label>
             <button type="button" className="btn small danger" onClick={() => set('products', form.products.filter((_, j) => j !== i))}>삭제</button>
-            {p.sold !== undefined && p.sold > 0 && <span className="muted small">판매 {p.sold}개</span>}
+            {p.sold !== undefined && p.sold > 0 && <span className="muted small">주문 {p.sold}개{p.stockLimit && Number(p.stockLimit) < p.sold ? ` (${p.sold - Number(p.stockLimit)}개 초과)` : ''}</span>}
           </div>
         ))}
-        <button type="button" className="btn small" onClick={() => set('products', [...form.products, { name: '', unitPrice: '', stockLimit: '', perOrderLimit: '' }])}>+ 상품 추가</button>
+        <button type="button" className="btn small" onClick={() => set('products', [...form.products, { name: '', unitPrice: '', stockLimit: '', perOrderLimit: '', stockAlertThreshold: '' }])}>+ 상품 추가</button>
+        <p className="muted small">준비 수량을 넘어도 주문은 막지 않습니다 (가짜 주문으로 진짜 손님이 막히지 않게). 손님 화면에는 남은 수량이 1개 이상일 때만 보이고, 판매자 화면에는 초과 수량까지 보입니다. "알림"에 숫자를 넣으면 남은 수량이 그 이하가 될 때 화면과 메일로 알려 드립니다. 준비 수량은 언제든 바꿀 수 있습니다.</p>
       </div>
 
       <div className="card">

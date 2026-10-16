@@ -90,7 +90,9 @@ export default function OrderEditForm({ groupBuy, order, onSaved, onClose }: Pro
               <b>{r.product.name}</b> <span className="small muted">{won(r.unitPrice)}</span>
               <div className="small muted">
                 {r.ordered > 0 ? `지금 ${r.ordered}개` : '주문 안 함'}
-                {r.product.remaining != null && <> · 남은 수량 {r.product.remaining}개</>}
+                {r.product.remaining != null && (r.product.remaining < 0
+                  ? <span style={{ color: 'var(--danger)' }}> · 재고 {-r.product.remaining}개 초과</span>
+                  : <> · 남은 수량 {r.product.remaining}개</>)}
               </div>
             </div>
             <input type="number" min={0} max={9999} inputMode="numeric" value={qty[r.product.id] ?? ''} placeholder="0"

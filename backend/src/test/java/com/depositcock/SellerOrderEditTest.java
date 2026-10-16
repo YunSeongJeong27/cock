@@ -104,16 +104,20 @@ class SellerOrderEditTest extends IntegrationTest {
         assertThat(firstOrder(g).get("items").size()).isEqualTo(1);
     }
 
+    /** 재고를 넘겨도 막지 않는다 (2026-10-16 사용자 결정). 판매자 화면에는 초과 수량이 음수로 보인다 */
     @Test
-    void stockLimitStillApplies() throws Exception {
+    void editOverStockIsAllowedAndShownAsOver() throws Exception {
         Opened g = open();
         order(g, "010-9500-2001", 2);
         long orderId = firstOrder(g).get("id").asLong();
-        // 재고 10 중 2 판매 → 11개로 늘리면 9개가 더 필요 (남은 8) → 거절, 재고 그대로
+        // 재고 10 → 11개로 늘림: 막지 않음
         mvc.perform(withJson(put(g.base() + "/orders/" + orderId).cookie(g.seller()), edit(g, 11, 0)))
-                .andExpect(status().isConflict());
-        assertThat(remainingA(g)).isEqualTo(8);
-        assertThat(firstOrder(g).get("changes").size()).isZero();
+                .andExpect(status().isOk());
+        mvc.perform(get(g.base()).cookie(g.seller()))
+                .andExpect(jsonPath("$.products[0].sold").value(11))
+                .andExpect(jsonPath("$.products[0].remaining").value(-1));
+        // 손님 화면은 0 이하면 수량을 숨긴다
+        mvc.perform(get("/api/public/g/" + g.token())).andExpect(jsonPath("$.products[0].remaining").doesNotExist());
     }
 
     @Test

@@ -87,9 +87,13 @@ CREATE TABLE product (
     group_buy_id    BIGINT       NOT NULL REFERENCES group_buy (id) ON DELETE CASCADE,
     name            VARCHAR(200) NOT NULL,
     unit_price      INTEGER      NOT NULL,
+    -- 준비 수량(재고). 넘어도 주문은 막지 않는다 (2026-10-16). sold 가 넘으면 판매자 화면에 초과 수량 표시
     stock_limit     INTEGER,
     sold            INTEGER      NOT NULL DEFAULT 0,
     per_order_limit INTEGER,
+    -- 남은 수량이 이 값 이하가 되면 판매자에게 알림 (화면·메일). stock_alert_sent: 메일을 보냈는지 (다시 늘면 false)
+    stock_alert_threshold INTEGER,
+    stock_alert_sent BOOLEAN     NOT NULL DEFAULT FALSE,
     sort_order      INTEGER      NOT NULL,
     version         BIGINT       NOT NULL DEFAULT 0
 );

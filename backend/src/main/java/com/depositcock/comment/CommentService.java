@@ -1,5 +1,6 @@
 package com.depositcock.comment;
 
+import com.depositcock.groupbuy.StockAlerts;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -49,11 +50,13 @@ public class CommentService {
     private final EntityManager entityManager;
     private final Clock clock;
     private final FeatureAccess featureAccess;
+    private final StockAlerts stockAlerts;
 
     public CommentService(GroupBuyService groupBuyService, GroupBuyRepository groupBuyRepository,
                           ImportedCommentRepository commentRepository, CustomerOrderRepository orderRepository,
                           ProductRepository productRepository, Customers customers, EntityManager entityManager,
-                          Clock clock, FeatureAccess featureAccess) {
+                          Clock clock, FeatureAccess featureAccess, StockAlerts stockAlerts) {
+        this.stockAlerts = stockAlerts;
         this.featureAccess = featureAccess;
         this.customers = customers;
         this.groupBuyService = groupBuyService;
@@ -287,10 +290,11 @@ public class CommentService {
             order.addItem(new OrderItem(order, product, t.quantity()));
             order.fillAmounts(product.getUnitPrice() * t.quantity(), 0);
             orderRepository.save(order);
-            productRepository.addSoldUnchecked(product.getId(), t.quantity());
+            productRepository.increaseSold(product.getId(), t.quantity());
             created++;
         }
         entityManager.refresh(product);
+        stockAlerts.check(product);
         return new ApplyResult(created, review + staleOrders(appliedOrders, totals).size());
     }
 

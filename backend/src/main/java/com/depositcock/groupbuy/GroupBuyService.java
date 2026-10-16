@@ -40,10 +40,12 @@ public class GroupBuyService {
     private final Customers customers;
     private final Clock clock;
     private final FeatureAccess featureAccess;
+    private final StockAlerts stockAlerts;
 
     public GroupBuyService(GroupBuyRepository groupBuyRepository, SellerRepository sellerRepository,
                            CustomerOrderRepository orderRepository, EntityManager entityManager, AliasBook aliasBook,
-                           Customers customers, Clock clock, FeatureAccess featureAccess) {
+                           Customers customers, Clock clock, FeatureAccess featureAccess, StockAlerts stockAlerts) {
+        this.stockAlerts = stockAlerts;
         this.featureAccess = featureAccess;
         this.aliasBook = aliasBook;
         this.customers = customers;
@@ -210,17 +212,16 @@ public class GroupBuyService {
             order++;
             if (r.id() != null && existing.containsKey(r.id())) {
                 Product product = existing.get(r.id());
-                if (r.stockLimit() != null && r.stockLimit() < product.getSold()) {
-                    throw ApiException.badRequest("'" + product.getName() + "'의 재고 한도는 이미 팔린 수량("
-                            + product.getSold() + ")보다 작을 수 없습니다.");
-                }
-                product.update(r.name().trim(), r.unitPrice(), r.stockLimit(), r.perOrderLimit(), order);
+                // 재고를 이미 팔린 수량보다 작게 바꿔도 된다 (넘친 만큼 초과로 보임, 2026-10-16)
+                product.update(r.name().trim(), r.unitPrice(), r.stockLimit(), r.perOrderLimit(), order,
+                        r.stockAlertThreshold());
+                stockAlerts.check(product);
                 kept.add(r.id());
             } else if (r.id() != null) {
                 throw ApiException.badRequest("상품을 찾을 수 없습니다: " + r.id());
             } else {
                 groupBuy.getProducts().add(new Product(groupBuy, r.name().trim(), r.unitPrice(), r.stockLimit(),
-                        r.perOrderLimit(), order));
+                        r.perOrderLimit(), order, r.stockAlertThreshold()));
             }
         }
         for (Product product : List.copyOf(groupBuy.getProducts())) {

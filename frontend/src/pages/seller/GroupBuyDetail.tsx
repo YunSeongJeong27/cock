@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, dateTime, errorMessage, won } from '../../api'
 import { useAuth } from '../../auth'
 import { CopyButton, ErrorBox, Stat, StatusBadge } from '../../components/Ui'
-import type { Dashboard, GroupBuy, SellerOrder } from '../../types'
+import type { Dashboard, GroupBuy, Product, SellerOrder } from '../../types'
 import OrdersTab from './OrdersTab'
 import DepositTab from './DepositTab'
 import PickupTab from './PickupTab'
@@ -120,6 +120,7 @@ export default function GroupBuyDetail() {
           {dashboard.refundPendingCount > 0 && <Stat label="환불 필요" value={dashboard.refundPendingCount} tone="danger" />}
         </div>
       )}
+      <StockStatus products={groupBuy.products} />
       <ErrorBox message={error} />
 
       {/* 주문 링크만 쓰는 공구는 댓글 집계를 숨긴다 (저장된 탭이 댓글이었으면 주문 목록으로) */}
@@ -153,4 +154,58 @@ function localStorageSet(key: string, value: string) {
   } catch {
     // 저장 못 해도 화면은 동작한다
   }
+}
+
+/** 재고 알림 문구 (메일과 같은 문장) */
+function stockHeadline(p: Product): string {
+  const r = p.remaining ?? 0
+  if (r > 0) return `'${p.name}' 재고가 ${r}개 남았습니다.`
+  if (r === 0) return `'${p.name}' 준비 수량이 모두 주문됐습니다.`
+  return `'${p.name}' 재고보다 ${-r}개 더 주문됐습니다.`
+}
+
+/**
+ * 판매자용 상품별 재고 현황 + 알림 (2026-10-16 사용자 결정). 재고로 주문을 막지 않으므로 초과 수량까지 그대로 보여 주고,
+ * 남은 수량이 알림 기준 이하이거나 초과되면 맨 위에 알린다.
+ */
+function StockStatus({ products }: { products: Product[] }) {
+  const stocked = products.filter((p) => p.stockLimit != null)
+  if (stocked.length === 0) return null
+  const alerts = stocked.filter((p) => (p.remaining ?? 0) < 0
+    || (p.stockAlertThreshold != null && p.remaining != null && p.remaining <= p.stockAlertThreshold))
+  return (
+    <>
+      {alerts.length > 0 && (
+        <div className="warn-box">
+          {alerts.map((p) => <div key={p.id}><b>{stockHeadline(p)}</b></div>)}
+          <div className="small" style={{ color: 'var(--danger)', marginTop: 4 }}>악용하는 고객이 있을 수 있으니 계좌 입금내역 대조를 통해 확인하십시오.</div>
+        </div>
+      )}
+      <div className="card">
+        <div className="row between"><h3 style={{ margin: 0 }}>상품별 재고</h3><span className="small muted">준비 수량을 넘어도 주문은 받습니다</span></div>
+        <div className="table-wrap mt">
+          <table className="stack">
+            <thead><tr><th>상품</th><th className="right">준비</th><th className="right">주문</th><th className="right">남은 수량</th><th className="right">알림 기준</th></tr></thead>
+            <tbody>
+              {stocked.map((p) => {
+                const r = p.remaining ?? 0
+                const alert = r < 0 || (p.stockAlertThreshold != null && r <= p.stockAlertThreshold)
+                return (
+                  <tr key={p.id}>
+                    <td className="stack-title"><b>{p.name}</b></td>
+                    <td className="right" data-label="준비">{p.stockLimit}</td>
+                    <td className="right" data-label="주문">{p.sold}</td>
+                    <td className="right" data-label="남은 수량" style={{ color: alert ? 'var(--danger)' : undefined, fontWeight: alert ? 700 : undefined }}>
+                      {r < 0 ? `${r} (${-r}개 초과)` : r}
+                    </td>
+                    <td className="right" data-label="알림 기준">{p.stockAlertThreshold != null ? `${p.stockAlertThreshold}개 이하` : <span className="muted">없음</span>}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )
 }

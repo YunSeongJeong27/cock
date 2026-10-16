@@ -31,9 +31,11 @@ export interface Product {
   unitPrice: number
   stockLimit: number | null
   sold: number
+  /** 판매자용 남은 수량. 재고보다 더 주문되면 음수 (예: -3 = 3개 초과). 재고 제한이 없으면 null */
   remaining: number | null
   perOrderLimit: number | null
-  soldOut: boolean
+  /** 남은 수량이 이 값 이하가 되면 알림 (화면·메일). 없으면 null */
+  stockAlertThreshold: number | null
 }
 
 export interface PickupPoint {

@@ -29,8 +29,15 @@ public class Product {
     @Column(nullable = false)
     private int unitPrice;
 
-    /** null 이면 재고 제한 없음 */
+    /** 준비 수량(재고). null 이면 제한 없음. 넘어도 주문은 막지 않는다 (2026-10-16) */
     private Integer stockLimit;
+
+    /** 남은 수량이 이 값 이하가 되면 판매자에게 알림 (화면·메일). null 이면 알림 없음 */
+    private Integer stockAlertThreshold;
+
+    /** 알림 메일을 보냈는지. 남은 수량이 기준보다 다시 많아지면 false 로 돌아가 다음에 또 보낸다 */
+    @Column(nullable = false)
+    private boolean stockAlertSent;
 
     /**
      * 판매된 수량. 주문/취소 시 ProductRepository 의 원자 UPDATE 로만 바꾼다.
@@ -51,29 +58,51 @@ public class Product {
     protected Product() {
     }
 
-    public Product(GroupBuy groupBuy, String name, int unitPrice, Integer stockLimit, Integer perOrderLimit, int sortOrder) {
+    public Product(GroupBuy groupBuy, String name, int unitPrice, Integer stockLimit, Integer perOrderLimit, int sortOrder,
+                   Integer stockAlertThreshold) {
         this.groupBuy = groupBuy;
         this.name = name;
         this.unitPrice = unitPrice;
         this.stockLimit = stockLimit;
         this.perOrderLimit = perOrderLimit;
         this.sortOrder = sortOrder;
+        this.stockAlertThreshold = stockAlertThreshold;
     }
 
-    public void update(String name, int unitPrice, Integer stockLimit, Integer perOrderLimit, int sortOrder) {
+    public void update(String name, int unitPrice, Integer stockLimit, Integer perOrderLimit, int sortOrder,
+                       Integer stockAlertThreshold) {
         this.name = name;
         this.unitPrice = unitPrice;
         this.stockLimit = stockLimit;
         this.perOrderLimit = perOrderLimit;
         this.sortOrder = sortOrder;
+        this.stockAlertThreshold = stockAlertThreshold;
     }
 
-    public boolean isSoldOut() {
-        return stockLimit != null && sold >= stockLimit;
-    }
-
+    /** 판매자용 남은 수량. 재고보다 더 주문되면 음수 (예: -3 = 3개 초과). 재고 제한이 없으면 null */
     public Integer remaining() {
-        return stockLimit == null ? null : Math.max(0, stockLimit - sold);
+        return stockLimit == null ? null : stockLimit - sold;
+    }
+
+    /**
+     * 손님 화면용 남은 수량: 1개 이상일 때만 보여 주고, 0 이하면 null (수량 표시를 숨김. 주문은 받음).
+     * "1개 남음"처럼 거짓으로 보이게 하지 않는다 (공정위 다크패턴 가이드라인의 거짓 재고 표시 주의, 2026-10-16 사용자 결정)
+     */
+    public Integer publicRemaining() {
+        Integer remaining = remaining();
+        return remaining == null || remaining < 1 ? null : remaining;
+    }
+
+    public Integer getStockAlertThreshold() {
+        return stockAlertThreshold;
+    }
+
+    public boolean isStockAlertSent() {
+        return stockAlertSent;
+    }
+
+    void markStockAlertSent(boolean sent) {
+        this.stockAlertSent = sent;
     }
 
     public Long getId() {

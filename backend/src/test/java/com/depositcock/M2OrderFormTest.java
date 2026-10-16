@@ -131,7 +131,7 @@ class M2OrderFormTest extends IntegrationTest {
     }
 
     @Test
-    void stockIsAtomicUnderConcurrency() throws Exception {
+    void concurrentOrdersAreAllCountedEvenOverStock() throws Exception {
         Opened g = openGroupBuy(groupBuyBody("선착순", List.of(product("홍게", 21900, 5))));
         int threads = 12;
         ExecutorService pool = Executors.newFixedThreadPool(threads);
@@ -147,21 +147,21 @@ class M2OrderFormTest extends IntegrationTest {
         }
         start.countDown();
         int ok = 0;
-        int soldOut = 0;
         for (Future<Integer> f : results) {
-            int code = f.get();
-            if (code == 200) {
+            if (f.get() == 200) {
                 ok++;
-            } else if (code == 409) {
-                soldOut++;
             }
         }
         pool.shutdown();
-        assertThat(ok).isEqualTo(5);
-        assertThat(soldOut).isEqualTo(threads - 5);
+        // 재고(5)를 넘어도 막지 않는다 (2026-10-16 사용자 결정). 동시에 들어와도 판매 수량은 빠짐없이 더해진다
+        assertThat(ok).isEqualTo(threads);
+        // 손님 화면: 남은 수량이 0 이하면 수량 표시를 숨긴다 ("1개 남음" 같은 거짓 표시 안 함)
         mvc.perform(get("/api/public/g/" + g.token()))
-                .andExpect(jsonPath("$.products[0].soldOut").value(true))
-                .andExpect(jsonPath("$.products[0].remaining").value(0));
+                .andExpect(jsonPath("$.products[0].remaining").doesNotExist());
+        // 판매자 화면: 초과 수량까지 음수로 보인다
+        mvc.perform(get("/api/seller/group-buys/" + g.id()).cookie(g.seller()))
+                .andExpect(jsonPath("$.products[0].sold").value(threads))
+                .andExpect(jsonPath("$.products[0].remaining").value(5 - threads));
     }
 
     @Test

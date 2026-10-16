@@ -49,8 +49,8 @@ public final class OrderDtos {
     public record CancelRequest(@Min(1) Integer orderNo, @NotBlank String phone, @NotBlank String depositorName) {
     }
 
-    public record PublicProduct(Long id, String name, int unitPrice, Integer remaining, Integer perOrderLimit,
-                                boolean soldOut) {
+    /** 손님용. remaining 은 1개 이상일 때만 값이 있고 0 이하면 null (수량 표시 숨김, 주문은 받음) */
+    public record PublicProduct(Long id, String name, int unitPrice, Integer remaining, Integer perOrderLimit) {
     }
 
     public record AccountInfo(String bankName, String accountNumber, String accountHolder) {

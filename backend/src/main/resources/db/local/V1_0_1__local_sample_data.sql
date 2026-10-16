@@ -18,8 +18,8 @@ SELECT id, '파프리카 한봉지 (8일 목요일 오후 픽업)', '선착순 �
        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM seller WHERE email = 'demo@depositcock.local';
 
-INSERT INTO product (group_buy_id, name, unit_price, stock_limit, sold, per_order_limit, sort_order, version)
-SELECT id, '파프리카 한봉지', 1900, 50, 3, 5, 1, 0 FROM group_buy WHERE public_token = 'demo-paprika';
+INSERT INTO product (group_buy_id, name, unit_price, stock_limit, sold, per_order_limit, sort_order, version, stock_alert_threshold)
+SELECT id, '파프리카 한봉지', 1900, 50, 3, 5, 1, 0, 5 FROM group_buy WHERE public_token = 'demo-paprika';
 INSERT INTO product (group_buy_id, name, unit_price, stock_limit, sold, per_order_limit, sort_order, version)
 SELECT id, '한우 1++ 차돌 200g', 8900, NULL, 2, NULL, 2, 0 FROM group_buy WHERE public_token = 'demo-paprika';
 

@@ -1,5 +1,6 @@
 package com.depositcock.order;
 
+import com.depositcock.groupbuy.StockAlerts;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -55,11 +56,13 @@ public class PublicOrderService {
     private final Customers customers;
     private final EntityManager entityManager;
     private final Clock clock;
+    private final StockAlerts stockAlerts;
 
     public PublicOrderService(GroupBuyRepository groupBuyRepository, ProductRepository productRepository,
                               CustomerOrderRepository orderRepository, CustomerDeviceRepository deviceRepository,
                               CustomerRepository customerRepository, Customers customers,
-                              EntityManager entityManager, Clock clock) {
+                              EntityManager entityManager, Clock clock, StockAlerts stockAlerts) {
+        this.stockAlerts = stockAlerts;
         this.customerRepository = customerRepository;
         this.customers = customers;
         this.entityManager = entityManager;
@@ -165,14 +168,10 @@ public class PublicOrderService {
         long itemsAmount = 0;
         for (Map.Entry<Long, Integer> e : quantities.entrySet()) {
             Product product = products.get(e.getKey());
-            // 재고 원자 처리. 실패하면 예외 → 트랜잭션 롤백으로 앞서 늘린 수량도 되돌아간다.
-            if (productRepository.increaseSold(product.getId(), e.getValue()) == 0) {
-                Product fresh = product;
-                entityManager.refresh(fresh);
-                throw ApiException.conflict("'" + fresh.getName() + "'이(가) 품절되었거나 남은 수량이 부족합니다. (남은 수량 "
-                        + fresh.remaining() + "개)");
-            }
+            // 재고를 넘어도 막지 않는다 (2026-10-16). 판매 수량만 더하고 판매자 알림 기준을 확인한다
+            productRepository.increaseSold(product.getId(), e.getValue());
             entityManager.refresh(product);
+            stockAlerts.check(product);
             order.addItem(new OrderItem(order, product, e.getValue()));
             itemsAmount += (long) product.getUnitPrice() * e.getValue();
         }
@@ -288,7 +287,7 @@ public class PublicOrderService {
         if (order.isPickedUp()) {
             throw ApiException.badRequest("이미 수령한 주문은 취소할 수 없습니다.");
         }
-        OrderCancellation.cancel(order, productRepository, entityManager, now);
+        OrderCancellation.cancel(order, productRepository, entityManager, stockAlerts, now);
         // 응답은 이 기기가 볼 수 있는 주문만 (취소 정보를 안다고 그 사람의 다른 주문까지 보여주지 않음)
         return toPublic(groupBuy, device(groupBuy, cookieToken).orElse(null), now);
     }
@@ -403,7 +402,7 @@ public class PublicOrderService {
         return new PublicGroupBuy(g.getTitle(), g.getDescription(), g.getSeller().getDisplayName(), accepting,
                 closedReason, g.getCloseAt(),
                 g.sortedProducts().stream().map(p -> new PublicProduct(p.getId(), p.getName(), p.getUnitPrice(),
-                        p.remaining(), p.getPerOrderLimit(), p.isSoldOut())).toList(),
+                        p.publicRemaining(), p.getPerOrderLimit())).toList(),
                 g.sortedPickupPoints().stream().map(PickupPointResponse::of).toList(),
                 g.isPickupEnabled(), g.isPickupPrepayEnabled(), g.isPickupOnsiteEnabled(), g.isDeliveryEnabled(),
                 g.getShippingFeeType(), g.getShippingFee(), g.isNicknameRequired(), g.isUnitAddressFieldEnabled(),

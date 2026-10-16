@@ -1,5 +1,6 @@
 package com.depositcock.order;
 
+import com.depositcock.groupbuy.StockAlerts;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -37,9 +38,11 @@ public class SellerOrderService {
     private final ProductRepository productRepository;
     private final EntityManager entityManager;
     private final Clock clock;
+    private final StockAlerts stockAlerts;
 
     public SellerOrderService(GroupBuyService groupBuyService, CustomerOrderRepository orderRepository,
-                              ProductRepository productRepository, EntityManager entityManager, Clock clock) {
+                              ProductRepository productRepository, EntityManager entityManager, Clock clock, StockAlerts stockAlerts) {
+        this.stockAlerts = stockAlerts;
         this.entityManager = entityManager;
         this.groupBuyService = groupBuyService;
         this.orderRepository = orderRepository;
@@ -75,7 +78,7 @@ public class SellerOrderService {
         if (!order.isActive()) {
             throw ApiException.badRequest("이미 취소된 주문입니다.");
         }
-        OrderCancellation.cancel(order, productRepository, entityManager, LocalDateTime.now(clock));
+        OrderCancellation.cancel(order, productRepository, entityManager, stockAlerts, LocalDateTime.now(clock));
         return OrderMapper.toSellerOrder(order, false);
     }
 
@@ -160,11 +163,9 @@ public class SellerOrderService {
                 // 주문 뒤에 상품이 지워진 경우는 없다 (주문 있는 상품은 삭제 불가). 안전하게 막는다
                 throw ApiException.badRequest("상품을 찾을 수 없습니다.");
             }
-            // 재고: 늘어나는 만큼만 원자적으로 확인하며 더하고, 줄어드는 만큼 돌려놓는다
-            if (after > before && productRepository.increaseSold(productId, after - before) == 0) {
-                entityManager.refresh(product);
-                throw ApiException.conflict("'" + product.getName() + "'의 남은 수량이 부족합니다. (남은 수량 "
-                        + product.remaining() + "개)");
+            // 판매 수량: 늘어난 만큼 더하고(재고를 넘어도 막지 않음, 2026-10-16) 줄어든 만큼 돌려놓는다
+            if (after > before) {
+                productRepository.increaseSold(productId, after - before);
             }
             if (after < before) {
                 productRepository.decreaseSold(productId, before - after);
@@ -179,7 +180,10 @@ public class SellerOrderService {
                 item.changeQuantity(after);
             }
         }
-        products.values().forEach(entityManager::refresh);
+        products.values().forEach(p -> {
+            entityManager.refresh(p);
+            stockAlerts.check(p);
+        });
 
         // 3) 고객이 적은 값
         if (receive != order.getReceiveMethod() || point != order.getPickupPoint()) {
