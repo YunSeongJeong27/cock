@@ -22,7 +22,9 @@ public final class GroupBuyDtos {
             @Min(1) Integer stockLimit,
             @Min(1) Integer perOrderLimit,
             /** 남은 수량이 이 값 이하가 되면 판매자에게 알림. 비우면 알림 없음 */
-            @Min(0) @Max(100_000) Integer stockAlertThreshold) {
+            @Min(0) @Max(100_000) Integer stockAlertThreshold,
+            /** 켜면 준비 수량에 도달했을 때 품절로 주문을 막음 (기본 꺼짐) */
+            boolean blockWhenSoldOut) {
     }
 
     public record PickupPointRequest(
@@ -54,11 +56,12 @@ public final class GroupBuyDtos {
 
     /** 판매자용. remaining 은 재고보다 더 주문되면 음수 (초과 수량) */
     public record ProductResponse(Long id, String name, int unitPrice, Integer stockLimit, int sold,
-                                  Integer remaining, Integer perOrderLimit, Integer stockAlertThreshold) {
+                                  Integer remaining, Integer perOrderLimit, Integer stockAlertThreshold,
+                                  boolean blockWhenSoldOut, boolean soldOut) {
 
         public static ProductResponse of(Product p) {
             return new ProductResponse(p.getId(), p.getName(), p.getUnitPrice(), p.getStockLimit(), p.getSold(),
-                    p.remaining(), p.getPerOrderLimit(), p.getStockAlertThreshold());
+                    p.remaining(), p.getPerOrderLimit(), p.getStockAlertThreshold(), p.isBlockWhenSoldOut(), p.isSoldOut());
         }
     }
 

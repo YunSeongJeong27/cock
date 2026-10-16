@@ -17,6 +17,15 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("update Product p set p.sold = p.sold + :quantity where p.id = :productId")
     int increaseSold(@Param("productId") Long productId, @Param("quantity") int quantity);
 
+    /**
+     * "다 팔리면 품절" 을 켠 상품용: 준비 수량 안에서만 더한다. 영향받은 행이 0 이면 품절(남은 수량 부족).
+     * 여러 사람이 동시에 주문해도 DB 가 한 줄씩 처리하므로 준비 수량을 넘지 않는다.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("update Product p set p.sold = p.sold + :quantity "
+            + "where p.id = :productId and (p.stockLimit is null or p.sold + :quantity <= p.stockLimit)")
+    int increaseSoldWithinStock(@Param("productId") Long productId, @Param("quantity") int quantity);
+
     /** 취소 시 판매 수량 복구 */
     @Modifying(flushAutomatically = true)
     @Query("update Product p set p.sold = p.sold - :quantity where p.id = :productId and p.sold >= :quantity")

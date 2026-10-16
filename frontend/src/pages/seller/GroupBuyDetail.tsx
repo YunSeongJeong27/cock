@@ -182,10 +182,10 @@ function StockStatus({ products }: { products: Product[] }) {
         </div>
       )}
       <div className="card">
-        <div className="row between"><h3 style={{ margin: 0 }}>상품별 재고</h3><span className="small muted">준비 수량을 넘어도 주문은 받습니다</span></div>
+        <div className="row between"><h3 style={{ margin: 0 }}>상품별 재고</h3><span className="small muted">"다 팔리면 품절"은 공구 수정에서 상품마다 켜고 끕니다</span></div>
         <div className="table-wrap mt">
           <table className="stack">
-            <thead><tr><th>상품</th><th className="right">준비</th><th className="right">주문</th><th className="right">남은 수량</th><th className="right">알림 기준</th></tr></thead>
+            <thead><tr><th>상품</th><th className="right">준비</th><th className="right">주문</th><th className="right">남은 수량</th><th className="right">알림 기준</th><th>다 팔리면</th></tr></thead>
             <tbody>
               {stocked.map((p) => {
                 const r = p.remaining ?? 0
@@ -199,6 +199,7 @@ function StockStatus({ products }: { products: Product[] }) {
                       {r < 0 ? `${r} (${-r}개 초과)` : r}
                     </td>
                     <td className="right" data-label="알림 기준">{p.stockAlertThreshold != null ? `${p.stockAlertThreshold}개 이하` : <span className="muted">없음</span>}</td>
+                    <td data-label="다 팔리면">{p.soldOut ? <span className="badge badge-CANCELLED">품절 (주문 막는 중)</span> : p.blockWhenSoldOut ? '품절로 막음' : <span className="muted">계속 받음</span>}</td>
                   </tr>
                 )
               })}

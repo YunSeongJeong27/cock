@@ -94,6 +94,8 @@ CREATE TABLE product (
     -- 남은 수량이 이 값 이하가 되면 판매자에게 알림 (화면·메일). stock_alert_sent: 메일을 보냈는지 (다시 늘면 false)
     stock_alert_threshold INTEGER,
     stock_alert_sent BOOLEAN     NOT NULL DEFAULT FALSE,
+    -- 켜면 준비 수량에 도달했을 때 품절로 주문을 막는다 (판매자가 상품마다 켬, 기본 꺼짐 = 막지 않음)
+    block_when_sold_out BOOLEAN  NOT NULL DEFAULT FALSE,
     sort_order      INTEGER      NOT NULL,
     version         BIGINT       NOT NULL DEFAULT 0
 );

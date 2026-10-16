@@ -4,8 +4,11 @@ import { ApiError, api, dateTime, errorMessage, won } from '../../api'
 import { CopyButton, ErrorBox, StatusBadge } from '../../components/Ui'
 import type { PaymentMethod, ReceiveMethod, ShippingFeeType } from '../../types'
 
-/** remaining: 1개 이상일 때만 값이 있음 (0 이하면 숨김, 주문은 받음) */
-interface PublicProduct { id: number; name: string; unitPrice: number; remaining: number | null; perOrderLimit: number | null }
+/**
+ * remaining: 1개 이상일 때만 값이 있음. blockWhenSoldOut 이면 남은 수량까지만 주문 가능하고 soldOut 이면 품절,
+ * 아니면 0 이하에서 수량 표시만 숨기고 주문은 받음
+ */
+interface PublicProduct { id: number; name: string; unitPrice: number; remaining: number | null; perOrderLimit: number | null; blockWhenSoldOut: boolean; soldOut: boolean }
 interface Account { bankName: string; accountNumber: string; accountHolder: string }
 interface MyOrder {
   orderNo: number
@@ -189,9 +192,13 @@ export default function PublicOrder() {
     </p>
   )
 
-  /** 수량 상한: 1인 최대 수량만 (재고로는 막지 않음, 2026-10-16). 1인 최대는 이미 주문한 수량을 서버가 합쳐서 다시 확인 */
+  /**
+   * 수량 상한: 1인 최대 수량, 그리고 판매자가 "다 팔리면 품절"을 켠 상품만 남은 수량 (기본은 재고로 막지 않음, 2026-10-16).
+   * 1인 최대는 이미 주문한 수량을 서버가 합쳐서 다시 확인
+   */
   function maxQty(p: PublicProduct): number {
-    return p.perOrderLimit ?? 999
+    const limits = [p.perOrderLimit, p.blockWhenSoldOut ? p.remaining : null].filter((n): n is number => n !== null && n !== undefined)
+    return limits.length ? Math.min(...limits) : 999
   }
 
   function setQtyFor(p: PublicProduct, value: number) {
@@ -305,11 +312,13 @@ export default function PublicOrder() {
                 <div><b>{p.name}</b></div>
                 <div className="small">{won(p.unitPrice)}{p.remaining !== null && <span className="muted"> · 남은 수량 {p.remaining}</span>}{p.perOrderLimit && <span className="muted"> · 1인 최대 {p.perOrderLimit}</span>}</div>
               </div>
-              <div className="qty">
-                <button type="button" onClick={() => setQtyFor(p, (qty[p.id] ?? 0) - 1)}>−</button>
-                <input type="number" min={0} max={maxQty(p)} value={qty[p.id] ?? 0} onChange={(e) => setQtyFor(p, Number(e.target.value))} />
-                <button type="button" disabled={(qty[p.id] ?? 0) >= maxQty(p)} onClick={() => setQtyFor(p, (qty[p.id] ?? 0) + 1)}>+</button>
-              </div>
+              {p.soldOut ? <span className="badge badge-CANCELLED">품절</span> : (
+                <div className="qty">
+                  <button type="button" onClick={() => setQtyFor(p, (qty[p.id] ?? 0) - 1)}>−</button>
+                  <input type="number" min={0} max={maxQty(p)} value={qty[p.id] ?? 0} onChange={(e) => setQtyFor(p, Number(e.target.value))} />
+                  <button type="button" disabled={(qty[p.id] ?? 0) >= maxQty(p)} onClick={() => setQtyFor(p, (qty[p.id] ?? 0) + 1)}>+</button>
+                </div>
+              )}
             </div>
           ))}
 

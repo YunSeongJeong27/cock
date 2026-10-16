@@ -36,6 +36,10 @@ export interface Product {
   perOrderLimit: number | null
   /** 남은 수량이 이 값 이하가 되면 알림 (화면·메일). 없으면 null */
   stockAlertThreshold: number | null
+  /** 켜면 준비 수량에 도달했을 때 품절로 주문을 막음 (기본 꺼짐) */
+  blockWhenSoldOut: boolean
+  /** 품절로 막는 중 */
+  soldOut: boolean
 }
 
 export interface PickupPoint {

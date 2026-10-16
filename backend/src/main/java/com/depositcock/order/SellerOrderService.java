@@ -163,9 +163,18 @@ public class SellerOrderService {
                 // 주문 뒤에 상품이 지워진 경우는 없다 (주문 있는 상품은 삭제 불가). 안전하게 막는다
                 throw ApiException.badRequest("상품을 찾을 수 없습니다.");
             }
-            // 판매 수량: 늘어난 만큼 더하고(재고를 넘어도 막지 않음, 2026-10-16) 줄어든 만큼 돌려놓는다
+            // 판매 수량: 늘어난 만큼 더하고 줄어든 만큼 돌려놓는다. 기본은 재고를 넘어도 막지 않고,
+            // "다 팔리면 품절"을 켠 상품만 준비 수량 안에서 더한다 (2026-10-16)
             if (after > before) {
-                productRepository.increaseSold(productId, after - before);
+                if (product.isBlockWhenSoldOut()) {
+                    if (productRepository.increaseSoldWithinStock(productId, after - before) == 0) {
+                        entityManager.refresh(product);
+                        throw ApiException.conflict("'" + product.getName() + "'의 남은 수량이 부족합니다. (남은 수량 "
+                                + Math.max(0, product.remaining()) + "개, 품절로 막는 상품)");
+                    }
+                } else {
+                    productRepository.increaseSold(productId, after - before);
+                }
             }
             if (after < before) {
                 productRepository.decreaseSold(productId, before - after);

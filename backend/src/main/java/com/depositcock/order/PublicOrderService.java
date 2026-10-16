@@ -168,8 +168,18 @@ public class PublicOrderService {
         long itemsAmount = 0;
         for (Map.Entry<Long, Integer> e : quantities.entrySet()) {
             Product product = products.get(e.getKey());
-            // 재고를 넘어도 막지 않는다 (2026-10-16). 판매 수량만 더하고 판매자 알림 기준을 확인한다
-            productRepository.increaseSold(product.getId(), e.getValue());
+            // 기본은 재고를 넘어도 막지 않는다 (2026-10-16). 판매자가 "다 팔리면 품절"을 켠 상품만 준비 수량 안에서 원자적으로
+            // 더하고, 넘으면 예외 → 트랜잭션 롤백으로 앞서 늘린 수량도 되돌아간다
+            if (product.isBlockWhenSoldOut()) {
+                if (productRepository.increaseSoldWithinStock(product.getId(), e.getValue()) == 0) {
+                    entityManager.refresh(product);
+                    Integer left = product.publicRemaining();
+                    throw ApiException.conflict("'" + product.getName() + "'이(가) "
+                            + (left == null ? "품절되었습니다." : "남은 수량보다 많습니다. (남은 수량 " + left + "개)"));
+                }
+            } else {
+                productRepository.increaseSold(product.getId(), e.getValue());
+            }
             entityManager.refresh(product);
             stockAlerts.check(product);
             order.addItem(new OrderItem(order, product, e.getValue()));
@@ -402,7 +412,7 @@ public class PublicOrderService {
         return new PublicGroupBuy(g.getTitle(), g.getDescription(), g.getSeller().getDisplayName(), accepting,
                 closedReason, g.getCloseAt(),
                 g.sortedProducts().stream().map(p -> new PublicProduct(p.getId(), p.getName(), p.getUnitPrice(),
-                        p.publicRemaining(), p.getPerOrderLimit())).toList(),
+                        p.publicRemaining(), p.getPerOrderLimit(), p.isBlockWhenSoldOut(), p.isSoldOut())).toList(),
                 g.sortedPickupPoints().stream().map(PickupPointResponse::of).toList(),
                 g.isPickupEnabled(), g.isPickupPrepayEnabled(), g.isPickupOnsiteEnabled(), g.isDeliveryEnabled(),
                 g.getShippingFeeType(), g.getShippingFee(), g.isNicknameRequired(), g.isUnitAddressFieldEnabled(),

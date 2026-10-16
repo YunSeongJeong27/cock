@@ -214,14 +214,14 @@ public class GroupBuyService {
                 Product product = existing.get(r.id());
                 // 재고를 이미 팔린 수량보다 작게 바꿔도 된다 (넘친 만큼 초과로 보임, 2026-10-16)
                 product.update(r.name().trim(), r.unitPrice(), r.stockLimit(), r.perOrderLimit(), order,
-                        r.stockAlertThreshold());
+                        r.stockAlertThreshold(), r.blockWhenSoldOut());
                 stockAlerts.check(product);
                 kept.add(r.id());
             } else if (r.id() != null) {
                 throw ApiException.badRequest("상품을 찾을 수 없습니다: " + r.id());
             } else {
                 groupBuy.getProducts().add(new Product(groupBuy, r.name().trim(), r.unitPrice(), r.stockLimit(),
-                        r.perOrderLimit(), order, r.stockAlertThreshold()));
+                        r.perOrderLimit(), order, r.stockAlertThreshold(), r.blockWhenSoldOut()));
             }
         }
         for (Product product : List.copyOf(groupBuy.getProducts())) {

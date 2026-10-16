@@ -39,6 +39,10 @@ public class Product {
     @Column(nullable = false)
     private boolean stockAlertSent;
 
+    /** 켜면 준비 수량에 도달했을 때 품절로 주문을 막는다 (판매자 선택, 기본 꺼짐. 2026-10-16) */
+    @Column(nullable = false)
+    private boolean blockWhenSoldOut;
+
     /**
      * 판매된 수량. 주문/취소 시 ProductRepository 의 원자 UPDATE 로만 바꾼다.
      * updatable = false: 판매자가 상품을 수정할 때 메모리의 옛 값으로 덮어써서 재고가 틀어지는 것 방지.
@@ -59,7 +63,7 @@ public class Product {
     }
 
     public Product(GroupBuy groupBuy, String name, int unitPrice, Integer stockLimit, Integer perOrderLimit, int sortOrder,
-                   Integer stockAlertThreshold) {
+                   Integer stockAlertThreshold, boolean blockWhenSoldOut) {
         this.groupBuy = groupBuy;
         this.name = name;
         this.unitPrice = unitPrice;
@@ -67,16 +71,27 @@ public class Product {
         this.perOrderLimit = perOrderLimit;
         this.sortOrder = sortOrder;
         this.stockAlertThreshold = stockAlertThreshold;
+        this.blockWhenSoldOut = blockWhenSoldOut;
     }
 
     public void update(String name, int unitPrice, Integer stockLimit, Integer perOrderLimit, int sortOrder,
-                       Integer stockAlertThreshold) {
+                       Integer stockAlertThreshold, boolean blockWhenSoldOut) {
         this.name = name;
         this.unitPrice = unitPrice;
         this.stockLimit = stockLimit;
         this.perOrderLimit = perOrderLimit;
         this.sortOrder = sortOrder;
         this.stockAlertThreshold = stockAlertThreshold;
+        this.blockWhenSoldOut = blockWhenSoldOut;
+    }
+
+    public boolean isBlockWhenSoldOut() {
+        return blockWhenSoldOut;
+    }
+
+    /** 품절로 막는 중인지: "다 팔리면 품절"을 켰고 준비 수량에 도달함 */
+    public boolean isSoldOut() {
+        return blockWhenSoldOut && stockLimit != null && sold >= stockLimit;
     }
 
     /** 판매자용 남은 수량. 재고보다 더 주문되면 음수 (예: -3 = 3개 초과). 재고 제한이 없으면 null */
@@ -85,7 +100,8 @@ public class Product {
     }
 
     /**
-     * 손님 화면용 남은 수량: 1개 이상일 때만 보여 주고, 0 이하면 null (수량 표시를 숨김. 주문은 받음).
+     * 손님 화면용 남은 수량: 1개 이상일 때만 보여 주고, 0 이하면 null (막지 않는 상품은 수량 표시를 숨기고 주문을 받음,
+     * "다 팔리면 품절"을 켠 상품은 품절로 표시).
      * "1개 남음"처럼 거짓으로 보이게 하지 않는다 (공정위 다크패턴 가이드라인의 거짓 재고 표시 주의, 2026-10-16 사용자 결정)
      */
     public Integer publicRemaining() {

@@ -49,8 +49,12 @@ public final class OrderDtos {
     public record CancelRequest(@Min(1) Integer orderNo, @NotBlank String phone, @NotBlank String depositorName) {
     }
 
-    /** 손님용. remaining 은 1개 이상일 때만 값이 있고 0 이하면 null (수량 표시 숨김, 주문은 받음) */
-    public record PublicProduct(Long id, String name, int unitPrice, Integer remaining, Integer perOrderLimit) {
+    /**
+     * 손님용. remaining 은 1개 이상일 때만 값이 있고 0 이하면 null.
+     * blockWhenSoldOut 이면 남은 수량까지만 주문할 수 있고 soldOut 이면 품절(주문 막힘). 아니면 수량 표시만 숨기고 주문을 받음
+     */
+    public record PublicProduct(Long id, String name, int unitPrice, Integer remaining, Integer perOrderLimit,
+                                boolean blockWhenSoldOut, boolean soldOut) {
     }
 
     public record AccountInfo(String bankName, String accountNumber, String accountHolder) {
