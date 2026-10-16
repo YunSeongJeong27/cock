@@ -1,0 +1,20 @@
+# backend
+backend/target/
+backend/data/
+*.log
+
+# frontend
+frontend/node_modules/
+frontend/dist/
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# 비밀값
+.env
+.env.*
+!.env.example
+frontend/*.tsbuildinfo

@@ -1,0 +1,57 @@
+package com.depositcock.vision;
+
+import java.time.LocalDate;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+/** 판매자별·날짜별 비전 AI 로 보낸 캡처 장수 */
+@Entity
+@Table(name = "capture_usage")
+public class CaptureUsage {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private Long sellerId;
+
+    @Column(nullable = false)
+    private LocalDate usageDate;
+
+    @Column(nullable = false)
+    private int imageCount;
+
+    protected CaptureUsage() {
+    }
+
+    public CaptureUsage(Long sellerId, LocalDate usageDate) {
+        this.sellerId = sellerId;
+        this.usageDate = usageDate;
+    }
+
+    public void add(int count) {
+        this.imageCount += count;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Long getSellerId() {
+        return sellerId;
+    }
+
+    public LocalDate getUsageDate() {
+        return usageDate;
+    }
+
+    public int getImageCount() {
+        return imageCount;
+    }
+}

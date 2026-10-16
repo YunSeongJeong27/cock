@@ -1,0 +1,69 @@
+package com.depositcock.groupbuy;
+
+import java.util.List;
+
+import com.depositcock.groupbuy.GroupBuyDtos.Dashboard;
+import com.depositcock.groupbuy.GroupBuyDtos.GroupBuyRequest;
+import com.depositcock.groupbuy.GroupBuyDtos.GroupBuyResponse;
+import com.depositcock.groupbuy.GroupBuyDtos.GroupBuySummary;
+import com.depositcock.security.CurrentSeller;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/seller/group-buys")
+public class GroupBuyController {
+
+    private final GroupBuyService groupBuyService;
+
+    public GroupBuyController(GroupBuyService groupBuyService) {
+        this.groupBuyService = groupBuyService;
+    }
+
+    @GetMapping
+    public List<GroupBuySummary> list() {
+        return groupBuyService.list(CurrentSeller.id());
+    }
+
+    @PostMapping
+    public GroupBuyResponse create(@Valid @RequestBody GroupBuyRequest request) {
+        return groupBuyService.create(CurrentSeller.id(), request);
+    }
+
+    @GetMapping("/{id}")
+    public GroupBuyResponse get(@PathVariable Long id) {
+        return groupBuyService.getResponse(CurrentSeller.id(), id);
+    }
+
+    @PutMapping("/{id}")
+    public GroupBuyResponse update(@PathVariable Long id, @Valid @RequestBody GroupBuyRequest request) {
+        return groupBuyService.update(CurrentSeller.id(), id, request);
+    }
+
+    @PostMapping("/{id}/open")
+    public GroupBuyResponse open(@PathVariable Long id) {
+        return groupBuyService.open(CurrentSeller.id(), id);
+    }
+
+    @PostMapping("/{id}/close")
+    public GroupBuyResponse close(@PathVariable Long id) {
+        return groupBuyService.close(CurrentSeller.id(), id);
+    }
+
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long id) {
+        groupBuyService.delete(CurrentSeller.id(), id);
+    }
+
+    @GetMapping("/{id}/dashboard")
+    public Dashboard dashboard(@PathVariable Long id) {
+        return groupBuyService.getDashboard(CurrentSeller.id(), id);
+    }
+}
