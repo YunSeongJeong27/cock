@@ -495,13 +495,11 @@ export default function PublicOrder() {
               {warnings.list.map((w) => <div key={w}>⚠ {w}</div>)}
               {warnings.replaceOrder && showExisting && (
                 <OrderSummary o={warnings.replaceOrder}
-                  title={<><b>기존 주문 · {warnings.replaceOrder.orderNo}번</b> <span className="muted">({warnings.replaceOrder.statusLabel})</span></>} />
+                  title={<><b>기존 주문</b> <span className="muted">({warnings.replaceOrder.statusLabel})</span></>} />
               )}
               <div className="row mt">
-                {warnings.replaceOrder && (
-                  <button type="button" className="btn small" onClick={() => setShowExisting((v) => !v)}>
-                    {showExisting ? '기존 주문 닫기' : '기존 주문 확인'}
-                  </button>
+                {warnings.replaceOrder && !showExisting && (
+                  <button type="button" className="btn small" onClick={() => setShowExisting(true)}>기존 주문 확인</button>
                 )}
                 <button type="button" className="btn small primary" disabled={busy} onClick={() => submit(null, true)}>
                   {warnings.replaceOrder ? (warnings.replaceOrder.paymentMethod === 'PREPAID' ? '입금 전이에요, 수정하기' : '수정하기') : '확인했어요, 주문하기'}

@@ -113,17 +113,17 @@ class AuditFixesTest extends IntegrationTest {
                 .andExpect(jsonPath("$.myOrders[0].cancellable").value(false));
     }
 
-    /** 같은 입금자명 경고는 띄어쓰기를 무시한다 ("김민지" = "김 민지") */
+    /** 같은 입금자명을 다른 번호가 써도 경고하지 않는다 (2026-10-18 사용자 결정: 경고는 같은 번호인지만 봄) */
     @Test
-    void sameDepositorWarningIgnoresSpaces() throws Exception {
+    void sameDepositorNameFromAnotherPhoneIsNotWarned() throws Exception {
         Opened g = open(groupBuyBody("경고", List.of(product("상품", 1000, null))));
         mvc.perform(withJson(post("/api/public/g/" + g.token() + "/orders"), order(g.productId(), "010-9600-0001", "김민지")))
                 .andExpect(status().isOk());
-        Map<String, Object> second = order(g.productId(), "010-9600-0002", "김 민지");
+        Map<String, Object> second = order(g.productId(), "010-9600-0002", "김민지");
         second.put("acknowledgeWarnings", false);
         mvc.perform(withJson(post("/api/public/g/" + g.token() + "/orders"), second))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.warnings[0]").exists());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderNo").value(2));
     }
 
     /** 기본 주문 정리표에도 수령 방법·픽업 지점 열이 있다 (연락처는 없음) */

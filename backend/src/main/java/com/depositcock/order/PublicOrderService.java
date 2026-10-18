@@ -161,9 +161,9 @@ public class PublicOrderService {
         if (!confirmed) {
             List<String> messages = new ArrayList<>();
             if (mismatch) {
-                messages.add(r.replaceOrderNo() + "번 주문은 수정할 수 없습니다. 이미 입금했거나 휴대폰 번호가 다릅니다.");
+                messages.add("이 주문은 수정할 수 없습니다. 이미 입금했거나 휴대폰 번호가 다릅니다.");
             }
-            messages.addAll(warnings(groupBuy, existingCustomerId, depositorName, previous, target));
+            messages.addAll(warnings(previous, target));
             if (!messages.isEmpty()) {
                 ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, String.join("\n", messages));
                 problem.setProperty("warnings", messages);
@@ -440,36 +440,24 @@ public class PublicOrderService {
     }
 
     /**
-     * @param customerId 이 번호의 기존 고객 (처음 주문하는 번호면 null)
-     * @param previous   이 번호의 이 공구 주문 (취소 제외)
-     * @param target     같은 번호로 다시 주문해서 바뀔 주문 (없으면 null)
+     * 경고는 이 번호로 주문했는지만 본다 (2026-10-18 사용자 결정: 같은 입금자명 경고는 뺌, 문구에 주문번호도 넣지 않음).
+     *
+     * @param previous 이 번호의 이 공구 주문 (취소 제외)
+     * @param target   같은 번호로 다시 주문해서 수정될 주문 (없으면 null)
      */
-    private List<String> warnings(GroupBuy groupBuy, Long customerId, String depositorName, List<CustomerOrder> previous,
-                                  CustomerOrder target) {
-        List<String> warnings = new ArrayList<>();
-        // 문구는 필요한 말만 짧게. 바뀔 주문 내용은 화면의 "기존 주문 확인" 버튼으로 본다 (2026-10-18 사용자 요청).
+    private static List<String> warnings(List<CustomerOrder> previous, CustomerOrder target) {
         // 수정은 입금 전에만: 시스템은 고객이 송금만 하고 "입금했어요"를 안 누른 것은 모르므로, 화면 버튼
-        // "입금 전이에요, 수정하기"로 고객이 직접 확인한다
+        // "입금 전이에요, 수정하기"로 고객이 직접 확인한다. 수정될 주문 내용은 화면의 "기존 주문 확인"으로 본다
         if (target != null) {
-            String no = target.getOrderNo() + "번";
-            warnings.add(target.isPrepaid()
-                    ? "이 번호로 입금 전인 " + no + " 주문이 있습니다. 계속하면 " + no + " 주문이 지금 내용으로 수정됩니다. "
-                            + "이미 입금하셨다면 판매자에게 문의해 주세요."
-                    : "이 번호로 주문한 " + no + " 주문이 있습니다. 계속하면 " + no + " 주문이 지금 내용으로 수정됩니다.");
-        } else if (!previous.isEmpty()) {
+            return List.of(target.isPrepaid()
+                    ? "이 번호로 입금 전인 주문이 있습니다. 계속하면 지금 내용으로 수정됩니다. 이미 입금하셨다면 판매자에게 문의해 주세요."
+                    : "이 번호로 주문한 내역이 있습니다. 계속하면 지금 내용으로 수정됩니다.");
+        }
+        if (!previous.isEmpty()) {
             boolean deposited = previous.stream().anyMatch(o -> o.getDepositReportedAt() != null || o.isPaid());
-            warnings.add("이 번호로 " + (deposited ? "입금한" : "수령한") + " 주문이 있어, 이번 주문은 새 주문으로 추가됩니다.");
+            return List.of("이 번호로 " + (deposited ? "입금한" : "수령한") + " 주문이 있어, 이번 주문은 새 주문으로 추가됩니다.");
         }
-        // 띄어쓰기·대소문자만 다른 이름도 같은 이름으로 본다 (입금 대조도 그렇게 비교함)
-        String name = squash(depositorName).toLowerCase(java.util.Locale.ROOT);
-        boolean sameNameByOther = orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()).stream()
-                .anyMatch(o -> o.getStatus() == OrderStatus.ORDERED && !o.getCustomerId().equals(customerId)
-                        && name.equals(squash(o.getDepositorName()).toLowerCase(java.util.Locale.ROOT)));
-        if (sameNameByOther) {
-            warnings.add("같은 입금자명으로 주문한 다른 분이 있습니다. 입금 확인이 헷갈리지 않게 입금자명 뒤에 동·호수나 숫자를 "
-                    + "붙여주세요. (예: 김민지1505)");
-        }
-        return warnings;
+        return List.of();
     }
 
     private PublicGroupBuy toPublic(GroupBuy g, CustomerDevice device, LocalDateTime now) {

@@ -116,7 +116,7 @@ class CustomerReorderTest extends IntegrationTest {
         again.put("replaceOrderNo", 1);
         mvc.perform(withJson(post(url + "/orders"), again)).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.replaceOrderNo").isEmpty())
-                .andExpect(jsonPath("$.warnings[0]").value("1번 주문은 수정할 수 없습니다. 이미 입금했거나 휴대폰 번호가 다릅니다."))
+                .andExpect(jsonPath("$.warnings[0]").value("이 주문은 수정할 수 없습니다. 이미 입금했거나 휴대폰 번호가 다릅니다."))
                 .andExpect(jsonPath("$.warnings[1]").value("이 번호로 입금한 주문이 있어, 이번 주문은 새 주문으로 추가됩니다."));
         again.put("replaceOrderNo", null);
         mvc.perform(withJson(post(url + "/orders"), again)).andExpect(status().isOk())
@@ -152,7 +152,7 @@ class CustomerReorderTest extends IntegrationTest {
         // [주문 수정]으로 1번을 골라 보내도 수정되지 않는다
         Map<String, Object> edit = order(Map.of(g.apple(), 2), "010-7300-0001", "박입금", 1);
         mvc.perform(withJson(post(url + "/orders").cookie(device), edit)).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.warnings[0]").value("1번 주문은 수정할 수 없습니다. 이미 입금했거나 휴대폰 번호가 다릅니다."));
+                .andExpect(jsonPath("$.warnings[0]").value("이 주문은 수정할 수 없습니다. 이미 입금했거나 휴대폰 번호가 다릅니다."));
         again.put("acknowledgeWarnings", true);
         mvc.perform(withJson(post(url + "/orders").cookie(device), again)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.orderNo").value(2)).andExpect(jsonPath("$.changed").value(false));
@@ -201,7 +201,7 @@ class CustomerReorderTest extends IntegrationTest {
         mvc.perform(withJson(post(url + "/orders").cookie(device), order(Map.of(g.apple(), 2), "010-7400-0002", "정수정", 1)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.replaceOrderNo").isEmpty())
-                .andExpect(jsonPath("$.warnings[0]").value("1번 주문은 수정할 수 없습니다. 이미 입금했거나 휴대폰 번호가 다릅니다."));
+                .andExpect(jsonPath("$.warnings[0]").value("이 주문은 수정할 수 없습니다. 이미 입금했거나 휴대폰 번호가 다릅니다."));
 
         // 다른 기기(내 주문 찾기)에서는 수정용 값에 휴대폰·주소가 없다
         Cookie other = mvc.perform(withJson(post(url + "/identify"), Map.of("phone", phone))).andExpect(status().isOk())
