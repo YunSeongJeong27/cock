@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import com.depositcock.common.ApiException;
@@ -131,7 +132,15 @@ public class PublicOrderService {
         Long sellerId = groupBuy.getSeller().getId();
         // 처음 주문하는 번호면 아직 고객이 없다. 고객은 검사를 모두 통과한 뒤에 만든다 (실패한 주문의 번호를 남기지 않게)
         Long existingCustomerId = customerRepository.findBySellerIdAndPhone(sellerId, phone).map(Customer::getId).orElse(null);
-        checkPerPersonLimit(groupBuy, existingCustomerId, products, quantities);
+        List<CustomerOrder> previous = existingCustomerId == null ? List.of() : orderRepository
+                .findByGroupBuyIdAndCustomer_IdOrderByOrderNoAsc(groupBuy.getId(), existingCustomerId).stream()
+                .filter(CustomerOrder::isActive)
+                .toList();
+        // 같은 번호로 다시 주문하면 새 주문을 더하지 않고 입금 확정 전 주문을 이 내용으로 바꾼다 (2026-10-18 사용자 결정).
+        // 그런 주문이 여러 건이면(판매자가 입금 확정을 취소한 경우 등) 가장 최근 주문
+        CustomerOrder target = previous.stream().filter(CustomerOrder::isReplaceableByCustomer)
+                .reduce((a, b) -> b).orElse(null);
+        checkPerPersonLimit(products, quantities, previous, target);
 
         // 배송 정보 검사는 경고(409)보다 먼저 한다 (경고를 확인한 뒤에 입력 오류가 나오지 않게)
         String recipientPhone = null;
@@ -142,31 +151,65 @@ public class PublicOrderService {
             }
         }
 
-        if (!r.acknowledgeWarnings()) {
-            List<String> warnings = warnings(groupBuy, existingCustomerId, depositorName);
+        // 경고에서 보여준 "바뀔 주문"이 그 사이에 달라졌으면(입금 확정·취소 등) 확인을 다시 받는다
+        Integer targetNo = target == null ? null : target.getOrderNo();
+        boolean confirmed = r.acknowledgeWarnings() && Objects.equals(r.replaceOrderNo(), targetNo);
+        if (!confirmed) {
+            List<String> warnings = warnings(groupBuy, existingCustomerId, depositorName, previous, target, products,
+                    quantities, receiveMethod);
             if (!warnings.isEmpty()) {
                 ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, String.join("\n", warnings));
                 problem.setProperty("warnings", warnings);
+                problem.setProperty("replaceOrderNo", targetNo);
                 throw new ErrorResponseException(HttpStatus.CONFLICT, problem, null);
             }
         }
 
-        Customer customer = customers.byPhone(sellerId, phone, now);
-        // 주문만으로는 본인 확인으로 치지 않는다 (남의 번호로 주문해 그 사람의 주문·개인정보를 보는 것 방지)
-        String newCookie = rememberDevice(groupBuy, cookieToken, customer.getId(), false, now);
+        boolean delivery = receiveMethod == ReceiveMethod.DELIVERY;
+        OrderUpdate.Values values = new OrderUpdate.Values(quantities, receiveMethod, pickupPoint, paymentMethod,
+                depositorName, nickname, unitAddress, delivery ? r.recipientName().trim() : null, recipientPhone,
+                delivery ? trimToNull(r.zipcode()) : null, delivery ? r.address().trim() : null,
+                delivery ? trimToNull(r.addressDetail()) : null);
+        CustomerOrder order;
+        String newCookie;
+        if (target != null) {
+            // 같은 번호의 주문을 바꾼 기기는 그 고객의 주문을 볼 수 있게 한다 ("내 주문 찾기"와 같은 기준: 휴대폰 번호 전체).
+            // 주문을 넣은 기기 표시(device_token)는 그대로 둔다 (원래 기기에서도 계속 보이게)
+            newCookie = rememberDevice(groupBuy, cookieToken, target.getCustomerId(), true, now);
+            order = target;
+            // 번호만 알면 남이 바꿀 수도 있어서, 주문한 기기가 아닌 곳에서 바꾸면 판매자 기록에 표시한다
+            boolean otherDevice = !Objects.equals(target.getDeviceToken(), newCookie != null ? newCookie : cookieToken);
+            OrderUpdate.apply(order, values, ChangeActor.CUSTOMER, otherDevice ? "(주문한 기기와 다른 기기에서 바꿈)" : null,
+                    productRepository, entityManager, stockAlerts, now);
+            orderRepository.flush();
+        } else {
+            Customer customer = customers.byPhone(sellerId, phone, now);
+            // 새 주문만으로는 본인 확인으로 치지 않는다 (남의 번호로 주문해 그 사람의 다른 주문을 보는 것 방지)
+            newCookie = rememberDevice(groupBuy, cookieToken, customer.getId(), false, now);
+            order = newOrder(groupBuy, customer, newCookie != null ? newCookie : cookieToken, values, products, now);
+        }
+
         String deviceToken = newCookie != null ? newCookie : cookieToken;
+        List<MyOrder> myOrders = myOrders(groupBuy, deviceRepository.findByCookieTokenAndGroupBuyId(deviceToken,
+                groupBuy.getId()).orElse(null), now);
+        AccountInfo account = order.getPaymentMethod() == PaymentMethod.PREPAID ? account(groupBuy) : null;
+        return new WithCookie<>(new PlaceOrderResponse(order.getOrderNo(), order.getExpectedAmount(),
+                order.getPaymentMethod(), order.getDepositorName(), account, myOrders, target != null), newCookie);
+    }
+
+    private CustomerOrder newOrder(GroupBuy groupBuy, Customer customer, String deviceToken, OrderUpdate.Values v,
+                                   Map<Long, Product> products, LocalDateTime now) {
         CustomerOrder order = new CustomerOrder(groupBuy, orderRepository.maxOrderNo(groupBuy.getId()) + 1,
                 OrderSource.FORM, customer, Tokens.random(16), now);
         order.placedFrom(deviceToken);
-        order.fillCustomer(depositorName, nickname, unitAddress);
-        order.fillReceive(receiveMethod, pickupPoint, paymentMethod);
-        if (receiveMethod == ReceiveMethod.DELIVERY) {
-            order.fillDelivery(r.recipientName().trim(), recipientPhone, trimToNull(r.zipcode()), r.address().trim(),
-                    trimToNull(r.addressDetail()));
+        order.fillCustomer(v.depositorName(), v.nickname(), v.unitAddress());
+        order.fillReceive(v.receive(), v.point(), v.payment());
+        if (v.receive() == ReceiveMethod.DELIVERY) {
+            order.fillDelivery(v.recipientName(), v.recipientPhone(), v.zipcode(), v.address(), v.addressDetail());
         }
 
         long itemsAmount = 0;
-        for (Map.Entry<Long, Integer> e : quantities.entrySet()) {
+        for (Map.Entry<Long, Integer> e : v.quantities().entrySet()) {
             Product product = products.get(e.getKey());
             // 기본은 재고를 넘어도 막지 않는다 (2026-10-16). 판매자가 "다 팔리면 품절"을 켠 상품만 준비 수량 안에서 원자적으로
             // 더하고, 넘으면 예외 → 트랜잭션 롤백으로 앞서 늘린 수량도 되돌아간다
@@ -185,19 +228,17 @@ public class PublicOrderService {
             order.addItem(new OrderItem(order, product, e.getValue()));
             itemsAmount += (long) product.getUnitPrice() * e.getValue();
         }
-        int shippingFee = receiveMethod == ReceiveMethod.DELIVERY && groupBuy.getShippingFeeType() == ShippingFeeType.FIXED
-                ? groupBuy.getShippingFee() : 0;
+        int shippingFee = shippingFee(groupBuy, v.receive());
         if (itemsAmount + shippingFee > MAX_ORDER_AMOUNT) {
             throw ApiException.badRequest("주문 금액이 너무 큽니다. 수량을 확인해 주세요.");
         }
         order.fillAmounts((int) itemsAmount, shippingFee);
-        orderRepository.save(order);
+        return orderRepository.save(order);
+    }
 
-        List<MyOrder> myOrders = myOrders(groupBuy, deviceRepository.findByCookieTokenAndGroupBuyId(deviceToken,
-                groupBuy.getId()).orElse(null), now);
-        AccountInfo account = paymentMethod == PaymentMethod.PREPAID ? account(groupBuy) : null;
-        return new WithCookie<>(new PlaceOrderResponse(order.getOrderNo(), order.getExpectedAmount(), paymentMethod,
-                depositorName, account, myOrders), newCookie);
+    private static int shippingFee(GroupBuy groupBuy, ReceiveMethod receive) {
+        return receive == ReceiveMethod.DELIVERY && groupBuy.getShippingFeeType() == ShippingFeeType.FIXED
+                ? groupBuy.getShippingFee() : 0;
     }
 
     /**
@@ -361,36 +402,54 @@ public class PublicOrderService {
     }
 
     /**
-     * 1인 최대 수량 (정리본 5장): 같은 사람(휴대폰 번호)이 이 공구에 이미 주문한 수량(취소 제외)까지 합쳐서 본다.
+     * 1인 최대 수량 (정리본 5장): 같은 사람(휴대폰 번호)의 이 공구 주문(취소 제외) 합계로 본다.
+     * 기존 주문을 바꾸는 경우(target)는 그 주문 수량을 빼고 새로 적은 수량으로 센다 (더하기가 아니라 바꾸기, 2026-10-18)
      */
-    private void checkPerPersonLimit(GroupBuy groupBuy, Long customerId, Map<Long, Product> products,
-                                     Map<Long, Integer> quantities) {
-        List<CustomerOrder> previous = customerId == null ? List.of() : orderRepository
-                .findByGroupBuyIdAndCustomer_IdOrderByOrderNoAsc(groupBuy.getId(), customerId).stream()
-                .filter(CustomerOrder::isActive)
-                .toList();
+    private void checkPerPersonLimit(Map<Long, Product> products, Map<Long, Integer> quantities,
+                                     List<CustomerOrder> previous, CustomerOrder target) {
         for (Map.Entry<Long, Integer> e : quantities.entrySet()) {
             Product product = products.get(e.getKey());
             if (product.getPerOrderLimit() == null) {
                 continue;
             }
-            int already = previous.stream().flatMap(o -> o.getItems().stream())
+            int already = previous.stream().filter(o -> o != target).flatMap(o -> o.getItems().stream())
                     .filter(i -> i.getProduct().getId().equals(product.getId()))
                     .mapToInt(OrderItem::getQuantity).sum();
             if (already + e.getValue() > product.getPerOrderLimit()) {
-                String detail = already > 0 ? " (이미 주문한 " + already + "개 포함)" : "";
+                String detail = already > 0 ? " (이미 주문한 " + already + "개 포함"
+                        + (target != null ? ", 바뀔 " + target.getOrderNo() + "번 주문 제외)" : ")") : "";
                 throw ApiException.badRequest("'" + product.getName() + "'은(는) 1인 최대 " + product.getPerOrderLimit()
                         + "개까지 주문할 수 있습니다." + detail);
             }
         }
     }
 
-    /** @param customerId 이 번호의 기존 고객 (처음 주문하는 번호면 null) */
-    private List<String> warnings(GroupBuy groupBuy, Long customerId, String depositorName) {
+    /**
+     * @param customerId 이 번호의 기존 고객 (처음 주문하는 번호면 null)
+     * @param previous   이 번호의 이 공구 주문 (취소 제외)
+     * @param target     같은 번호로 다시 주문해서 바뀔 주문 (없으면 null)
+     */
+    private List<String> warnings(GroupBuy groupBuy, Long customerId, String depositorName, List<CustomerOrder> previous,
+                                  CustomerOrder target, Map<Long, Product> products, Map<Long, Integer> quantities,
+                                  ReceiveMethod receiveMethod) {
         List<String> warnings = new ArrayList<>();
-        if (customerId != null
-                && orderRepository.existsByGroupBuyIdAndCustomer_IdAndStatus(groupBuy.getId(), customerId, OrderStatus.ORDERED)) {
-            warnings.add("이 휴대폰 번호로 이미 주문한 내역이 있습니다. 추가 주문이 맞으면 그대로 진행해 주세요.");
+        if (target != null) {
+            List<String> diff = new ArrayList<>(OrderUpdate.itemChanges(target, quantities, products));
+            int after = previewAmount(groupBuy, target, products, quantities, receiveMethod);
+            if (after != target.getExpectedAmount()) {
+                diff.add("금액 " + OrderUpdate.won(target.getExpectedAmount()) + "→" + OrderUpdate.won(after));
+            }
+            String no = target.getOrderNo() + "번";
+            warnings.add("이 휴대폰 번호로 주문한 " + no + " 주문이 있습니다. 계속하면 새 주문이 추가되지 않고 " + no
+                    + " 주문이 지금 적은 내용으로 바뀝니다. (" + (diff.isEmpty() ? "상품·금액은 그대로" : String.join(", ", diff))
+                    + ")");
+            if (target.getDepositReportedAt() != null) {
+                warnings.add(no + " 주문은 '입금했어요'를 누른 주문입니다. 이미 입금하셨다면 바뀐 금액과의 차액은 판매자에게 "
+                        + "문의해 주세요.");
+            }
+        } else if (!previous.isEmpty()) {
+            warnings.add("이 휴대폰 번호로 입금 확인(또는 수령)된 주문이 있습니다. 그 주문은 바꿀 수 없어 이번 주문은 새 주문으로 "
+                    + "추가됩니다. 추가 주문이 맞으면 그대로 진행해 주세요.");
         }
         // 띄어쓰기·대소문자만 다른 이름도 같은 이름으로 본다 (입금 대조도 그렇게 비교함)
         String name = squash(depositorName).toLowerCase(java.util.Locale.ROOT);
@@ -402,6 +461,19 @@ public class PublicOrderService {
                     + "붙여주세요. (예: 김민지1505)");
         }
         return warnings;
+    }
+
+    /** 바꾼 뒤 금액 미리 계산 (OrderUpdate 와 같은 규칙: 원래 있던 상품은 주문 당시 단가, 새 상품은 지금 단가) */
+    private static int previewAmount(GroupBuy groupBuy, CustomerOrder target, Map<Long, Product> products,
+                                     Map<Long, Integer> quantities, ReceiveMethod receiveMethod) {
+        long amount = shippingFee(groupBuy, receiveMethod);
+        for (Map.Entry<Long, Integer> e : quantities.entrySet()) {
+            int unitPrice = target.getItems().stream().filter(i -> i.getProduct().getId().equals(e.getKey()))
+                    .map(OrderItem::getUnitPriceSnapshot).findFirst()
+                    .orElse(products.get(e.getKey()).getUnitPrice());
+            amount += (long) unitPrice * e.getValue();
+        }
+        return (int) Math.min(amount, Integer.MAX_VALUE);
     }
 
     private PublicGroupBuy toPublic(GroupBuy g, CustomerDevice device, LocalDateTime now) {

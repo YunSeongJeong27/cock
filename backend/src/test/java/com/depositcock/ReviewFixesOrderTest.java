@@ -54,21 +54,32 @@ class ReviewFixesOrderTest extends IntegrationTest {
     }
 
     @Test
-    void perPersonLimitCountsPreviousOrders() throws Exception {
+    void perPersonLimitTreatsReorderAsReplacement() throws Exception {
         Map<String, Object> p = product("한정", 1000, null);
         p.put("perOrderLimit", 3);
         Opened g = open(groupBuyBody("1인 한도", List.of(p)));
-        mvc.perform(withJson(post("/api/public/g/" + g.token() + "/orders"), order(g.productId(), 2, "010-5000-0001", "가", true)))
-                .andExpect(status().isOk());
-        // 이미 2개 + 2개 = 4 > 3
-        mvc.perform(withJson(post("/api/public/g/" + g.token() + "/orders"), order(g.productId(), 2, "010-5000-0001", "가", true)))
+        String url = "/api/public/g/" + g.token() + "/orders";
+        mvc.perform(withJson(post(url), order(g.productId(), 2, "010-5000-0001", "가", true))).andExpect(status().isOk());
+        // 같은 번호로 3개: 2 + 3 이 아니라 2개 → 3개로 바꾸기라 한도 안 (2026-10-18)
+        Map<String, Object> again = order(g.productId(), 3, "010-5000-0001", "가", true);
+        again.put("replaceOrderNo", 1);
+        mvc.perform(withJson(post(url), again)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderNo").value(1)).andExpect(jsonPath("$.changed").value(true));
+        Map<String, Object> over = order(g.productId(), 4, "010-5000-0001", "가", true);
+        over.put("replaceOrderNo", 1);
+        mvc.perform(withJson(post(url), over)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("1인 최대 3개")));
+
+        // 입금 확정된 주문은 바뀌지 않으므로 그 수량은 합쳐서 센다: 3 + 1 > 3
+        long orderId = read(mvc.perform(get("/api/seller/group-buys/" + g.id() + "/orders").cookie(g.seller())).andReturn())
+                .get(0).get("id").asLong();
+        mvc.perform(withJson(post("/api/seller/group-buys/" + g.id() + "/orders/" + orderId + "/manual-paid").cookie(g.seller()),
+                Map.of("depositorName", "가", "amount", 3000))).andExpect(status().isOk());
+        mvc.perform(withJson(post(url), order(g.productId(), 1, "010-5000-0001", "가", true)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("이미 주문한 2개")));
-        mvc.perform(withJson(post("/api/public/g/" + g.token() + "/orders"), order(g.productId(), 1, "010-5000-0001", "가", true)))
-                .andExpect(status().isOk());
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("이미 주문한 3개")));
         // 다른 사람은 따로 센다
-        mvc.perform(withJson(post("/api/public/g/" + g.token() + "/orders"), order(g.productId(), 3, "010-5000-0002", "나", true)))
-                .andExpect(status().isOk());
+        mvc.perform(withJson(post(url), order(g.productId(), 3, "010-5000-0002", "나", true))).andExpect(status().isOk());
     }
 
     @Test
@@ -102,9 +113,13 @@ class ReviewFixesOrderTest extends IntegrationTest {
         mvc.perform(withJson(post(url + "/cancel").cookie(device), cancel)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.myOrders[0].status").value("CANCELLED"));
 
-        // 주문 2건: 고르라는 409 + 주문 목록 → 주문번호로 취소
+        // 주문 2건(입금 확정된 주문 + 추가 주문): 고르라는 409 + 주문 목록 → 주문번호로 취소
         mvc.perform(withJson(post(url + "/orders"), order(g.productId(), 1, "010-5200-0001", "김지영", true))).andExpect(status().isOk());
-        mvc.perform(withJson(post(url + "/orders"), order(g.productId(), 2, "010-5200-0001", "김지영", true))).andExpect(status().isOk());
+        JsonNode orders = read(mvc.perform(get("/api/seller/group-buys/" + g.id() + "/orders").cookie(g.seller())).andReturn());
+        mvc.perform(withJson(post("/api/seller/group-buys/" + g.id() + "/orders/" + orders.get(1).get("id").asLong()
+                + "/manual-paid").cookie(g.seller()), Map.of("depositorName", "김지영", "amount", 1000))).andExpect(status().isOk());
+        mvc.perform(withJson(post(url + "/orders"), order(g.productId(), 2, "010-5200-0001", "김지영", true)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.orderNo").value(3)).andExpect(jsonPath("$.changed").value(false));
         JsonNode conflict = read(mvc.perform(withJson(post(url + "/cancel"), cancel))
                 .andExpect(status().isConflict()).andReturn());
         assertThat(conflict.get("orders")).hasSize(2);

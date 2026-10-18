@@ -37,8 +37,13 @@ public final class OrderDtos {
             @Size(max = 10) String zipcode,
             @Size(max = 300) String address,
             @Size(max = 300) String addressDetail,
-            /** 경고(같은 연락처 중복 주문 등)를 확인하고 그래도 주문하는지 */
-            boolean acknowledgeWarnings) {
+            /** 경고(같은 연락처의 기존 주문 등)를 확인하고 그래도 주문하는지 */
+            boolean acknowledgeWarnings,
+            /**
+             * 경고에서 "이 내용으로 바뀝니다"라고 보여준 주문번호 (409 의 replaceOrderNo 를 그대로).
+             * 그 사이에 바뀔 주문이 달라졌으면(입금 확정 등) 다시 경고한다
+             */
+            @Min(1) Integer replaceOrderNo) {
     }
 
     /** 내 주문 찾기: 휴대폰 번호 전체만 (2026-10-15 사용자 결정) */
@@ -60,7 +65,7 @@ public final class OrderDtos {
     public record AccountInfo(String bankName, String accountNumber, String accountHolder) {
     }
 
-    public record PublicItem(String productName, int quantity, int unitPrice, int amount) {
+    public record PublicItem(Long productId, String productName, int quantity, int unitPrice, int amount) {
     }
 
     public record MyOrder(
@@ -80,7 +85,11 @@ public final class OrderDtos {
             boolean refundRequired,
             LocalDateTime orderedAt,
             /** 판매자가 주문을 마지막으로 바꾼 시각 (안 바꿨으면 null) */
-            LocalDateTime changedAt) {
+            LocalDateTime changedAt,
+            /** 고객이 같은 번호로 다시 주문해서 마지막으로 바꾼 시각 (안 바꿨으면 null) */
+            LocalDateTime customerChangedAt,
+            /** 같은 휴대폰 번호로 다시 주문하면 이 주문이 바뀌는 상태인지 (주문 링크 주문, 입금 확정·수령 전, 주문 받는 중) */
+            boolean replaceable) {
     }
 
     /**
@@ -122,7 +131,9 @@ public final class OrderDtos {
             PaymentMethod paymentMethod,
             String depositorName,
             AccountInfo account,
-            List<MyOrder> myOrders) {
+            List<MyOrder> myOrders,
+            /** true 면 새 주문이 아니라 같은 번호의 기존 주문(orderNo)을 바꾼 것 */
+            boolean changed) {
     }
 
     // ---------- 판매자 ----------
@@ -180,7 +191,7 @@ public final class OrderDtos {
             List<Integer> sameNicknameOrderNos) {
     }
 
-    public record ChangeRecord(String summary, LocalDateTime changedAt) {
+    public record ChangeRecord(String summary, ChangeActor changedBy, LocalDateTime changedAt) {
     }
 
     /**

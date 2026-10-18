@@ -166,9 +166,9 @@ public class CustomerOrder {
         this.addressDetail = addressDetail;
     }
 
-    /** 판매자가 주문 내용을 바꿨다는 기록을 남긴다 */
-    public void recordChange(String summary, LocalDateTime now) {
-        changes.add(new OrderChange(this, summary, now));
+    /** 주문 내용을 바꿨다는 기록을 남긴다 */
+    public void recordChange(String summary, ChangeActor actor, LocalDateTime now) {
+        changes.add(new OrderChange(this, summary, actor, now));
         this.updatedAt = now;
     }
 
@@ -193,6 +193,14 @@ public class CustomerOrder {
 
     public boolean isActive() {
         return status == OrderStatus.ORDERED;
+    }
+
+    /**
+     * 고객이 같은 휴대폰 번호로 다시 주문하면 이 주문이 바뀌는지 (2026-10-18).
+     * 주문 링크 주문이고, 취소·입금 확정·수령 전. 입금 확정된 주문은 판매자가 대조를 끝낸 것이라 바꾸지 않는다
+     */
+    public boolean isReplaceableByCustomer() {
+        return isActive() && source == OrderSource.FORM && !isPaid() && !pickedUp;
     }
 
     public boolean isPrepaid() {

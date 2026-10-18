@@ -1,0 +1,204 @@
+package com.depositcock.order;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+import com.depositcock.common.ApiException;
+import com.depositcock.groupbuy.GroupBuy;
+import com.depositcock.groupbuy.PickupPoint;
+import com.depositcock.groupbuy.Product;
+import com.depositcock.groupbuy.ProductRepository;
+import com.depositcock.groupbuy.ShippingFeeType;
+import com.depositcock.groupbuy.StockAlerts;
+import jakarta.persistence.EntityManager;
+
+/**
+ * 주문 내용 바꾸기 공통 처리: 판매자 "주문 변경"(2026-10-15)과 고객이 같은 휴대폰 번호로 다시 주문한 경우(2026-10-18).
+ * - 상품 수량은 늘어난 만큼 판매 수량에 더하고 줄어든 만큼 돌려놓는다. 기본은 재고를 넘어도 막지 않고,
+ *   "다 팔리면 품절"을 켠 상품만 준비 수량 안에서 더한다 (2026-10-16)
+ * - 원래 있던 상품은 주문 당시 단가 그대로, 새로 넣은 상품은 지금 단가
+ * - 바뀐 내용을 사람이 읽는 문장으로 order_change 에 남긴다
+ */
+final class OrderUpdate {
+
+    private OrderUpdate() {
+    }
+
+    /** 바꿀 값. 입력 검사(필수값, 수령·결제 규칙, 배송 정보)는 부르는 쪽에서 끝낸 값 */
+    record Values(Map<Long, Integer> quantities, ReceiveMethod receive, PickupPoint point, PaymentMethod payment,
+                  String depositorName, String nickname, String unitAddress, String recipientName,
+                  String recipientPhone, String zipcode, String address, String addressDetail) {
+    }
+
+    /** 상품 수량이 어떻게 바뀌는지 ("사과 2→3개"). 바꾸기 전에 고객에게 미리 보여줄 때도 쓴다 */
+    static List<String> itemChanges(CustomerOrder order, Map<Long, Integer> quantities, Map<Long, Product> products) {
+        List<String> changes = new ArrayList<>();
+        Map<Long, OrderItem> current = currentItems(order);
+        for (Long productId : productIds(current, quantities)) {
+            OrderItem item = current.get(productId);
+            int before = item == null ? 0 : item.getQuantity();
+            int after = quantities.getOrDefault(productId, 0);
+            if (before != after) {
+                String name = item == null ? products.get(productId).getName() : item.getProductNameSnapshot();
+                changes.add(name + " " + before + "→" + after + "개");
+            }
+        }
+        return changes;
+    }
+
+    /**
+     * 주문을 바꾸고 기록을 남긴다. 바뀐 것이 없으면 400.
+     * 예외가 나면 트랜잭션 롤백으로 앞서 바꾼 판매 수량도 되돌아간다.
+     *
+     * @param note 기록 끝에 붙일 말 (없으면 null)
+     */
+    static void apply(CustomerOrder order, Values v, ChangeActor actor, String note, ProductRepository productRepository,
+                      EntityManager em, StockAlerts stockAlerts, LocalDateTime now) {
+        GroupBuy groupBuy = order.getGroupBuy();
+        Map<Long, Product> products = new LinkedHashMap<>();
+        groupBuy.getProducts().forEach(p -> products.put(p.getId(), p));
+
+        // 1) 상품 수량
+        List<String> changes = new ArrayList<>(itemChanges(order, v.quantities(), products));
+        Map<Long, OrderItem> current = currentItems(order);
+        for (Long productId : productIds(current, v.quantities())) {
+            OrderItem item = current.get(productId);
+            int before = item == null ? 0 : item.getQuantity();
+            int after = v.quantities().getOrDefault(productId, 0);
+            if (before == after) {
+                continue;
+            }
+            Product product = products.get(productId);
+            if (product == null) {
+                // 주문 뒤에 상품이 지워진 경우는 없다 (주문 있는 상품은 삭제 불가). 안전하게 막는다
+                throw ApiException.badRequest("상품을 찾을 수 없습니다.");
+            }
+            if (after > before) {
+                if (product.isBlockWhenSoldOut()) {
+                    if (productRepository.increaseSoldWithinStock(productId, after - before) == 0) {
+                        em.refresh(product);
+                        throw ApiException.conflict(soldOutMessage(product, before, actor));
+                    }
+                } else {
+                    productRepository.increaseSold(productId, after - before);
+                }
+            } else {
+                productRepository.decreaseSold(productId, before - after);
+            }
+            if (item == null) {
+                order.addItem(new OrderItem(order, product, after));
+            } else if (after == 0) {
+                order.removeItem(item);
+            } else {
+                item.changeQuantity(after);
+            }
+        }
+        products.values().forEach(p -> {
+            em.refresh(p);
+            stockAlerts.check(p);
+        });
+
+        // 2) 고객이 적은 값
+        if (v.receive() != order.getReceiveMethod() || v.point() != order.getPickupPoint()) {
+            changes.add("수령 " + receiveLabel(order.getReceiveMethod(), order.getPickupPoint()) + "→"
+                    + receiveLabel(v.receive(), v.point()));
+        }
+        if (v.payment() != order.getPaymentMethod()) {
+            changes.add("결제 " + paymentLabel(order.getPaymentMethod()) + "→" + paymentLabel(v.payment()));
+        }
+        addIfChanged(changes, "입금자명", order.getDepositorName(), v.depositorName());
+        addIfChanged(changes, "닉네임", order.getNickname(), v.nickname());
+        addIfChanged(changes, "동·호수", order.getUnitAddress(), v.unitAddress());
+        if (v.receive() == ReceiveMethod.DELIVERY) {
+            String before = deliveryText(order.getRecipientName(), order.getRecipientPhone(), order.getZipcode(),
+                    order.getAddress(), order.getAddressDetail());
+            String after = deliveryText(v.recipientName(), v.recipientPhone(), v.zipcode(), v.address(), v.addressDetail());
+            if (!after.equals(before)) {
+                changes.add("배송지 변경");
+            }
+        }
+
+        // 3) 금액
+        long itemsAmount = order.getItems().stream().mapToLong(i -> (long) i.getUnitPriceSnapshot() * i.getQuantity()).sum();
+        int shippingFee = v.receive() == ReceiveMethod.DELIVERY && groupBuy.getShippingFeeType() == ShippingFeeType.FIXED
+                ? groupBuy.getShippingFee() : 0;
+        if (itemsAmount + shippingFee > PublicOrderService.MAX_ORDER_AMOUNT) {
+            throw ApiException.badRequest("주문 금액이 너무 큽니다. 수량을 확인해 주세요.");
+        }
+        if (changes.isEmpty()) {
+            throw ApiException.badRequest(actor == ChangeActor.CUSTOMER
+                    ? order.getOrderNo() + "번 주문과 같은 내용입니다. 바뀐 내용이 없습니다." : "바뀐 내용이 없습니다.");
+        }
+        int beforeAmount = order.getExpectedAmount();
+        order.fillCustomer(v.depositorName(), v.nickname(), v.unitAddress());
+        order.fillReceive(v.receive(), v.point(), v.payment());
+        if (v.receive() == ReceiveMethod.DELIVERY) {
+            order.fillDelivery(v.recipientName(), v.recipientPhone(), v.zipcode(), v.address(), v.addressDetail());
+        } else {
+            order.fillDelivery(null, null, null, null, null);
+        }
+        order.fillAmounts((int) itemsAmount, shippingFee);
+        if (order.getExpectedAmount() != beforeAmount) {
+            changes.add("금액 " + won(beforeAmount) + "→" + won(order.getExpectedAmount()));
+        }
+        if (note != null) {
+            changes.add(note);
+        }
+        order.recordChange(String.join(", ", changes), actor, now);
+    }
+
+    private static String soldOutMessage(Product product, int before, ChangeActor actor) {
+        if (actor == ChangeActor.SELLER) {
+            return "'" + product.getName() + "'의 남은 수량이 부족합니다. (남은 수량 " + Math.max(0, product.remaining())
+                    + "개, 품절로 막는 상품)";
+        }
+        // 고객에게는 이 주문에 이미 있던 수량까지 더해서 고를 수 있는 최대를 알려준다
+        int max = before + Math.max(0, product.remaining());
+        return "'" + product.getName() + "'은(는) 남은 수량이 부족해 최대 " + max + "개까지 주문할 수 있습니다."
+                + (before > 0 ? " (지금 주문한 " + before + "개 포함)" : "");
+    }
+
+    private static Map<Long, OrderItem> currentItems(CustomerOrder order) {
+        Map<Long, OrderItem> current = new LinkedHashMap<>();
+        order.getItems().forEach(i -> current.put(i.getProduct().getId(), i));
+        return current;
+    }
+
+    private static Set<Long> productIds(Map<Long, OrderItem> current, Map<Long, Integer> quantities) {
+        Set<Long> ids = new LinkedHashSet<>(current.keySet());
+        ids.addAll(quantities.keySet());
+        return ids;
+    }
+
+    private static void addIfChanged(List<String> changes, String label, String before, String after) {
+        if (!Objects.equals(before, after)) {
+            changes.add(label + " " + (before == null ? "(없음)" : before) + "→" + (after == null ? "(없음)" : after));
+        }
+    }
+
+    private static String receiveLabel(ReceiveMethod method, PickupPoint point) {
+        if (method == ReceiveMethod.DELIVERY) {
+            return "배송";
+        }
+        return point == null ? "픽업" : "픽업(" + point.getName() + ")";
+    }
+
+    private static String paymentLabel(PaymentMethod method) {
+        return method == PaymentMethod.PREPAID ? "선입금" : "현장결제";
+    }
+
+    private static String deliveryText(String name, String phone, String zipcode, String address, String detail) {
+        return String.join("|", Objects.toString(name, ""), Objects.toString(phone, ""), Objects.toString(zipcode, ""),
+                Objects.toString(address, ""), Objects.toString(detail, ""));
+    }
+
+    static String won(long amount) {
+        return String.format("%,d원", amount);
+    }
+}

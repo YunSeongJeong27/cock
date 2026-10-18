@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class CustomerPrivacyTest extends IntegrationTest {
 
-    record Opened(String token, long productId) {
+    record Opened(Cookie seller, long id, String token, long productId) {
     }
 
     private Opened open() throws Exception {
@@ -33,7 +33,7 @@ class CustomerPrivacyTest extends IntegrationTest {
                 .andExpect(status().isOk()).andReturn());
         long id = created.get("id").asLong();
         mvc.perform(post("/api/seller/group-buys/" + id + "/open").cookie(seller)).andExpect(status().isOk());
-        return new Opened(created.get("publicToken").asText(), created.get("products").get(0).get("id").asLong());
+        return new Opened(seller, id, created.get("publicToken").asText(), created.get("products").get(0).get("id").asLong());
     }
 
     private Map<String, Object> delivery(long productId, String phone, String depositor, String address) {
@@ -49,8 +49,12 @@ class CustomerPrivacyTest extends IntegrationTest {
         return o;
     }
 
+    /**
+     * 같은 번호로 다시 주문하면 기존 주문이 바뀐다 (2026-10-18 사용자 결정). 번호를 아는 남도 바꿀 수 있는 것은 받아들인 위험이고,
+     * 그래도 피해자의 휴대폰·주소는 다른 기기로 나가지 않으며, 판매자 기록에 "다른 기기에서 바꿈"이 남는다.
+     */
     @Test
-    void orderingWithSomeoneElsesPhoneDoesNotRevealTheirOrders() throws Exception {
+    void reorderWithSomeoneElsesPhoneDoesNotRevealTheirPersonalInfo() throws Exception {
         Opened g = open();
         String url = "/api/public/g/" + g.token();
         String cookieName = "dcg_" + g.token();
@@ -61,32 +65,43 @@ class CustomerPrivacyTest extends IntegrationTest {
         Cookie victimDevice = victim.getResponse().getCookie(cookieName);
         int victimOrderNo = read(victim).get("orderNo").asInt();
 
-        // 공격자: 피해자 번호로 주문 → 응답의 내 주문에는 자기 주문만
-        MvcResult attack = mvc.perform(withJson(post(url + "/orders"),
-                        delivery(g.productId(), "010-6100-0001", "아무개", "공격자 주소")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.myOrders.length()").value(1))
-                .andExpect(jsonPath("$.myOrders[0].depositorName").value("아무개"))
+        // 다른 기기에서 피해자 번호로 주문: 바뀔 주문 번호를 알려주는 경고(409). 주소·휴대폰은 들어 있지 않다
+        Map<String, Object> attack = delivery(g.productId(), "010-6100-0001", "아무개", "공격자 주소");
+        MvcResult warned = mvc.perform(withJson(post(url + "/orders"), attack))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.replaceOrderNo").value(victimOrderNo))
                 .andReturn();
-        Cookie attacker = attack.getResponse().getCookie(cookieName);
+        assertThat(warned.getResponse().getContentAsString()).doesNotContain("피해자로").doesNotContain("6100");
 
-        // 피해자 주문에 "입금했어요"를 대신 누를 수 없다
-        mvc.perform(post(url + "/orders/" + victimOrderNo + "/report-deposit").cookie(attacker))
-                .andExpect(status().isNotFound());
+        attack.put("replaceOrderNo", victimOrderNo);
+        MvcResult replaced = mvc.perform(withJson(post(url + "/orders"), attack))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderNo").value(victimOrderNo))
+                .andExpect(jsonPath("$.changed").value(true))
+                .andReturn();
+        Cookie attacker = replaced.getResponse().getCookie(cookieName);
+        assertThat(replaced.getResponse().getContentAsString()).doesNotContain("피해자로");
 
-        // 피해자가 자기 기기에서 다시 주문해도, 공격자 기기에는 피해자 주소가 채워지지 않는다
-        mvc.perform(withJson(post(url + "/orders").cookie(victimDevice),
-                delivery(g.productId(), "010-6100-0001", "피해자이름", "서울시 피해자로 2"))).andExpect(status().isOk());
+        // 바꾼 기기는 주문 상태는 보지만(휴대폰 번호 전체로 "내 주문 찾기"와 같은 기준), 휴대폰·주소 자동 채움은 없다
         JsonNode attackerView = read(mvc.perform(get(url).cookie(attacker)).andReturn());
         assertThat(attackerView.get("myOrders").size()).isEqualTo(1);
-        assertThat(attackerView.get("prefill").get("address").asText()).isEqualTo("공격자 주소");
-        assertThat(attackerView.toString()).doesNotContain("피해자로").doesNotContain("피해자이름");
+        assertThat(attackerView.get("prefill").get("limited").asBoolean()).isTrue();
+        assertThat(attackerView.get("prefill").get("phone").isNull()).isTrue();
+        assertThat(attackerView.toString()).doesNotContain("피해자로");
 
-        // 피해자 기기는 자기 주문 2건과 최근 주소
+        // 피해자 기기: 주문이 바뀐 것이 보인다 (고객 변경 시각)
         mvc.perform(get(url).cookie(victimDevice))
-                .andExpect(jsonPath("$.myOrders.length()").value(2))
-                .andExpect(jsonPath("$.prefill.address").value("서울시 피해자로 2"))
-                .andExpect(jsonPath("$.prefill.limited").value(false));
+                .andExpect(jsonPath("$.myOrders.length()").value(1))
+                .andExpect(jsonPath("$.myOrders[0].depositorName").value("아무개"))
+                .andExpect(jsonPath("$.myOrders[0].customerChangedAt").isNotEmpty())
+                .andExpect(jsonPath("$.myOrders[0].changedAt").isEmpty());
+
+        // 판매자: 고객 변경 기록 + 다른 기기 표시
+        JsonNode orders = read(mvc.perform(get("/api/seller/group-buys/" + g.id() + "/orders").cookie(g.seller())).andReturn());
+        JsonNode change = orders.get(0).get("changes").get(0);
+        assertThat(change.get("changedBy").asText()).isEqualTo("CUSTOMER");
+        assertThat(change.get("summary").asText()).contains("입금자명 피해자이름→아무개").contains("배송지 변경")
+                .contains("다른 기기");
     }
 
     @Test
@@ -107,8 +122,6 @@ class CustomerPrivacyTest extends IntegrationTest {
         Opened g = open();
         String url = "/api/public/g/" + g.token();
         mvc.perform(withJson(post(url + "/orders"), delivery(g.productId(), "010-6300-0001", "이다라", "주소 1")))
-                .andExpect(status().isOk());
-        mvc.perform(withJson(post(url + "/orders"), delivery(g.productId(), "010-6300-0001", "이다라", "주소 2")))
                 .andExpect(status().isOk());
         // 쿠키 없이 휴대폰 + 입금자명 + 주문번호로 취소 → 취소는 되지만 남은 주문 목록은 보여주지 않는다
         mvc.perform(withJson(post(url + "/cancel"), Map.of("phone", "010-6300-0001", "depositorName", "이다라", "orderNo", 1)))

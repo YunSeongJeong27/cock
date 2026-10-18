@@ -83,15 +83,34 @@ class M2OrderFormTest extends IntegrationTest {
                 .andExpect(jsonPath("$.prefill.phone").value("010-1234-5678"))
                 .andExpect(jsonPath("$.products[0].remaining").value(8));
 
-        // 같은 연락처 재주문은 경고(409) 후 확인하면 진행
-        Map<String, Object> again = order(productId, 1, "01012345678", "김지영");
-        mvc.perform(withJson(post("/api/public/g/" + token + "/orders").cookie(device), again))
+        // 같은 연락처로 다시 주문하면 새 주문이 아니라 1번 주문이 바뀐다 (2026-10-18). 먼저 바뀌는 내용을 경고(409)로 보여준다
+        String orders = "/api/public/g/" + token + "/orders";
+        Map<String, Object> again = order(productId, 3, "01012345678", "김지영");
+        mvc.perform(withJson(post(orders).cookie(device), again))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.warnings[0]").exists());
+                .andExpect(jsonPath("$.replaceOrderNo").value(1))
+                .andExpect(jsonPath("$.warnings[0]").value(org.hamcrest.Matchers.containsString(
+                        "1번 주문이 지금 적은 내용으로 바뀝니다. (파프리카 한봉지 2→3개, 금액 3,800원→5,700원)")));
+        // 바뀔 주문번호 없이 확인만 보내면 다시 경고 (경고를 본 뒤 바뀔 주문이 달라지는 경우 대비)
         again.put("acknowledgeWarnings", true);
-        mvc.perform(withJson(post("/api/public/g/" + token + "/orders").cookie(device), again))
+        mvc.perform(withJson(post(orders).cookie(device), again)).andExpect(status().isConflict());
+        again.put("replaceOrderNo", 1);
+        mvc.perform(withJson(post(orders).cookie(device), again))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.orderNo").value(2));
+                .andExpect(jsonPath("$.orderNo").value(1))
+                .andExpect(jsonPath("$.changed").value(true))
+                .andExpect(jsonPath("$.expectedAmount").value(5700))
+                .andExpect(jsonPath("$.myOrders.length()").value(1));
+        mvc.perform(get("/api/public/g/" + token).cookie(device))
+                .andExpect(jsonPath("$.products[0].remaining").value(7))
+                .andExpect(jsonPath("$.myOrders[0].customerChangedAt").isNotEmpty())
+                .andExpect(jsonPath("$.myOrders[0].changedAt").isEmpty());
+
+        // 같은 기기라도 다른 번호로 주문하면 새 주문 (2번)
+        mvc.perform(withJson(post(orders).cookie(device), order(productId, 2, "010-2222-3333", "박민수")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderNo").value(2))
+                .andExpect(jsonPath("$.changed").value(false));
 
         // 입금 신고 (확정 아님)
         mvc.perform(post("/api/public/g/" + token + "/orders/1/report-deposit").cookie(device))
@@ -101,13 +120,13 @@ class M2OrderFormTest extends IntegrationTest {
         // 쿠키 없이 입금 신고 불가
         mvc.perform(post("/api/public/g/" + token + "/orders/2/report-deposit")).andExpect(status().isForbidden());
 
-        // 다른 기기: 휴대폰 전체 번호만으로 본인 확인 (뒷4자리만은 불가, 입금자명은 묻지 않음)
+        // 다른 기기: 휴대폰 전체 번호만으로 본인 확인 (뒷4자리만은 불가, 입금자명은 묻지 않음). 그 번호의 주문만 보인다
         mvc.perform(withJson(post("/api/public/g/" + token + "/identify"),
                 Map.of("phone", "5678"))).andExpect(status().isBadRequest());
         MvcResult identified = mvc.perform(withJson(post("/api/public/g/" + token + "/identify"),
                         Map.of("phone", "01012345678")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.myOrders.length()").value(2))
+                .andExpect(jsonPath("$.myOrders.length()").value(1))
                 .andReturn();
         assertThat(identified.getResponse().getCookie("dcg_" + token)).isNotNull();
         mvc.perform(withJson(post("/api/public/g/" + token + "/identify"),
@@ -115,16 +134,16 @@ class M2OrderFormTest extends IntegrationTest {
 
         // 취소: 주문번호 + 휴대폰 + 입금자명이 맞아야 함, 재고 복구
         mvc.perform(withJson(post("/api/public/g/" + token + "/cancel"),
-                Map.of("orderNo", 2, "phone", "01099999999", "depositorName", "김지영"))).andExpect(status().isNotFound());
+                Map.of("orderNo", 2, "phone", "01099999999", "depositorName", "박민수"))).andExpect(status().isNotFound());
         mvc.perform(withJson(post("/api/public/g/" + token + "/cancel"),
-                        Map.of("orderNo", 2, "phone", "010-1234-5678", "depositorName", "김지영")))
+                        Map.of("orderNo", 2, "phone", "010-2222-3333", "depositorName", "박민수")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.products[0].remaining").value(8));
+                .andExpect(jsonPath("$.products[0].remaining").value(7));
 
         mvc.perform(get("/api/seller/group-buys/" + created.get("id").asLong() + "/dashboard").cookie(seller))
                 .andExpect(jsonPath("$.orderCount").value(1))
-                .andExpect(jsonPath("$.totalQuantity").value(2))
-                .andExpect(jsonPath("$.totalAmount").value(3800))
+                .andExpect(jsonPath("$.totalQuantity").value(3))
+                .andExpect(jsonPath("$.totalAmount").value(5700))
                 .andExpect(jsonPath("$.unpaidCount").value(1))
                 .andExpect(jsonPath("$.depositReportedCount").value(1))
                 .andExpect(jsonPath("$.cancelledCount").value(1));

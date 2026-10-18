@@ -112,7 +112,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             </div>
           ))}
           {o.changes.map((c, i) => (
-            <div key={i} className="change-log">판매자 변경 {dateTime(c.changedAt)} · {c.summary}</div>
+            <div key={i} className="change-log">{c.changedBy === 'CUSTOMER' ? '고객 변경' : '판매자 변경'} {dateTime(c.changedAt)} · {c.summary}</div>
           ))}
           {o.cancelledAt && <div>취소: {dateTime(o.cancelledAt)}</div>}
         </div>

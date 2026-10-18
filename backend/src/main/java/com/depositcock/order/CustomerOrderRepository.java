@@ -19,9 +19,6 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     List<CustomerOrder> findByGroupBuyIdAndDeviceTokenOrderByOrderNoAsc(Long groupBuyId, String deviceToken);
 
-    boolean existsByGroupBuyIdAndCustomer_IdAndStatus(Long groupBuyId, Long customerId, OrderStatus status);
-
-
     @Query("select coalesce(max(o.orderNo), 0) from CustomerOrder o where o.groupBuy.id = :groupBuyId")
     int maxOrderNo(@Param("groupBuyId") Long groupBuyId);
 

@@ -12,7 +12,7 @@ interface PublicProduct { id: number; name: string; unitPrice: number; remaining
 interface Account { bankName: string; accountNumber: string; accountHolder: string }
 interface MyOrder {
   orderNo: number
-  items: { productName: string; quantity: number; unitPrice: number; amount: number }[]
+  items: { productId: number; productName: string; quantity: number; unitPrice: number; amount: number }[]
   itemsAmount: number
   shippingFee: number
   expectedAmount: number
@@ -28,6 +28,10 @@ interface MyOrder {
   orderedAt: string
   /** 판매자가 주문을 마지막으로 바꾼 시각 */
   changedAt: string | null
+  /** 고객이 같은 번호로 다시 주문해서 마지막으로 바꾼 시각 */
+  customerChangedAt: string | null
+  /** 같은 휴대폰 번호로 다시 주문하면 이 주문이 바뀌는 상태 (입금 확인·수령 전) */
+  replaceable: boolean
 }
 interface Prefill {
   phone: string; depositorName: string; nickname: string | null; unitAddress: string | null; receiveMethod: ReceiveMethod
@@ -43,7 +47,10 @@ interface View {
   shippingFeeType: ShippingFeeType; shippingFee: number; nicknameRequired: boolean; unitAddressFieldEnabled: boolean
   kakaoInquiryUrl: string | null; account: Account | null; myOrders: MyOrder[]; prefill: Prefill | null
 }
-interface Placed { orderNo: number; expectedAmount: number; paymentMethod: PaymentMethod; depositorName: string; account: Account | null; myOrders: MyOrder[] }
+/** changed: 새 주문이 아니라 같은 번호의 기존 주문(orderNo)을 바꿈 */
+interface Placed { orderNo: number; expectedAmount: number; paymentMethod: PaymentMethod; depositorName: string; account: Account | null; myOrders: MyOrder[]; changed: boolean }
+/** replaceOrderNo: 확인하면 이 번호의 주문이 지금 적은 내용으로 바뀜 (없으면 새 주문) */
+interface Warnings { list: string[]; replaceOrderNo: number | null }
 
 declare global {
   interface Window { daum?: any }
@@ -73,7 +80,7 @@ export default function PublicOrder() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [qty, setQty] = useState<Record<number, number>>({})
   const [form, setForm] = useState(emptyForm)
-  const [warnings, setWarnings] = useState<string[] | null>(null)
+  const [warnings, setWarnings] = useState<Warnings | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [placed, setPlaced] = useState<Placed | null>(null)
   const [busy, setBusy] = useState(false)
@@ -98,6 +105,9 @@ export default function PublicOrder() {
     api.get<View>(base).then(applyView).catch((e) => setLoadError(errorMessage(e)))
   }, [base, applyView])
 
+  // 경고에는 "무엇이 어떻게 바뀌는지"가 들어 있어서, 입력을 고치면 다시 주문하기를 눌러 새로 받는다
+  useEffect(() => setWarnings(null), [qty, form])
+
   const receive: ReceiveMethod | '' = view
     ? view.pickupEnabled && view.deliveryEnabled ? form.receiveMethod : view.pickupEnabled ? 'PICKUP' : 'DELIVERY'
     : ''
@@ -119,6 +129,7 @@ export default function PublicOrder() {
         receiveMethod: receive || null, pickupPointId: form.pickupPointId ? Number(form.pickupPointId) : null, paymentMethod: payment || null,
         recipientName: form.recipientName || null, recipientPhone: form.recipientPhone || null, zipcode: form.zipcode || null,
         address: form.address || null, addressDetail: form.addressDetail || null, acknowledgeWarnings: acknowledge,
+        replaceOrderNo: acknowledge ? warnings?.replaceOrderNo ?? null : null,
       })
       setPlaced(res)
       setWarnings(null)
@@ -128,7 +139,7 @@ export default function PublicOrder() {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
       if (err instanceof ApiError && err.status === 409 && err.body?.warnings) {
-        setWarnings(err.body.warnings)
+        setWarnings({ list: err.body.warnings, replaceOrderNo: err.body.replaceOrderNo ?? null })
       } else {
         setError(errorMessage(err))
       }
@@ -185,7 +196,7 @@ export default function PublicOrder() {
     setTimeout(() => document.getElementById('cancel-form')?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
 
-  /** 고객 화면에는 주문 변경 기능이 없다 (판매자만 변경 가능) → 취소 후 다시 주문 안내 (2026-10-16 사용자 요청) */
+  /** 주문 변경 안내 (2026-10-16 사용자 요청 문구). 2026-10-18부터는 같은 번호로 다시 주문해도 입금 확인 전 주문이 바뀐다 */
   const changeNote = (
     <p className="small mt" style={{ marginBottom: 0 }}>
       <b style={{ fontWeight: 800 }}>주문 변경</b> 희망 시 주문 취소 후 다시 주문해 주시면 감사하겠습니다.
@@ -193,11 +204,22 @@ export default function PublicOrder() {
   )
 
   /**
+   * 같은 번호로 다시 주문하면 바뀔 주문(이 기기에서 보이는 것 중 가장 최근, 서버와 같은 기준)의 상품별 수량.
+   * 바꾸기는 늘어난 만큼만 재고를 쓰므로, 품절인 상품도 이미 주문한 수량까지는 고를 수 있다
+   */
+  const mine = useMemo(() => {
+    const target = view?.myOrders.find((o) => o.replaceable)
+    return Object.fromEntries((target?.items ?? []).map((i) => [i.productId, i.quantity])) as Record<number, number>
+  }, [view])
+  const replaceTarget = view?.myOrders.find((o) => o.replaceable) ?? null
+
+  /**
    * 수량 상한: 1인 최대 수량, 그리고 판매자가 "다 팔리면 품절"을 켠 상품만 남은 수량 (기본은 재고로 막지 않음, 2026-10-16).
-   * 1인 최대는 이미 주문한 수량을 서버가 합쳐서 다시 확인
+   * 1인 최대·남은 수량은 서버가 다시 확인 (기존 주문을 바꾸는 경우 그 주문 수량을 빼고 셈)
    */
   function maxQty(p: PublicProduct): number {
-    const limits = [p.perOrderLimit, p.blockWhenSoldOut ? p.remaining : null].filter((n): n is number => n !== null && n !== undefined)
+    const stock = p.blockWhenSoldOut ? (p.remaining ?? 0) + (mine[p.id] ?? 0) : null
+    const limits = [p.perOrderLimit, stock].filter((n): n is number => n !== null && n !== undefined)
     return limits.length ? Math.min(...limits) : 999
   }
 
@@ -236,7 +258,7 @@ export default function PublicOrder() {
 
       {placed && (
         <div className="card" style={{ borderColor: 'var(--ok)' }}>
-          <h2>주문 완료 🎉</h2>
+          <h2>{placed.changed ? '주문을 변경했어요 ✅' : '주문 완료 🎉'}</h2>
           <div>주문번호 <b>{placed.orderNo}</b> · 총 <b>{won(placed.expectedAmount)}</b></div>
           {placed.account ? (
             <div className="mt">
@@ -265,6 +287,7 @@ export default function PublicOrder() {
               <div className="small">{o.items.map((i) => `${i.productName} ${i.quantity}개`).join(', ')}</div>
               <div className="small muted">{o.receiveMethod === 'DELIVERY' ? '배송' : `픽업${o.pickupPointName ? ' · ' + o.pickupPointName : ''}`} · {o.paymentMethod === 'PREPAID' ? `선입금 (입금자명 ${o.depositorName})` : '현장결제'} · {dateTime(o.orderedAt)}</div>
               {o.changedAt && <div className="small" style={{ color: 'var(--warn)' }}>판매자가 주문을 변경했어요 ({dateTime(o.changedAt)}). 위 내용·금액을 확인해 주세요.</div>}
+              {o.customerChangedAt && <div className="small muted">다시 주문해서 변경됨 ({dateTime(o.customerChangedAt)})</div>}
               {o.refundRequired && <div className="small" style={{ color: 'var(--danger)' }}>취소됨 · 판매자가 환불할 예정입니다.</div>}
               {o.canReportDeposit && view.account && (
                 <div className="small mt">입금 계좌: {view.account.bankName} {view.account.accountNumber} ({view.account.accountHolder}) <CopyButton text={view.account.accountNumber} label="복사" /></div>
@@ -304,7 +327,8 @@ export default function PublicOrder() {
 
       {view.acceptingOrders && (
         <form className="card" onSubmit={(e) => submit(e)}>
-          <h3>{view.myOrders.length > 0 ? '추가 주문하기' : '주문서'}</h3>
+          <h3>{replaceTarget ? '주문서 (주문 변경)' : view.myOrders.length > 0 ? '추가 주문하기' : '주문서'}</h3>
+          {replaceTarget && <div className="small mb">같은 휴대폰 번호로 주문하면 새 주문이 추가되지 않고, 입금 확인 전 주문({replaceTarget.orderNo}번)이 지금 적은 내용으로 바뀝니다. <b>바꾼 뒤의 전체 수량</b>을 적어 주세요.</div>}
           {view.prefill?.limited && <div className="small muted mb">개인정보 보호를 위해 다른 기기에서 입력한 휴대폰 번호·주소는 채우지 않습니다. 다시 입력해 주세요.</div>}
           {view.products.map((p) => (
             <div key={p.id} className="product-row">
@@ -312,7 +336,7 @@ export default function PublicOrder() {
                 <div><b>{p.name}</b></div>
                 <div className="small">{won(p.unitPrice)}{p.remaining !== null && <span className="muted"> · 남은 수량 {p.remaining}</span>}{p.perOrderLimit && <span className="muted"> · 1인 최대 {p.perOrderLimit}</span>}</div>
               </div>
-              {p.soldOut ? <span className="badge badge-CANCELLED">품절</span> : (
+              {p.soldOut && !mine[p.id] ? <span className="badge badge-CANCELLED">품절</span> : (
                 <div className="qty">
                   <button type="button" onClick={() => setQtyFor(p, (qty[p.id] ?? 0) - 1)}>−</button>
                   <input type="number" min={0} max={maxQty(p)} value={qty[p.id] ?? 0} onChange={(e) => setQtyFor(p, Number(e.target.value))} />
@@ -392,9 +416,11 @@ export default function PublicOrder() {
           <ErrorBox message={error} />
           {warnings && (
             <div className="warn-box">
-              {warnings.map((w) => <div key={w}>⚠ {w}</div>)}
+              {warnings.list.map((w) => <div key={w}>⚠ {w}</div>)}
               <div className="row mt">
-                <button type="button" className="btn small primary" disabled={busy} onClick={() => submit(null, true)}>확인했어요, 주문하기</button>
+                <button type="button" className="btn small primary" disabled={busy} onClick={() => submit(null, true)}>
+                  {warnings.replaceOrderNo ? `확인했어요, ${warnings.replaceOrderNo}번 주문 바꾸기` : '확인했어요, 주문하기'}
+                </button>
                 <button type="button" className="btn small" onClick={() => setWarnings(null)}>다시 입력</button>
               </div>
             </div>

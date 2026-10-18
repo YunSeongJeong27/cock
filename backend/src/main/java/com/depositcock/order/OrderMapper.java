@@ -19,7 +19,7 @@ final class OrderMapper {
     static MyOrder toMyOrder(CustomerOrder o, boolean acceptingOrders) {
         DisplayStatus status = o.displayStatus();
         return new MyOrder(o.getOrderNo(),
-                o.getItems().stream().map(i -> new PublicItem(i.getProductNameSnapshot(), i.getQuantity(),
+                o.getItems().stream().map(i -> new PublicItem(i.getProduct().getId(), i.getProductNameSnapshot(), i.getQuantity(),
                         i.getUnitPriceSnapshot(), i.amount())).toList(),
                 o.getItemsAmount(), o.getShippingFee(), o.getExpectedAmount(), o.getReceiveMethod(),
                 o.getPickupPoint() == null ? null : o.getPickupPoint().getName(), o.getPaymentMethod(),
@@ -28,7 +28,13 @@ final class OrderMapper {
                 o.isActive() && acceptingOrders && !o.isPickedUp(), // 수령한 주문은 서버도 취소를 거절한다
                 o.isRefundRequired() && o.getRefundedAt() == null,
                 o.getOrderedAt(),
-                o.getChanges().isEmpty() ? null : o.getChanges().get(o.getChanges().size() - 1).getChangedAt());
+                lastChange(o, ChangeActor.SELLER), lastChange(o, ChangeActor.CUSTOMER),
+                acceptingOrders && o.isReplaceableByCustomer());
+    }
+
+    private static java.time.LocalDateTime lastChange(CustomerOrder o, ChangeActor actor) {
+        return o.getChanges().stream().filter(c -> c.getChangedBy() == actor).map(OrderChange::getChangedAt)
+                .reduce((a, b) -> b).orElse(null);
     }
 
     static List<SellerOrder> toSellerOrders(List<CustomerOrder> orders) {
@@ -72,7 +78,7 @@ final class OrderMapper {
                 o.isRefundRequired(), o.getRefundedAt(), duplicateContact, o.getOrderedAt(), o.getUpdatedAt(), o.getCancelledAt(),
                 o.getConfirmations().stream().map(c -> new PaymentRecord(c.getDepositorName(), c.getAmount(),
                         c.isManual(), c.getConfirmedAt(), c.getCancelledAt())).toList(),
-                o.getChanges().stream().map(c -> new ChangeRecord(c.getSummary(), c.getChangedAt())).toList(),
+                o.getChanges().stream().map(c -> new ChangeRecord(c.getSummary(), c.getChangedBy(), c.getChangedAt())).toList(),
                 sameNicknameOrderNos);
     }
 }

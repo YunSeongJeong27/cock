@@ -202,8 +202,9 @@ class M3DepositFlowTest extends IntegrationTest {
     void sameDaySameAmountTwiceIsKept() throws Exception {
         Cookie seller = signup(uniqueEmail());
         long id = openGroupBuy(seller, "두 번 입금", 5000);
+        // 같은 번호로 다시 주문하면 기존 주문이 바뀌므로(2026-10-18) 다른 번호, 같은 입금자명 두 사람
         placeOrder(seller, id, "010-7000-0001", "김지영");
-        placeOrder(seller, id, "010-7000-0001", "김지영");
+        placeOrder(seller, id, "010-7000-0002", "김지영");
         String content = "거래일자,입금자명,입금액\n2025-11-01,김지영,5000\n2025-11-01,김지영,5000\n";
         mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/uploads").file(csv(content)).cookie(seller))
                 .andExpect(jsonPath("$.savedCount").value(2))

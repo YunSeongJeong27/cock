@@ -144,8 +144,8 @@ export interface SellerOrder {
   cancelledAt: string | null
   /** 입금 확정 이력 (취소된 확정 포함, 오래된 순) */
   payments: PaymentRecord[]
-  /** 판매자가 주문을 바꾼 기록 (오래된 순) */
-  changes: { summary: string; changedAt: string }[]
+  /** 주문을 바꾼 기록 (오래된 순). CUSTOMER = 고객이 같은 휴대폰 번호로 다시 주문해서 바뀜 */
+  changes: { summary: string; changedBy: 'SELLER' | 'CUSTOMER'; changedAt: string }[]
   /** 닉네임이 같은 다른 경로(링크↔댓글) 주문 번호. 같은 사람이 양쪽으로 주문했을 수 있음 (경고만) */
   sameNicknameOrderNos: number[]
 }
