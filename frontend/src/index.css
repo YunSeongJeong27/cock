@@ -86,6 +86,11 @@ button.link { background: none; border: none; color: var(--muted); cursor: point
 
 .error-box { background: var(--danger-weak); color: #7f1d1d; padding: 10px 12px; border-radius: 8px; margin: 10px 0; font-size: 0.92rem; }
 .success-box { background: var(--ok-weak); color: #14532d; padding: 10px 12px; border-radius: 8px; margin: 10px 0; font-size: 0.92rem; }
+.receipt { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--card); }
+.receipt-line { padding: 4px 0; gap: 8px; flex-wrap: nowrap; align-items: baseline; }
+.receipt-line > span:first-child { flex: 1; min-width: 0; }
+.receipt-line > span:last-child { white-space: nowrap; }
+.receipt-total { border-top: 1px dashed var(--line); margin-top: 4px; padding-top: 6px; }
 .warn-box { background: var(--warn-weak); color: #7c4a03; padding: 10px 12px; border-radius: 8px; margin: 10px 0; font-size: 0.92rem; }
 
 .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }

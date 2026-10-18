@@ -133,7 +133,16 @@ public final class OrderDtos {
             AccountInfo account,
             List<MyOrder> myOrders,
             /** true 면 새 주문이 아니라 같은 번호의 기존 주문(orderNo)을 바꾼 것 */
-            boolean changed) {
+            boolean changed,
+            FinalOrder finalOrder) {
+    }
+
+    /**
+     * 방금 넣거나 바꾼 주문의 최종 내용 (완료 화면에 보여줌, 2026-10-18).
+     * 바꾼 경우에도 모든 칸이 이번 요청에 적은 값으로 바뀌므로, 요청한 사람이 적지 않은 값(바뀌기 전 주소 등)은 들어 있지 않다
+     */
+    public record FinalOrder(MyOrder order, String nickname, String unitAddress, String recipientName,
+                             String recipientPhone, String zipcode, String address, String addressDetail) {
     }
 
     // ---------- 판매자 ----------

@@ -63,7 +63,12 @@ class CustomerReorderTest extends IntegrationTest {
         mvc.perform(withJson(post(url + "/orders").cookie(device), order(Map.of(g.apple(), 2, g.pear(), 1), "010-7100-0001", "김사과", 1)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.orderNo").value(1))
-                .andExpect(jsonPath("$.expectedAmount").value(2500));
+                .andExpect(jsonPath("$.expectedAmount").value(2500))
+                // 완료 화면에 보여줄 최종 주문
+                .andExpect(jsonPath("$.finalOrder.order.orderNo").value(1))
+                .andExpect(jsonPath("$.finalOrder.order.items.length()").value(2))
+                .andExpect(jsonPath("$.finalOrder.order.expectedAmount").value(2500))
+                .andExpect(jsonPath("$.finalOrder.order.depositorName").value("김사과"));
         // 사과를 3개로 늘리는 건 품절이라 막힘
         mvc.perform(withJson(post(url + "/orders").cookie(device), order(Map.of(g.apple(), 3), "010-7100-0001", "김사과", 1)))
                 .andExpect(status().isConflict())

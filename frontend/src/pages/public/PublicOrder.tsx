@@ -47,8 +47,16 @@ interface View {
   shippingFeeType: ShippingFeeType; shippingFee: number; nicknameRequired: boolean; unitAddressFieldEnabled: boolean
   kakaoInquiryUrl: string | null; account: Account | null; myOrders: MyOrder[]; prefill: Prefill | null
 }
+/** 방금 넣거나 바꾼 주문의 최종 내용 (이번에 적은 값만 들어 있음) */
+interface FinalOrder {
+  order: MyOrder; nickname: string | null; unitAddress: string | null; recipientName: string | null; recipientPhone: string | null
+  zipcode: string | null; address: string | null; addressDetail: string | null
+}
 /** changed: 새 주문이 아니라 같은 번호의 기존 주문(orderNo)을 바꿈 */
-interface Placed { orderNo: number; expectedAmount: number; paymentMethod: PaymentMethod; depositorName: string; account: Account | null; myOrders: MyOrder[]; changed: boolean }
+interface Placed {
+  orderNo: number; expectedAmount: number; paymentMethod: PaymentMethod; depositorName: string; account: Account | null; myOrders: MyOrder[]
+  changed: boolean; finalOrder: FinalOrder
+}
 /** replaceOrderNo: 확인하면 이 번호의 주문이 지금 적은 내용으로 바뀜 (없으면 새 주문) */
 interface Warnings { list: string[]; replaceOrderNo: number | null }
 
@@ -66,6 +74,33 @@ function loadPostcode(): Promise<void> {
     s.onerror = () => reject(new Error('주소 검색을 불러오지 못했습니다. 주소를 직접 입력해 주세요.'))
     document.head.appendChild(s)
   })
+}
+
+/** 바꾼 뒤의 최종 주문 (2026-10-18 사용자 요청: 다시 주문해서 바뀌면 최종 주문을 보여 주며 마무리) */
+function FinalOrderView({ f }: { f: FinalOrder }) {
+  const o = f.order
+  return (
+    <div className="receipt mt">
+      <div className="small"><b>최종 주문 · {o.orderNo}번</b> <span className="muted">(이 내용으로 바뀌었습니다)</span></div>
+      {o.items.map((i) => (
+        <div key={i.productId} className="row between receipt-line">
+          <span>{i.productName} <b>{i.quantity}개</b> <span className="small muted" style={{ whiteSpace: 'nowrap' }}>× {won(i.unitPrice)}</span></span>
+          <span>{won(i.amount)}</span>
+        </div>
+      ))}
+      {o.shippingFee > 0 && <div className="row between receipt-line"><span>배송비</span><span>{won(o.shippingFee)}</span></div>}
+      <div className="row between receipt-total"><b>총 금액</b><b>{won(o.expectedAmount)}</b></div>
+      <div className="small mt">
+        <div>수령: {o.receiveMethod === 'DELIVERY' ? '배송' : `픽업${o.pickupPointName ? ' · ' + o.pickupPointName : ''}`}</div>
+        {o.receiveMethod === 'DELIVERY' && (
+          <div>배송지: {f.recipientName} · {f.recipientPhone} · {f.zipcode ? `(${f.zipcode}) ` : ''}{f.address}{f.addressDetail ? ' ' + f.addressDetail : ''}</div>
+        )}
+        <div>결제: {o.paymentMethod === 'PREPAID' ? `선입금 (입금자명 ${o.depositorName})` : `현장결제 (이름 ${o.depositorName})`}</div>
+        {f.nickname && <div>닉네임: {f.nickname}</div>}
+        {f.unitAddress && <div>동·호수: {f.unitAddress}</div>}
+      </div>
+    </div>
+  )
 }
 
 const emptyForm = {
@@ -259,16 +294,22 @@ export default function PublicOrder() {
       {placed && (
         <div className="card" style={{ borderColor: 'var(--ok)' }}>
           <h2>{placed.changed ? '주문을 변경했어요 ✅' : '주문 완료 🎉'}</h2>
-          <div>주문번호 <b>{placed.orderNo}</b> · 총 <b>{won(placed.expectedAmount)}</b></div>
+          {placed.changed
+            ? <FinalOrderView f={placed.finalOrder} />
+            : <div>주문번호 <b>{placed.orderNo}</b> · 총 <b>{won(placed.expectedAmount)}</b></div>}
           {placed.account ? (
             <div className="mt">
               <div>아래 계좌로 <b>{won(placed.expectedAmount)}</b>을 보내주세요.</div>
               <div className="row mt"><b>{placed.account.bankName} {placed.account.accountNumber}</b> ({placed.account.accountHolder}) <CopyButton text={placed.account.accountNumber} label="계좌 복사" /></div>
               <div className="warn-box">받는 분 통장 표시(입금자명)를 꼭 <b>{placed.depositorName}</b>(으)로 해주세요. 입금 확인이 빨라집니다.</div>
-              <div className="row mt">
-                <span className="small grow">입금하셨나요? 입금 후 눌러주세요. (판매자가 입금내역을 확인하면 "입금 확인됨"으로 바뀝니다)</span>
-                <button className="btn small primary" onClick={() => reportDeposit(placed.orderNo)}>입금했어요</button>
-              </div>
+              {placed.finalOrder.order.status === 'DEPOSIT_REPORTED' ? (
+                <div className="small mt" style={{ color: 'var(--warn)' }}>이미 "입금했어요"를 누른 주문입니다. 바뀌기 전 금액으로 입금하셨다면 차액은 판매자에게 문의해 주세요.</div>
+              ) : (
+                <div className="row mt">
+                  <span className="small grow">입금하셨나요? 입금 후 눌러주세요. (판매자가 입금내역을 확인하면 "입금 확인됨"으로 바뀝니다)</span>
+                  <button className="btn small primary" onClick={() => reportDeposit(placed.orderNo)}>입금했어요</button>
+                </div>
+              )}
             </div>
           ) : <div className="mt">현장에서 결제해 주세요.</div>}
           <p className="small muted">이 화면 위쪽 "내 주문"에서 언제든 상태를 확인할 수 있습니다. 이 링크를 다시 열면 됩니다.</p>

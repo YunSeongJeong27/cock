@@ -27,6 +27,7 @@ import com.depositcock.groupbuy.ProductRepository;
 import com.depositcock.groupbuy.ShippingFeeType;
 import com.depositcock.order.OrderDtos.AccountInfo;
 import com.depositcock.order.OrderDtos.CancelRequest;
+import com.depositcock.order.OrderDtos.FinalOrder;
 import com.depositcock.order.OrderDtos.IdentifyRequest;
 import com.depositcock.order.OrderDtos.MyOrder;
 import com.depositcock.order.OrderDtos.OrderItemRequest;
@@ -193,8 +194,13 @@ public class PublicOrderService {
         List<MyOrder> myOrders = myOrders(groupBuy, deviceRepository.findByCookieTokenAndGroupBuyId(deviceToken,
                 groupBuy.getId()).orElse(null), now);
         AccountInfo account = order.getPaymentMethod() == PaymentMethod.PREPAID ? account(groupBuy) : null;
+        FinalOrder finalOrder = new FinalOrder(OrderMapper.toMyOrder(order, groupBuy.isAcceptingOrders(now)),
+                order.getNickname(), order.getUnitAddress(), order.getRecipientName(),
+                PhoneNumbers.format(order.getRecipientPhone()), order.getZipcode(), order.getAddress(),
+                order.getAddressDetail());
         return new WithCookie<>(new PlaceOrderResponse(order.getOrderNo(), order.getExpectedAmount(),
-                order.getPaymentMethod(), order.getDepositorName(), account, myOrders, target != null), newCookie);
+                order.getPaymentMethod(), order.getDepositorName(), account, myOrders, target != null, finalOrder),
+                newCookie);
     }
 
     private CustomerOrder newOrder(GroupBuy groupBuy, Customer customer, String deviceToken, OrderUpdate.Values v,

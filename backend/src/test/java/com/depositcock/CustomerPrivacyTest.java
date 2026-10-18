@@ -78,6 +78,7 @@ class CustomerPrivacyTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.orderNo").value(victimOrderNo))
                 .andExpect(jsonPath("$.changed").value(true))
+                .andExpect(jsonPath("$.finalOrder.address").value("공격자 주소"))
                 .andReturn();
         Cookie attacker = replaced.getResponse().getCookie(cookieName);
         assertThat(replaced.getResponse().getContentAsString()).doesNotContain("피해자로");
