@@ -36,8 +36,8 @@ final class OrderUpdate {
                   String recipientPhone, String zipcode, String address, String addressDetail) {
     }
 
-    /** 상품 수량이 어떻게 바뀌는지 ("사과 2→3개"). 바꾸기 전에 고객에게 미리 보여줄 때도 쓴다 */
-    static List<String> itemChanges(CustomerOrder order, Map<Long, Integer> quantities, Map<Long, Product> products) {
+    /** 상품 수량이 어떻게 바뀌는지 ("사과 2→3개", 뺀 상품 "사과 2→0개", 새 상품 "배 0→1개") */
+    private static List<String> itemChanges(CustomerOrder order, Map<Long, Integer> quantities, Map<Long, Product> products) {
         List<String> changes = new ArrayList<>();
         Map<Long, OrderItem> current = currentItems(order);
         for (Long productId : productIds(current, quantities)) {
@@ -198,7 +198,7 @@ final class OrderUpdate {
                 Objects.toString(address, ""), Objects.toString(detail, ""));
     }
 
-    static String won(long amount) {
+    private static String won(long amount) {
         return String.format("%,d원", amount);
     }
 }

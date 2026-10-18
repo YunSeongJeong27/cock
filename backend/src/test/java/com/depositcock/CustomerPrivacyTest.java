@@ -65,13 +65,14 @@ class CustomerPrivacyTest extends IntegrationTest {
         Cookie victimDevice = victim.getResponse().getCookie(cookieName);
         int victimOrderNo = read(victim).get("orderNo").asInt();
 
-        // 다른 기기에서 피해자 번호로 주문: 바뀔 주문 번호를 알려주는 경고(409). 주소·휴대폰은 들어 있지 않다
+        // 다른 기기에서 피해자 번호로 주문: 바뀔 주문을 알려주는 경고(409). "내 주문 찾기"와 같은 정보만, 주소·휴대폰은 없다
         Map<String, Object> attack = delivery(g.productId(), "010-6100-0001", "아무개", "공격자 주소");
         MvcResult warned = mvc.perform(withJson(post(url + "/orders"), attack))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.replaceOrderNo").value(victimOrderNo))
                 .andReturn();
-        assertThat(warned.getResponse().getContentAsString()).doesNotContain("피해자로").doesNotContain("6100");
+        assertThat(warned.getResponse().getContentAsString()).doesNotContain("피해자로").doesNotContain("010-6100-0001")
+                .doesNotContain("01061000001");
 
         attack.put("replaceOrderNo", victimOrderNo);
         MvcResult replaced = mvc.perform(withJson(post(url + "/orders"), attack))

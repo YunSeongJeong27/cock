@@ -83,14 +83,16 @@ class M2OrderFormTest extends IntegrationTest {
                 .andExpect(jsonPath("$.prefill.phone").value("010-1234-5678"))
                 .andExpect(jsonPath("$.products[0].remaining").value(8));
 
-        // 같은 연락처로 다시 주문하면 새 주문이 아니라 1번 주문이 바뀐다 (2026-10-18). 먼저 바뀌는 내용을 경고(409)로 보여준다
+        // 같은 연락처로 다시 주문하면 새 주문이 아니라 1번 주문이 바뀐다 (2026-10-18). 먼저 짧은 경고(409) + 바뀔 주문 내용
         String orders = "/api/public/g/" + token + "/orders";
         Map<String, Object> again = order(productId, 3, "01012345678", "김지영");
         mvc.perform(withJson(post(orders).cookie(device), again))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.replaceOrderNo").value(1))
-                .andExpect(jsonPath("$.warnings[0]").value(org.hamcrest.Matchers.containsString(
-                        "1번 주문이 지금 적은 내용으로 바뀝니다. (파프리카 한봉지 2→3개, 금액 3,800원→5,700원)")));
+                .andExpect(jsonPath("$.warnings[0]").value("이 번호로 주문한 1번 주문이 있습니다. 계속하면 지금 내용으로 바뀝니다."))
+                .andExpect(jsonPath("$.replaceOrder.orderNo").value(1))
+                .andExpect(jsonPath("$.replaceOrder.items[0].quantity").value(2))
+                .andExpect(jsonPath("$.replaceOrder.expectedAmount").value(3800));
         // 바뀔 주문번호 없이 확인만 보내면 다시 경고 (경고를 본 뒤 바뀔 주문이 달라지는 경우 대비)
         again.put("acknowledgeWarnings", true);
         mvc.perform(withJson(post(orders).cookie(device), again)).andExpect(status().isConflict());

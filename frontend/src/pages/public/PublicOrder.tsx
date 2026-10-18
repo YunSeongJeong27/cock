@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
 import { ApiError, api, dateTime, errorMessage, won } from '../../api'
 import { CopyButton, ErrorBox, StatusBadge } from '../../components/Ui'
@@ -57,8 +57,8 @@ interface Placed {
   orderNo: number; expectedAmount: number; paymentMethod: PaymentMethod; depositorName: string; account: Account | null; myOrders: MyOrder[]
   changed: boolean; finalOrder: FinalOrder
 }
-/** replaceOrderNo: 확인하면 이 번호의 주문이 지금 적은 내용으로 바뀜 (없으면 새 주문) */
-interface Warnings { list: string[]; replaceOrderNo: number | null }
+/** replaceOrderNo·replaceOrder: 확인하면 이 주문이 지금 적은 내용으로 바뀜 (없으면 새 주문) */
+interface Warnings { list: string[]; replaceOrderNo: number | null; replaceOrder: MyOrder | null }
 
 declare global {
   interface Window { daum?: any }
@@ -76,12 +76,14 @@ function loadPostcode(): Promise<void> {
   })
 }
 
-/** 바꾼 뒤의 최종 주문 (2026-10-18 사용자 요청: 다시 주문해서 바뀌면 최종 주문을 보여 주며 마무리) */
-function FinalOrderView({ f }: { f: FinalOrder }) {
-  const o = f.order
+/**
+ * 주문 내용 (2026-10-18 사용자 요청): 바뀐 뒤 완료 카드의 "최종 주문", 경고의 "기존 주문 확인".
+ * f(이번에 적은 값)가 있을 때만 배송지·닉네임·동호수도 보여준다
+ */
+function OrderSummary({ o, title, f }: { o: MyOrder; title: ReactNode; f?: FinalOrder }) {
   return (
     <div className="receipt mt">
-      <div className="small"><b>최종 주문 · {o.orderNo}번</b> <span className="muted">(이 내용으로 바뀌었습니다)</span></div>
+      <div className="small">{title}</div>
       {o.items.map((i) => (
         <div key={i.productId} className="row between receipt-line">
           <span>{i.productName} <b>{i.quantity}개</b> <span className="small muted" style={{ whiteSpace: 'nowrap' }}>× {won(i.unitPrice)}</span></span>
@@ -92,12 +94,12 @@ function FinalOrderView({ f }: { f: FinalOrder }) {
       <div className="row between receipt-total"><b>총 금액</b><b>{won(o.expectedAmount)}</b></div>
       <div className="small mt">
         <div>수령: {o.receiveMethod === 'DELIVERY' ? '배송' : `픽업${o.pickupPointName ? ' · ' + o.pickupPointName : ''}`}</div>
-        {o.receiveMethod === 'DELIVERY' && (
+        {o.receiveMethod === 'DELIVERY' && f && (
           <div>배송지: {f.recipientName} · {f.recipientPhone} · {f.zipcode ? `(${f.zipcode}) ` : ''}{f.address}{f.addressDetail ? ' ' + f.addressDetail : ''}</div>
         )}
         <div>결제: {o.paymentMethod === 'PREPAID' ? `선입금 (입금자명 ${o.depositorName})` : `현장결제 (이름 ${o.depositorName})`}</div>
-        {f.nickname && <div>닉네임: {f.nickname}</div>}
-        {f.unitAddress && <div>동·호수: {f.unitAddress}</div>}
+        {f?.nickname && <div>닉네임: {f.nickname}</div>}
+        {f?.unitAddress && <div>동·호수: {f.unitAddress}</div>}
       </div>
     </div>
   )
@@ -116,6 +118,7 @@ export default function PublicOrder() {
   const [qty, setQty] = useState<Record<number, number>>({})
   const [form, setForm] = useState(emptyForm)
   const [warnings, setWarnings] = useState<Warnings | null>(null)
+  const [showExisting, setShowExisting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [placed, setPlaced] = useState<Placed | null>(null)
   const [busy, setBusy] = useState(false)
@@ -174,7 +177,8 @@ export default function PublicOrder() {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
       if (err instanceof ApiError && err.status === 409 && err.body?.warnings) {
-        setWarnings({ list: err.body.warnings, replaceOrderNo: err.body.replaceOrderNo ?? null })
+        setWarnings({ list: err.body.warnings, replaceOrderNo: err.body.replaceOrderNo ?? null, replaceOrder: err.body.replaceOrder ?? null })
+        setShowExisting(false)
       } else {
         setError(errorMessage(err))
       }
@@ -295,7 +299,8 @@ export default function PublicOrder() {
         <div className="card" style={{ borderColor: 'var(--ok)' }}>
           <h2>{placed.changed ? '주문을 변경했어요 ✅' : '주문 완료 🎉'}</h2>
           {placed.changed
-            ? <FinalOrderView f={placed.finalOrder} />
+            ? <OrderSummary o={placed.finalOrder.order} f={placed.finalOrder}
+                title={<><b>최종 주문 · {placed.orderNo}번</b> <span className="muted">(이 내용으로 바뀌었습니다)</span></>} />
             : <div>주문번호 <b>{placed.orderNo}</b> · 총 <b>{won(placed.expectedAmount)}</b></div>}
           {placed.account ? (
             <div className="mt">
@@ -369,7 +374,7 @@ export default function PublicOrder() {
       {view.acceptingOrders && (
         <form className="card" onSubmit={(e) => submit(e)}>
           <h3>{replaceTarget ? '주문서 (주문 변경)' : view.myOrders.length > 0 ? '추가 주문하기' : '주문서'}</h3>
-          {replaceTarget && <div className="small mb">같은 휴대폰 번호로 주문하면 새 주문이 추가되지 않고, 입금 확인 전 주문({replaceTarget.orderNo}번)이 지금 적은 내용으로 바뀝니다. <b>바꾼 뒤의 전체 수량</b>을 적어 주세요.</div>}
+          {replaceTarget && <div className="small mb">같은 번호로 주문하면 {replaceTarget.orderNo}번 주문이 이 내용으로 바뀝니다. <b>바꾼 뒤 전체 수량</b>을 적어 주세요.</div>}
           {view.prefill?.limited && <div className="small muted mb">개인정보 보호를 위해 다른 기기에서 입력한 휴대폰 번호·주소는 채우지 않습니다. 다시 입력해 주세요.</div>}
           {view.products.map((p) => (
             <div key={p.id} className="product-row">
@@ -458,9 +463,18 @@ export default function PublicOrder() {
           {warnings && (
             <div className="warn-box">
               {warnings.list.map((w) => <div key={w}>⚠ {w}</div>)}
+              {warnings.replaceOrder && showExisting && (
+                <OrderSummary o={warnings.replaceOrder}
+                  title={<><b>기존 주문 · {warnings.replaceOrder.orderNo}번</b> <span className="muted">({warnings.replaceOrder.statusLabel})</span></>} />
+              )}
               <div className="row mt">
+                {warnings.replaceOrder && (
+                  <button type="button" className="btn small" onClick={() => setShowExisting((v) => !v)}>
+                    {showExisting ? '기존 주문 닫기' : '기존 주문 확인'}
+                  </button>
+                )}
                 <button type="button" className="btn small primary" disabled={busy} onClick={() => submit(null, true)}>
-                  {warnings.replaceOrderNo ? `확인했어요, ${warnings.replaceOrderNo}번 주문 바꾸기` : '확인했어요, 주문하기'}
+                  {warnings.replaceOrderNo ? '이 내용으로 바꾸기' : '확인했어요, 주문하기'}
                 </button>
                 <button type="button" className="btn small" onClick={() => setWarnings(null)}>다시 입력</button>
               </div>

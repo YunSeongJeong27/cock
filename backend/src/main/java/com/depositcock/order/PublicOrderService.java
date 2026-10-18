@@ -156,12 +156,14 @@ public class PublicOrderService {
         Integer targetNo = target == null ? null : target.getOrderNo();
         boolean confirmed = r.acknowledgeWarnings() && Objects.equals(r.replaceOrderNo(), targetNo);
         if (!confirmed) {
-            List<String> warnings = warnings(groupBuy, existingCustomerId, depositorName, previous, target, products,
-                    quantities, receiveMethod);
+            List<String> warnings = warnings(groupBuy, existingCustomerId, depositorName, previous, target);
             if (!warnings.isEmpty()) {
                 ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, String.join("\n", warnings));
                 problem.setProperty("warnings", warnings);
                 problem.setProperty("replaceOrderNo", targetNo);
+                // "기존 주문 확인" 버튼으로 보여줄 바뀔 주문. "내 주문 찾기"(휴대폰 번호 전체)로 보이는 것과 같은 정보만
+                // (상품·금액·수령·결제·입금자명. 휴대폰·주소·닉네임·동호수는 없음)
+                problem.setProperty("replaceOrder", target == null ? null : OrderMapper.toMyOrder(target, true));
                 throw new ErrorResponseException(HttpStatus.CONFLICT, problem, null);
             }
         }
@@ -436,26 +438,16 @@ public class PublicOrderService {
      * @param target     같은 번호로 다시 주문해서 바뀔 주문 (없으면 null)
      */
     private List<String> warnings(GroupBuy groupBuy, Long customerId, String depositorName, List<CustomerOrder> previous,
-                                  CustomerOrder target, Map<Long, Product> products, Map<Long, Integer> quantities,
-                                  ReceiveMethod receiveMethod) {
+                                  CustomerOrder target) {
         List<String> warnings = new ArrayList<>();
+        // 문구는 필요한 말만 짧게. 바뀔 주문 내용은 화면의 "기존 주문 확인" 버튼으로 본다 (2026-10-18 사용자 요청)
         if (target != null) {
-            List<String> diff = new ArrayList<>(OrderUpdate.itemChanges(target, quantities, products));
-            int after = previewAmount(groupBuy, target, products, quantities, receiveMethod);
-            if (after != target.getExpectedAmount()) {
-                diff.add("금액 " + OrderUpdate.won(target.getExpectedAmount()) + "→" + OrderUpdate.won(after));
-            }
-            String no = target.getOrderNo() + "번";
-            warnings.add("이 휴대폰 번호로 주문한 " + no + " 주문이 있습니다. 계속하면 새 주문이 추가되지 않고 " + no
-                    + " 주문이 지금 적은 내용으로 바뀝니다. (" + (diff.isEmpty() ? "상품·금액은 그대로" : String.join(", ", diff))
-                    + ")");
+            warnings.add("이 번호로 주문한 " + target.getOrderNo() + "번 주문이 있습니다. 계속하면 지금 내용으로 바뀝니다.");
             if (target.getDepositReportedAt() != null) {
-                warnings.add(no + " 주문은 '입금했어요'를 누른 주문입니다. 이미 입금하셨다면 바뀐 금액과의 차액은 판매자에게 "
-                        + "문의해 주세요.");
+                warnings.add("이미 입금하셨다면 차액은 판매자에게 문의해 주세요.");
             }
         } else if (!previous.isEmpty()) {
-            warnings.add("이 휴대폰 번호로 입금 확인(또는 수령)된 주문이 있습니다. 그 주문은 바꿀 수 없어 이번 주문은 새 주문으로 "
-                    + "추가됩니다. 추가 주문이 맞으면 그대로 진행해 주세요.");
+            warnings.add("이 번호로 입금 확인(또는 수령)된 주문이 있어, 이번 주문은 새 주문으로 추가됩니다.");
         }
         // 띄어쓰기·대소문자만 다른 이름도 같은 이름으로 본다 (입금 대조도 그렇게 비교함)
         String name = squash(depositorName).toLowerCase(java.util.Locale.ROOT);
@@ -467,19 +459,6 @@ public class PublicOrderService {
                     + "붙여주세요. (예: 김민지1505)");
         }
         return warnings;
-    }
-
-    /** 바꾼 뒤 금액 미리 계산 (OrderUpdate 와 같은 규칙: 원래 있던 상품은 주문 당시 단가, 새 상품은 지금 단가) */
-    private static int previewAmount(GroupBuy groupBuy, CustomerOrder target, Map<Long, Product> products,
-                                     Map<Long, Integer> quantities, ReceiveMethod receiveMethod) {
-        long amount = shippingFee(groupBuy, receiveMethod);
-        for (Map.Entry<Long, Integer> e : quantities.entrySet()) {
-            int unitPrice = target.getItems().stream().filter(i -> i.getProduct().getId().equals(e.getKey()))
-                    .map(OrderItem::getUnitPriceSnapshot).findFirst()
-                    .orElse(products.get(e.getKey()).getUnitPrice());
-            amount += (long) unitPrice * e.getValue();
-        }
-        return (int) Math.min(amount, Integer.MAX_VALUE);
     }
 
     private PublicGroupBuy toPublic(GroupBuy g, CustomerDevice device, LocalDateTime now) {
