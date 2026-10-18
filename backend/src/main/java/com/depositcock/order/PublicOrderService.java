@@ -137,10 +137,12 @@ public class PublicOrderService {
                 .findByGroupBuyIdAndCustomer_IdOrderByOrderNoAsc(groupBuy.getId(), existingCustomerId).stream()
                 .filter(CustomerOrder::isActive)
                 .toList();
-        // 같은 번호로 다시 주문하면 새 주문을 더하지 않고 입금 확정 전 주문을 이 내용으로 바꾼다 (2026-10-18 사용자 결정).
-        // 그런 주문이 여러 건이면(판매자가 입금 확정을 취소한 경우 등) 가장 최근 주문
-        CustomerOrder target = previous.stream().filter(CustomerOrder::isReplaceableByCustomer)
-                .reduce((a, b) -> b).orElse(null);
+        // 같은 번호로 다시 주문하면 새 주문을 더하지 않고 입금 전 주문을 이 내용으로 수정한다 (2026-10-18 사용자 결정).
+        // "내 주문"의 [주문 수정]으로 고른 주문(replaceOrderNo)이 수정할 수 있는 주문이면 그 주문,
+        // 아니면 가장 최근의 수정할 수 있는 주문 (여러 건: 판매자가 입금 확정을 취소한 경우 등)
+        List<CustomerOrder> replaceable = previous.stream().filter(CustomerOrder::isReplaceableByCustomer).toList();
+        CustomerOrder target = replaceable.stream().filter(o -> Objects.equals(o.getOrderNo(), r.replaceOrderNo()))
+                .findFirst().orElse(replaceable.isEmpty() ? null : replaceable.get(replaceable.size() - 1));
         checkPerPersonLimit(products, quantities, previous, target);
 
         // 배송 정보 검사는 경고(409)보다 먼저 한다 (경고를 확인한 뒤에 입력 오류가 나오지 않게)
@@ -152,14 +154,19 @@ public class PublicOrderService {
             }
         }
 
-        // 경고에서 보여준 "바뀔 주문"이 그 사이에 달라졌으면(입금 확정·취소 등) 확인을 다시 받는다
+        // 고른(또는 경고에서 보여준) 주문을 수정할 수 없게 됐으면(입금·취소, 다른 번호 등) 확인을 다시 받는다
         Integer targetNo = target == null ? null : target.getOrderNo();
+        boolean mismatch = r.replaceOrderNo() != null && !Objects.equals(r.replaceOrderNo(), targetNo);
         boolean confirmed = r.acknowledgeWarnings() && Objects.equals(r.replaceOrderNo(), targetNo);
         if (!confirmed) {
-            List<String> warnings = warnings(groupBuy, existingCustomerId, depositorName, previous, target);
-            if (!warnings.isEmpty()) {
-                ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, String.join("\n", warnings));
-                problem.setProperty("warnings", warnings);
+            List<String> messages = new ArrayList<>();
+            if (mismatch) {
+                messages.add(r.replaceOrderNo() + "번 주문은 수정할 수 없습니다. 이미 입금했거나 휴대폰 번호가 다릅니다.");
+            }
+            messages.addAll(warnings(groupBuy, existingCustomerId, depositorName, previous, target));
+            if (!messages.isEmpty()) {
+                ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, String.join("\n", messages));
+                problem.setProperty("warnings", messages);
                 problem.setProperty("replaceOrderNo", targetNo);
                 // "기존 주문 확인" 버튼으로 보여줄 바뀔 주문. "내 주문 찾기"(휴대폰 번호 전체)로 보이는 것과 같은 정보만
                 // (상품·금액·수령·결제·입금자명. 휴대폰·주소·닉네임·동호수는 없음)
@@ -440,14 +447,18 @@ public class PublicOrderService {
     private List<String> warnings(GroupBuy groupBuy, Long customerId, String depositorName, List<CustomerOrder> previous,
                                   CustomerOrder target) {
         List<String> warnings = new ArrayList<>();
-        // 문구는 필요한 말만 짧게. 바뀔 주문 내용은 화면의 "기존 주문 확인" 버튼으로 본다 (2026-10-18 사용자 요청)
+        // 문구는 필요한 말만 짧게. 바뀔 주문 내용은 화면의 "기존 주문 확인" 버튼으로 본다 (2026-10-18 사용자 요청).
+        // 수정은 입금 전에만: 시스템은 고객이 송금만 하고 "입금했어요"를 안 누른 것은 모르므로, 화면 버튼
+        // "입금 전이에요, 수정하기"로 고객이 직접 확인한다
         if (target != null) {
-            warnings.add("이 번호로 주문한 " + target.getOrderNo() + "번 주문이 있습니다. 계속하면 지금 내용으로 바뀝니다.");
-            if (target.getDepositReportedAt() != null) {
-                warnings.add("이미 입금하셨다면 차액은 판매자에게 문의해 주세요.");
-            }
+            String no = target.getOrderNo() + "번";
+            warnings.add(target.isPrepaid()
+                    ? "이 번호로 입금 전인 " + no + " 주문이 있습니다. 계속하면 " + no + " 주문이 지금 내용으로 수정됩니다. "
+                            + "이미 입금하셨다면 판매자에게 문의해 주세요."
+                    : "이 번호로 주문한 " + no + " 주문이 있습니다. 계속하면 " + no + " 주문이 지금 내용으로 수정됩니다.");
         } else if (!previous.isEmpty()) {
-            warnings.add("이 번호로 입금 확인(또는 수령)된 주문이 있어, 이번 주문은 새 주문으로 추가됩니다.");
+            boolean deposited = previous.stream().anyMatch(o -> o.getDepositReportedAt() != null || o.isPaid());
+            warnings.add("이 번호로 " + (deposited ? "입금한" : "수령한") + " 주문이 있어, 이번 주문은 새 주문으로 추가됩니다.");
         }
         // 띄어쓰기·대소문자만 다른 이름도 같은 이름으로 본다 (입금 대조도 그렇게 비교함)
         String name = squash(depositorName).toLowerCase(java.util.Locale.ROOT);
@@ -480,7 +491,9 @@ public class PublicOrderService {
         boolean accepting = g.isAcceptingOrders(now);
         return visibleOrders(g, device).stream()
                 .sorted(Comparator.comparingInt(CustomerOrder::getOrderNo).reversed())
-                .map(o -> OrderMapper.toMyOrder(o, accepting))
+                .map(o -> OrderMapper.toMyOrder(o, accepting, accepting && o.isReplaceableByCustomer()
+                        ? prefillOf(o, o.getDeviceToken() != null && o.getDeviceToken().equals(device.getCookieToken()))
+                        : null))
                 .toList();
     }
 
@@ -500,17 +513,19 @@ public class PublicOrderService {
         if (orders.isEmpty()) {
             return null;
         }
-        CustomerOrder last = orders.get(orders.size() - 1);
-        if (!fromOwn) {
-            return new Prefill(null, last.getDepositorName(), last.getNickname(), null, last.getReceiveMethod(),
-                    last.getPickupPoint() == null ? null : last.getPickupPoint().getId(), last.getPaymentMethod(),
-                    null, null, null, null, null, true);
+        return prefillOf(orders.get(orders.size() - 1), fromOwn);
+    }
+
+    /** @param full 이 기기에서 넣은 주문이면 true (휴대폰·동호수·배송지까지), 아니면 입금자명·닉네임·수령·결제만 */
+    private static Prefill prefillOf(CustomerOrder o, boolean full) {
+        Long pointId = o.getPickupPoint() == null ? null : o.getPickupPoint().getId();
+        if (!full) {
+            return new Prefill(null, o.getDepositorName(), o.getNickname(), null, o.getReceiveMethod(), pointId,
+                    o.getPaymentMethod(), null, null, null, null, null, true);
         }
-        return new Prefill(PhoneNumbers.format(last.getPhone()), last.getDepositorName(), last.getNickname(),
-                last.getUnitAddress(), last.getReceiveMethod(),
-                last.getPickupPoint() == null ? null : last.getPickupPoint().getId(), last.getPaymentMethod(),
-                last.getRecipientName(), PhoneNumbers.format(last.getRecipientPhone()), last.getZipcode(),
-                last.getAddress(), last.getAddressDetail(), false);
+        return new Prefill(PhoneNumbers.format(o.getPhone()), o.getDepositorName(), o.getNickname(), o.getUnitAddress(),
+                o.getReceiveMethod(), pointId, o.getPaymentMethod(), o.getRecipientName(),
+                PhoneNumbers.format(o.getRecipientPhone()), o.getZipcode(), o.getAddress(), o.getAddressDetail(), false);
     }
 
     private static AccountInfo account(GroupBuy g) {

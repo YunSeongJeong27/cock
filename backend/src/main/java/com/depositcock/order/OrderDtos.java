@@ -88,12 +88,17 @@ public final class OrderDtos {
             LocalDateTime changedAt,
             /** 고객이 같은 번호로 다시 주문해서 마지막으로 바꾼 시각 (안 바꿨으면 null) */
             LocalDateTime customerChangedAt,
-            /** 같은 휴대폰 번호로 다시 주문하면 이 주문이 바뀌는 상태인지 (주문 링크 주문, 입금 확정·수령 전, 주문 받는 중) */
-            boolean replaceable) {
+            /** 고객이 수정할 수 있는지 (주문 링크 주문, 입금 전 = "입금했어요"·입금 확인 전, 수령 전, 주문 받는 중) */
+            boolean replaceable,
+            /**
+             * [주문 수정]을 누르면 주문서에 채울 값 (수정할 수 있는 주문만, 그 외 null).
+             * 이 기기에서 넣은 주문이 아니면 limited: 휴대폰·동호수·배송지는 비움 (자동 채움 규칙과 같음)
+             */
+            Prefill editValues) {
     }
 
     /**
-     * @param limited true 면 "입금자명 + 뒷4자리"로만 확인한 기기라 휴대폰·동호수·배송지를 비워서 준다
+     * @param limited true 면 이 기기에서 넣은 주문이 아니라(내 주문 찾기 등) 휴대폰·동호수·배송지를 비워서 준다
      */
     public record Prefill(String phone, String depositorName, String nickname, String unitAddress,
                           ReceiveMethod receiveMethod, Long pickupPointId, PaymentMethod paymentMethod,

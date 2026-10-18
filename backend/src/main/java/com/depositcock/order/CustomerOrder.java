@@ -196,11 +196,12 @@ public class CustomerOrder {
     }
 
     /**
-     * 고객이 같은 휴대폰 번호로 다시 주문하면 이 주문이 바뀌는지 (2026-10-18).
-     * 주문 링크 주문이고, 취소·입금 확정·수령 전. 입금 확정된 주문은 판매자가 대조를 끝낸 것이라 바꾸지 않는다
+     * 고객이 이 주문을 수정할 수 있는지 ([주문 수정] 또는 같은 휴대폰 번호로 다시 주문, 2026-10-18).
+     * 주문 링크 주문이고, 취소·수령 전이고, 입금 전 = 고객이 "입금했어요"를 누르지 않았고 판매자 입금 확인도 없음
+     * (사용자 결정: 이미 보낸 금액과 주문 금액이 어긋나지 않게. 입금 후 변경은 취소 후 다시 주문)
      */
     public boolean isReplaceableByCustomer() {
-        return isActive() && source == OrderSource.FORM && !isPaid() && !pickedUp;
+        return isActive() && source == OrderSource.FORM && !isPaid() && depositReportedAt == null && !pickedUp;
     }
 
     public boolean isPrepaid() {

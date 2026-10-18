@@ -89,7 +89,8 @@ class M2OrderFormTest extends IntegrationTest {
         mvc.perform(withJson(post(orders).cookie(device), again))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.replaceOrderNo").value(1))
-                .andExpect(jsonPath("$.warnings[0]").value("이 번호로 주문한 1번 주문이 있습니다. 계속하면 지금 내용으로 바뀝니다."))
+                .andExpect(jsonPath("$.warnings[0]").value("이 번호로 입금 전인 1번 주문이 있습니다. 계속하면 1번 주문이 지금 내용으로 "
+                        + "수정됩니다. 이미 입금하셨다면 판매자에게 문의해 주세요."))
                 .andExpect(jsonPath("$.replaceOrder.orderNo").value(1))
                 .andExpect(jsonPath("$.replaceOrder.items[0].quantity").value(2))
                 .andExpect(jsonPath("$.replaceOrder.expectedAmount").value(3800));

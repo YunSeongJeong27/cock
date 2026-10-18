@@ -69,6 +69,7 @@ input[type=datetime-local], input[type=date], select, textarea {
 }
 textarea { min-height: 80px; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-weak); border-color: var(--primary); }
+input[readonly] { background: var(--bg); color: var(--muted); }
 .check { display: flex; gap: 8px; align-items: center; margin: 6px 0; font-size: 0.95rem; }
 .check input { width: 18px; height: 18px; }
 

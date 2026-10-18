@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import com.depositcock.order.OrderDtos.ChangeRecord;
 import com.depositcock.order.OrderDtos.MyOrder;
 import com.depositcock.order.OrderDtos.PaymentRecord;
+import com.depositcock.order.OrderDtos.Prefill;
 import com.depositcock.order.OrderDtos.PublicItem;
 import com.depositcock.order.OrderDtos.SellerOrder;
 import com.depositcock.order.OrderDtos.SellerOrderItem;
@@ -17,6 +18,10 @@ final class OrderMapper {
     }
 
     static MyOrder toMyOrder(CustomerOrder o, boolean acceptingOrders) {
+        return toMyOrder(o, acceptingOrders, null);
+    }
+
+    static MyOrder toMyOrder(CustomerOrder o, boolean acceptingOrders, Prefill editValues) {
         DisplayStatus status = o.displayStatus();
         return new MyOrder(o.getOrderNo(),
                 o.getItems().stream().map(i -> new PublicItem(i.getProduct().getId(), i.getProductNameSnapshot(), i.getQuantity(),
@@ -29,7 +34,7 @@ final class OrderMapper {
                 o.isRefundRequired() && o.getRefundedAt() == null,
                 o.getOrderedAt(),
                 lastChange(o, ChangeActor.SELLER), lastChange(o, ChangeActor.CUSTOMER),
-                acceptingOrders && o.isReplaceableByCustomer());
+                acceptingOrders && o.isReplaceableByCustomer(), editValues);
     }
 
     private static java.time.LocalDateTime lastChange(CustomerOrder o, ChangeActor actor) {

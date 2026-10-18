@@ -28,16 +28,18 @@ interface MyOrder {
   orderedAt: string
   /** 판매자가 주문을 마지막으로 바꾼 시각 */
   changedAt: string | null
-  /** 고객이 같은 번호로 다시 주문해서 마지막으로 바꾼 시각 */
+  /** 고객이 수정한 마지막 시각 */
   customerChangedAt: string | null
-  /** 같은 휴대폰 번호로 다시 주문하면 이 주문이 바뀌는 상태 (입금 확인·수령 전) */
+  /** 고객이 수정할 수 있는 상태 (입금 전 = "입금했어요"·입금 확인 전, 수령 전, 주문 받는 중) */
   replaceable: boolean
+  /** [주문 수정]을 누르면 주문서에 채울 값 (수정할 수 있는 주문만) */
+  editValues: Prefill | null
 }
 interface Prefill {
   phone: string; depositorName: string; nickname: string | null; unitAddress: string | null; receiveMethod: ReceiveMethod
   pickupPointId: number | null; paymentMethod: PaymentMethod; recipientName: string | null; recipientPhone: string | null
   zipcode: string | null; address: string | null; addressDetail: string | null
-  /** true: 이 기기에서 넣은 주문이 없어(본인 확인만 함) 휴대폰·동호수·배송지는 비어 있음 */
+  /** true: 이 기기에서 넣은 주문이 아니라(내 주문 찾기) 휴대폰·동호수·배송지는 비어 있음 */
   limited: boolean
 }
 interface View {
@@ -110,6 +112,15 @@ const emptyForm = {
   paymentMethod: '' as PaymentMethod | '', recipientName: '', recipientPhone: '', zipcode: '', address: '', addressDetail: '',
 }
 
+function formFrom(p: Prefill): typeof emptyForm {
+  return {
+    phone: p.phone ?? '', depositorName: p.depositorName ?? '', nickname: p.nickname ?? '', unitAddress: p.unitAddress ?? '',
+    receiveMethod: p.receiveMethod ?? '', pickupPointId: p.pickupPointId ? String(p.pickupPointId) : '', paymentMethod: p.paymentMethod ?? '',
+    recipientName: p.recipientName ?? '', recipientPhone: p.recipientPhone ?? '', zipcode: p.zipcode ?? '', address: p.address ?? '',
+    addressDetail: p.addressDetail ?? '',
+  }
+}
+
 export default function PublicOrder() {
   const { token } = useParams()
   const base = `/api/public/g/${token}`
@@ -119,6 +130,8 @@ export default function PublicOrder() {
   const [form, setForm] = useState(emptyForm)
   const [warnings, setWarnings] = useState<Warnings | null>(null)
   const [showExisting, setShowExisting] = useState(false)
+  /** "내 주문"의 [주문 수정]으로 고친 주문 (주문서가 "N번 주문 수정"이 됨) */
+  const [editing, setEditing] = useState<MyOrder | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [placed, setPlaced] = useState<Placed | null>(null)
   const [busy, setBusy] = useState(false)
@@ -128,15 +141,7 @@ export default function PublicOrder() {
 
   const applyView = useCallback((v: View) => {
     setView(v)
-    if (v.prefill) {
-      const p = v.prefill
-      setForm((f) => ({
-        ...f, phone: p.phone ?? '', depositorName: p.depositorName ?? '', nickname: p.nickname ?? '', unitAddress: p.unitAddress ?? '',
-        receiveMethod: p.receiveMethod ?? '', pickupPointId: p.pickupPointId ? String(p.pickupPointId) : '', paymentMethod: p.paymentMethod ?? '',
-        recipientName: p.recipientName ?? '', recipientPhone: p.recipientPhone ?? '', zipcode: p.zipcode ?? '', address: p.address ?? '',
-        addressDetail: p.addressDetail ?? '',
-      }))
-    }
+    if (v.prefill) setForm(formFrom(v.prefill))
   }, [])
 
   useEffect(() => {
@@ -166,10 +171,13 @@ export default function PublicOrder() {
         phone: form.phone, depositorName: form.depositorName, nickname: form.nickname || null, unitAddress: form.unitAddress || null,
         receiveMethod: receive || null, pickupPointId: form.pickupPointId ? Number(form.pickupPointId) : null, paymentMethod: payment || null,
         recipientName: form.recipientName || null, recipientPhone: form.recipientPhone || null, zipcode: form.zipcode || null,
-        address: form.address || null, addressDetail: form.addressDetail || null, acknowledgeWarnings: acknowledge,
-        replaceOrderNo: acknowledge ? warnings?.replaceOrderNo ?? null : null,
+        address: form.address || null, addressDetail: form.addressDetail || null,
+        // [주문 수정]은 고객이 주문을 직접 고른 것이라 경고 없이 그 주문을 수정 (서버가 수정할 수 없으면 다시 경고)
+        acknowledgeWarnings: acknowledge || editing !== null,
+        replaceOrderNo: acknowledge ? warnings?.replaceOrderNo ?? null : editing?.orderNo ?? null,
       })
       setPlaced(res)
+      setEditing(null)
       setWarnings(null)
       setQty({})
       setView((v) => (v ? { ...v, myOrders: res.myOrders } : v))
@@ -188,7 +196,8 @@ export default function PublicOrder() {
   }
 
   async function reportDeposit(orderNo: number) {
-    if (!confirm('입금하셨나요? 판매자가 입금내역을 확인한 뒤 "입금 확인됨"으로 바뀝니다.')) return
+    // 입금 신고 뒤에는 주문 수정이 안 되므로 여기서도 알린다 (입금 전에만 수정, 2026-10-18)
+    if (!confirm('입금하셨나요? 누르면 이 주문은 더 이상 수정할 수 없어요.\n(판매자가 입금내역을 확인한 뒤 "입금 확인됨"으로 바뀝니다)')) return
     try {
       setView(await api.post<View>(`${base}/orders/${orderNo}/report-deposit`))
     } catch (e) {
@@ -230,15 +239,31 @@ export default function PublicOrder() {
     }
   }
 
+  function startEdit(o: MyOrder) {
+    if (!o.editValues) return
+    setEditing(o)
+    setPlaced(null)
+    setError(null)
+    setQty(Object.fromEntries(o.items.map((i) => [i.productId, i.quantity])))
+    setForm(formFrom(o.editValues))
+    setTimeout(() => document.getElementById('order-form')?.scrollIntoView({ behavior: 'smooth' }), 50)
+  }
+
+  function stopEdit() {
+    setEditing(null)
+    setQty({})
+    setForm(view?.prefill ? formFrom(view.prefill) : emptyForm)
+  }
+
   function openCancel(orderNo?: number) {
     setCancel({ orderNo: orderNo ? String(orderNo) : '', phone: form.phone, depositorName: form.depositorName, open: true, error: '', choices: [] })
     setTimeout(() => document.getElementById('cancel-form')?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
 
-  /** 주문 변경 안내 (2026-10-16 사용자 요청 문구). 2026-10-18부터는 같은 번호로 다시 주문해도 입금 확인 전 주문이 바뀐다 */
+  /** 주문 변경 안내: 입금 전에는 [주문 수정], 입금 후에는 취소 후 다시 주문 (2026-10-18 사용자 결정) */
   const changeNote = (
     <p className="small mt" style={{ marginBottom: 0 }}>
-      <b style={{ fontWeight: 800 }}>주문 변경</b> 희망 시 주문 취소 후 다시 주문해 주시면 감사하겠습니다.
+      주문 변경: 입금 전에는 <b style={{ fontWeight: 800 }}>주문 수정</b>, 입금 후에는 <b style={{ fontWeight: 800 }}>주문 취소</b> 후 다시 주문해 주세요.
     </p>
   )
 
@@ -246,11 +271,11 @@ export default function PublicOrder() {
    * 같은 번호로 다시 주문하면 바뀔 주문(이 기기에서 보이는 것 중 가장 최근, 서버와 같은 기준)의 상품별 수량.
    * 바꾸기는 늘어난 만큼만 재고를 쓰므로, 품절인 상품도 이미 주문한 수량까지는 고를 수 있다
    */
-  const mine = useMemo(() => {
-    const target = view?.myOrders.find((o) => o.replaceable)
-    return Object.fromEntries((target?.items ?? []).map((i) => [i.productId, i.quantity])) as Record<number, number>
-  }, [view])
   const replaceTarget = view?.myOrders.find((o) => o.replaceable) ?? null
+  const mine = useMemo(() => {
+    const target = editing ?? view?.myOrders.find((o) => o.replaceable)
+    return Object.fromEntries((target?.items ?? []).map((i) => [i.productId, i.quantity])) as Record<number, number>
+  }, [view, editing])
 
   /**
    * 수량 상한: 1인 최대 수량, 그리고 판매자가 "다 팔리면 품절"을 켠 상품만 남은 수량 (기본은 재고로 막지 않음, 2026-10-16).
@@ -297,24 +322,20 @@ export default function PublicOrder() {
 
       {placed && (
         <div className="card" style={{ borderColor: 'var(--ok)' }}>
-          <h2>{placed.changed ? '주문을 변경했어요 ✅' : '주문 완료 🎉'}</h2>
+          <h2>{placed.changed ? '주문을 수정했어요 ✅' : '주문 완료 🎉'}</h2>
           {placed.changed
             ? <OrderSummary o={placed.finalOrder.order} f={placed.finalOrder}
-                title={<><b>최종 주문 · {placed.orderNo}번</b> <span className="muted">(이 내용으로 바뀌었습니다)</span></>} />
+                title={<><b>최종 주문 · {placed.orderNo}번</b> <span className="muted">(이 내용으로 수정되었습니다)</span></>} />
             : <div>주문번호 <b>{placed.orderNo}</b> · 총 <b>{won(placed.expectedAmount)}</b></div>}
           {placed.account ? (
             <div className="mt">
               <div>아래 계좌로 <b>{won(placed.expectedAmount)}</b>을 보내주세요.</div>
               <div className="row mt"><b>{placed.account.bankName} {placed.account.accountNumber}</b> ({placed.account.accountHolder}) <CopyButton text={placed.account.accountNumber} label="계좌 복사" /></div>
               <div className="warn-box">받는 분 통장 표시(입금자명)를 꼭 <b>{placed.depositorName}</b>(으)로 해주세요. 입금 확인이 빨라집니다.</div>
-              {placed.finalOrder.order.status === 'DEPOSIT_REPORTED' ? (
-                <div className="small mt" style={{ color: 'var(--warn)' }}>이미 "입금했어요"를 누른 주문입니다. 바뀌기 전 금액으로 입금하셨다면 차액은 판매자에게 문의해 주세요.</div>
-              ) : (
-                <div className="row mt">
-                  <span className="small grow">입금하셨나요? 입금 후 눌러주세요. (판매자가 입금내역을 확인하면 "입금 확인됨"으로 바뀝니다)</span>
-                  <button className="btn small primary" onClick={() => reportDeposit(placed.orderNo)}>입금했어요</button>
-                </div>
-              )}
+              <div className="row mt">
+                <span className="small grow">입금하셨나요? 입금 후 눌러주세요. (판매자가 입금내역을 확인하면 "입금 확인됨"으로 바뀝니다)</span>
+                <button className="btn small primary" onClick={() => reportDeposit(placed.orderNo)}>입금했어요</button>
+              </div>
             </div>
           ) : <div className="mt">현장에서 결제해 주세요.</div>}
           <p className="small muted">이 화면 위쪽 "내 주문"에서 언제든 상태를 확인할 수 있습니다. 이 링크를 다시 열면 됩니다.</p>
@@ -333,15 +354,20 @@ export default function PublicOrder() {
               <div className="small">{o.items.map((i) => `${i.productName} ${i.quantity}개`).join(', ')}</div>
               <div className="small muted">{o.receiveMethod === 'DELIVERY' ? '배송' : `픽업${o.pickupPointName ? ' · ' + o.pickupPointName : ''}`} · {o.paymentMethod === 'PREPAID' ? `선입금 (입금자명 ${o.depositorName})` : '현장결제'} · {dateTime(o.orderedAt)}</div>
               {o.changedAt && <div className="small" style={{ color: 'var(--warn)' }}>판매자가 주문을 변경했어요 ({dateTime(o.changedAt)}). 위 내용·금액을 확인해 주세요.</div>}
-              {o.customerChangedAt && <div className="small muted">다시 주문해서 변경됨 ({dateTime(o.customerChangedAt)})</div>}
+              {o.customerChangedAt && <div className="small muted">주문 수정됨 ({dateTime(o.customerChangedAt)})</div>}
               {o.refundRequired && <div className="small" style={{ color: 'var(--danger)' }}>취소됨 · 판매자가 환불할 예정입니다.</div>}
               {o.canReportDeposit && view.account && (
                 <div className="small mt">입금 계좌: {view.account.bankName} {view.account.accountNumber} ({view.account.accountHolder}) <CopyButton text={view.account.accountNumber} label="복사" /></div>
               )}
               <div className="row mt">
                 {o.canReportDeposit && <button className="btn small primary" onClick={() => reportDeposit(o.orderNo)}>입금했어요</button>}
+                {o.replaceable && o.editValues && <button className="btn small" onClick={() => startEdit(o)}>주문 수정</button>}
                 {o.cancellable && <button className="btn small danger" onClick={() => openCancel(o.orderNo)}>주문 취소</button>}
               </div>
+              {o.replaceable && o.paymentMethod === 'PREPAID' && <div className="small muted mt">주문 수정은 입금 전에만 할 수 있어요.</div>}
+              {!o.replaceable && o.cancellable && o.paymentMethod === 'PREPAID' && (
+                <div className="small muted mt">입금 후에는 수정할 수 없어요. 변경은 주문 취소 후 다시 주문해 주세요.</div>
+              )}
             </div>
           ))}
         </div>
@@ -372,10 +398,13 @@ export default function PublicOrder() {
       )}
 
       {view.acceptingOrders && (
-        <form className="card" onSubmit={(e) => submit(e)}>
-          <h3>{replaceTarget ? '주문서 (주문 변경)' : view.myOrders.length > 0 ? '추가 주문하기' : '주문서'}</h3>
-          {replaceTarget && <div className="small mb">같은 번호로 주문하면 {replaceTarget.orderNo}번 주문이 이 내용으로 바뀝니다. <b>바꾼 뒤 전체 수량</b>을 적어 주세요.</div>}
-          {view.prefill?.limited && <div className="small muted mb">개인정보 보호를 위해 다른 기기에서 입력한 휴대폰 번호·주소는 채우지 않습니다. 다시 입력해 주세요.</div>}
+        <form className="card" id="order-form" onSubmit={(e) => submit(e)}>
+          <h3>{editing ? `${editing.orderNo}번 주문 수정` : replaceTarget ? '주문서' : view.myOrders.length > 0 ? '추가 주문하기' : '주문서'}</h3>
+          {editing && editing.paymentMethod === 'PREPAID' && <div className="small mb"><b>입금 전에만 수정할 수 있어요.</b> 이미 입금하셨다면 판매자에게 문의해 주세요.</div>}
+          {!editing && replaceTarget && (
+            <div className="small mb">주문을 고치려면 위 <b>주문 수정</b>을 눌러 주세요.{replaceTarget.paymentMethod === 'PREPAID' && ' (입금 전에만)'}</div>
+          )}
+          {(editing ? editing.editValues?.limited : view.prefill?.limited) && <div className="small muted mb">개인정보 보호를 위해 다른 기기에서 입력한 휴대폰 번호·주소는 채우지 않습니다. 다시 입력해 주세요.</div>}
           {view.products.map((p) => (
             <div key={p.id} className="product-row">
               <div>
@@ -446,7 +475,8 @@ export default function PublicOrder() {
           )}
 
           <div className="mt">
-            <label className="field"><span>휴대폰 번호 *</span><input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} required placeholder="010-0000-0000" /></label>
+            <label className="field"><span>휴대폰 번호 *</span><input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} required placeholder="010-0000-0000"
+              readOnly={!!(editing && editing.editValues?.phone)} /></label>
             <label className="field"><span>입금자명 *</span><input type="text" value={form.depositorName} onChange={(e) => set('depositorName', e.target.value)} required placeholder="통장에 찍힐 이름" />
               <span className="muted small" style={{ fontWeight: 400 }}>{payment === 'ONSITE' ? '주문 확인용 이름입니다.' : '계좌이체할 때 받는 분 통장 표시에 이 이름을 적어주세요.'}</span>
             </label>
@@ -474,13 +504,19 @@ export default function PublicOrder() {
                   </button>
                 )}
                 <button type="button" className="btn small primary" disabled={busy} onClick={() => submit(null, true)}>
-                  {warnings.replaceOrderNo ? '이 내용으로 바꾸기' : '확인했어요, 주문하기'}
+                  {warnings.replaceOrder ? (warnings.replaceOrder.paymentMethod === 'PREPAID' ? '입금 전이에요, 수정하기' : '수정하기') : '확인했어요, 주문하기'}
                 </button>
                 <button type="button" className="btn small" onClick={() => setWarnings(null)}>다시 입력</button>
               </div>
             </div>
           )}
-          {!warnings && <button className="btn primary block" disabled={busy || itemsAmount === 0}>주문하기</button>}
+          {!warnings && !editing && <button className="btn primary block" disabled={busy || itemsAmount === 0}>주문하기</button>}
+          {!warnings && editing && (
+            <div className="row">
+              <button className="btn primary grow" disabled={busy || itemsAmount === 0}>{editing.paymentMethod === 'PREPAID' ? '입금 전이에요, 수정하기' : '수정하기'}</button>
+              <button type="button" className="btn" onClick={stopEdit} disabled={busy}>수정 취소</button>
+            </div>
+          )}
           <p className="muted small mt">주문하면 <a href="/privacy" target="_blank">개인정보처리방침</a>에 따라 주문 처리에 필요한 정보(연락처·입금자명·배송지)를 판매자에게 전달하는 데 동의하는 것으로 봅니다. 주문 후 이 링크에서 내 주문 상태를 볼 수 있도록 이 기기에 쿠키를 저장합니다.</p>
         </form>
       )}

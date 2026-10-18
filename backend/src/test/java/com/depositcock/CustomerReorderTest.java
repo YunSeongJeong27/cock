@@ -116,7 +116,8 @@ class CustomerReorderTest extends IntegrationTest {
         again.put("replaceOrderNo", 1);
         mvc.perform(withJson(post(url + "/orders"), again)).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.replaceOrderNo").isEmpty())
-                .andExpect(jsonPath("$.warnings[0]").value(containsString("새 주문으로 추가됩니다")));
+                .andExpect(jsonPath("$.warnings[0]").value("1번 주문은 수정할 수 없습니다. 이미 입금했거나 휴대폰 번호가 다릅니다."))
+                .andExpect(jsonPath("$.warnings[1]").value("이 번호로 입금한 주문이 있어, 이번 주문은 새 주문으로 추가됩니다."));
         again.put("replaceOrderNo", null);
         mvc.perform(withJson(post(url + "/orders"), again)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.orderNo").value(2))
@@ -127,28 +128,88 @@ class CustomerReorderTest extends IntegrationTest {
         assertThat(orders.get(0).get("changes")).isEmpty();
     }
 
+    /** "입금했어요"를 누르면 입금 후로 보고 수정하지 않는다 (2026-10-18 사용자 결정: 입금 전에만 수정) */
     @Test
-    void reportedDepositGetsExtraWarningAndSellerChangeIsShownSeparately() throws Exception {
+    void reportedDepositIsNotReplacedAndSellerChangeIsShownSeparately() throws Exception {
         Opened g = open(false);
         String url = "/api/public/g/" + g.token();
         Cookie device = mvc.perform(withJson(post(url + "/orders"), order(Map.of(g.apple(), 1), "010-7300-0001", "박입금", null)))
                 .andExpect(status().isOk()).andReturn().getResponse().getCookie("dcg_" + g.token());
+        mvc.perform(get(url).cookie(device))
+                .andExpect(jsonPath("$.myOrders[0].replaceable").value(true))
+                .andExpect(jsonPath("$.myOrders[0].editValues.phone").value("010-7300-0001"));
         mvc.perform(post(url + "/orders/1/report-deposit").cookie(device)).andExpect(status().isOk());
+        mvc.perform(get(url).cookie(device))
+                .andExpect(jsonPath("$.myOrders[0].replaceable").value(false))
+                .andExpect(jsonPath("$.myOrders[0].editValues").isEmpty());
 
+        // 같은 번호로 다시 주문하면 1번은 그대로, 새 주문으로 추가 (안내 경고)
         Map<String, Object> again = order(Map.of(g.apple(), 2), "010-7300-0001", "박입금", null);
         again.put("acknowledgeWarnings", false);
         mvc.perform(withJson(post(url + "/orders").cookie(device), again)).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.warnings[1]").value(containsString("차액은 판매자에게 문의해 주세요")));
+                .andExpect(jsonPath("$.replaceOrderNo").isEmpty())
+                .andExpect(jsonPath("$.warnings[0]").value("이 번호로 입금한 주문이 있어, 이번 주문은 새 주문으로 추가됩니다."));
+        // [주문 수정]으로 1번을 골라 보내도 수정되지 않는다
+        Map<String, Object> edit = order(Map.of(g.apple(), 2), "010-7300-0001", "박입금", 1);
+        mvc.perform(withJson(post(url + "/orders").cookie(device), edit)).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.warnings[0]").value("1번 주문은 수정할 수 없습니다. 이미 입금했거나 휴대폰 번호가 다릅니다."));
+        again.put("acknowledgeWarnings", true);
+        mvc.perform(withJson(post(url + "/orders").cookie(device), again)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderNo").value(2)).andExpect(jsonPath("$.changed").value(false));
 
-        // 판매자 변경은 고객 화면의 "판매자가 주문을 변경했어요"(changedAt), 고객 변경은 customerChangedAt
+        // 판매자 변경은 고객 화면의 "판매자가 주문을 변경했어요"(changedAt), 고객 수정은 customerChangedAt
         long orderId = sellerOrders(g).get(0).get("id").asLong();
         mvc.perform(withJson(put("/api/seller/group-buys/" + g.id() + "/orders/" + orderId).cookie(g.seller()),
                 Map.of("items", List.of(Map.of("productId", g.apple(), "quantity", 3)), "depositorName", "박입금")))
                 .andExpect(status().isOk());
         mvc.perform(get(url).cookie(device))
-                .andExpect(jsonPath("$.myOrders[0].changedAt").isNotEmpty())
-                .andExpect(jsonPath("$.myOrders[0].customerChangedAt").isEmpty())
-                .andExpect(jsonPath("$.myOrders[0].replaceable").value(true));
+                .andExpect(jsonPath("$.myOrders[1].orderNo").value(1))
+                .andExpect(jsonPath("$.myOrders[1].changedAt").isNotEmpty())
+                .andExpect(jsonPath("$.myOrders[1].customerChangedAt").isEmpty());
         assertThat(sellerOrders(g).get(0).get("changes").get(0).get("changedBy").asText()).isEqualTo("SELLER");
+    }
+
+    /** "내 주문"의 [주문 수정]: 고른 주문번호를 보내면 경고 없이 그 주문을 수정한다 */
+    @Test
+    void editButtonUpdatesTheChosenOrder() throws Exception {
+        Opened g = open(false);
+        String url = "/api/public/g/" + g.token();
+        String phone = "010-7400-0001";
+        Cookie device = mvc.perform(withJson(post(url + "/orders"), order(Map.of(g.apple(), 1), phone, "정수정", null)))
+                .andExpect(status().isOk()).andReturn().getResponse().getCookie("dcg_" + g.token());
+        // 1번 입금 확인 → 2번 새 주문 → 1번 입금 확인 취소: 수정할 수 있는 주문이 두 건
+        long first = sellerOrders(g).get(0).get("id").asLong();
+        String sellerOrder = "/api/seller/group-buys/" + g.id() + "/orders/" + first;
+        mvc.perform(withJson(post(sellerOrder + "/manual-paid").cookie(g.seller()), Map.of("depositorName", "정수정", "amount", 1000)))
+                .andExpect(status().isOk());
+        mvc.perform(withJson(post(url + "/orders").cookie(device), order(Map.of(g.pear(), 1), phone, "정수정", null)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.orderNo").value(2));
+        mvc.perform(post(sellerOrder + "/unconfirm-paid").cookie(g.seller())).andExpect(status().isOk());
+
+        // 1번을 골라 수정 → 1번이 바뀌고 2번은 그대로
+        mvc.perform(withJson(post(url + "/orders").cookie(device), order(Map.of(g.apple(), 3), phone, "정수정", 1)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderNo").value(1))
+                .andExpect(jsonPath("$.changed").value(true))
+                .andExpect(jsonPath("$.finalOrder.order.items[0].quantity").value(3));
+        JsonNode orders = sellerOrders(g);
+        assertThat(orders.get(0).get("items").get(0).get("quantity").asInt()).isEqualTo(3);
+        assertThat(orders.get(1).get("items").get(0).get("productName").asText()).isEqualTo("배");
+        assertThat(orders.get(1).get("changes")).isEmpty();
+
+        // 휴대폰 번호를 다르게 적으면 수정하지 않고 다시 확인
+        mvc.perform(withJson(post(url + "/orders").cookie(device), order(Map.of(g.apple(), 2), "010-7400-0002", "정수정", 1)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.replaceOrderNo").isEmpty())
+                .andExpect(jsonPath("$.warnings[0]").value("1번 주문은 수정할 수 없습니다. 이미 입금했거나 휴대폰 번호가 다릅니다."));
+
+        // 다른 기기(내 주문 찾기)에서는 수정용 값에 휴대폰·주소가 없다
+        Cookie other = mvc.perform(withJson(post(url + "/identify"), Map.of("phone", phone))).andExpect(status().isOk())
+                .andReturn().getResponse().getCookie("dcg_" + g.token());
+        mvc.perform(get(url).cookie(other))
+                .andExpect(jsonPath("$.myOrders[1].orderNo").value(1))
+                .andExpect(jsonPath("$.myOrders[1].editValues.limited").value(true))
+                .andExpect(jsonPath("$.myOrders[1].editValues.phone").isEmpty())
+                .andExpect(jsonPath("$.myOrders[1].editValues.depositorName").value("정수정"));
     }
 }
