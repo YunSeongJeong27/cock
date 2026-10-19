@@ -99,6 +99,10 @@ public class GroupBuy {
     /** 멈춤 중 고객 화면에 보여줄 링크 (밴드 글 등, 선택) */
     private String pauseLinkUrl;
 
+    /** 마지막으로 준 주문번호. 판매자가 주문을 지워도 번호를 다시 쓰지 않게 (2026-10-19) */
+    @Column(nullable = false)
+    private int lastOrderNo;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -159,6 +163,16 @@ public class GroupBuy {
         this.pauseMessage = message;
         this.pauseLinkUrl = linkUrl;
         this.updatedAt = now;
+    }
+
+    /**
+     * 다음 주문번호. 공구를 잠근 상태에서 부른다.
+     *
+     * @param maxExisting 지금 남아 있는 주문 중 가장 큰 번호 (이 칸이 생기기 전에 들어간 주문 대비)
+     */
+    public int nextOrderNo(int maxExisting) {
+        this.lastOrderNo = Math.max(lastOrderNo, maxExisting) + 1;
+        return lastOrderNo;
     }
 
     public boolean isPaused() {

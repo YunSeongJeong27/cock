@@ -35,6 +35,8 @@ const qtyOf = (o: SellerOrder, productId: number) =>
 export default function OrdersTab({ groupBuy, orders, reload }: Props) {
   const mobile = useIsMobile()
   const [filter, setFilter] = useState('all')
+  /** "완료" 목록에서 체크한 주문 (여러 건 삭제, 2026-10-19) */
+  const [checked, setChecked] = useState<Set<number>>(new Set())
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: 'orderNo', desc: false })
   const [error, setError] = useState<string | null>(null)
@@ -49,7 +51,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
       if (filter === 'unpaid' && !(o.active && o.paymentMethod === 'PREPAID' && !o.paid)) return false
       if (filter === 'refund' && !(o.refundRequired && !o.refundedAt)) return false
       if (filter === 'refundreq' && !refundPending(o)) return false
-      // 처리가 끝난 주문(취소·환불 완료)은 다른 목록에서 빼고 따로 모아 본다 (2026-10-19 사용자 결정)
+      // 처리가 끝난 주문(취소·환불 완료, 수령·입금까지 끝난 주문)은 다른 목록에서 빼고 "완료"에 따로 모은다 (2026-10-19 사용자 결정)
       if ((filter === 'finished') !== o.finished) return false
       if (filter === 'samenick' && o.sameNicknameOrderNos.length === 0) return false
       const q = query.trim()
@@ -101,7 +103,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
     post(`${o.id}/manual-paid`, { depositorName: name, amount: Number(amount.replace(/,/g, '')) })
   }
 
-  const sameNick = orders.filter((o) => o.sameNicknameOrderNos.length > 0).length
+  const sameNick = orders.filter((o) => !o.finished && o.sameNicknameOrderNos.length > 0).length
   const refundRequests = orders.filter(refundPending).length
   const finishedCount = orders.filter((o) => o.finished).length
   // 판매자 알림 설정 (2026-10-19). 꺼도 필터·주문 줄 표시는 그대로
@@ -177,7 +179,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             {o.active && o.paymentMethod === 'PREPAID' && !o.paid && <button className="btn small" onClick={() => manualPaid(o)}>수동 입금 확정</button>}
             {o.paid && !o.refundedAt && <button className="btn small" onClick={() => post(`${o.id}/unconfirm-paid`, undefined, '입금 확정을 취소할까요?')}>입금 확정 취소</button>}
             {o.refundRequired && !o.refundedAt && <button className="btn small ok" onClick={() => post(`${o.id}/refunded`)}>환불 완료</button>}
-            {o.active && !refundPending(o) && <button className="btn small danger" onClick={() => post(`${o.id}/cancel`, undefined, `${o.orderNo}번 주문을 취소할까요?${o.paid ? ' (입금 확정된 주문이라 환불 필요로 표시됩니다)' : ''}`)}>주문 취소</button>}
+            {o.active && !refundPending(o) && !o.pickedUp && <button className="btn small danger" onClick={() => post(`${o.id}/cancel`, undefined, `${o.orderNo}번 주문을 취소할까요?${o.paid ? ' (입금 확정된 주문이라 환불 필요로 표시됩니다)' : ''}`)}>주문 취소</button>}
           </div>
         )}
       </>
@@ -204,6 +206,27 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
         {children}{on ? (sort.desc ? ' ▼' : ' ▲') : ''}
       </th>
     )
+  }
+
+  // "완료" 목록에서만 체크해서 여러 건 삭제 (2026-10-19). 진행 중인 주문은 먼저 처리를 끝내야 지울 수 있다
+  const deleting = filter === 'finished'
+  const checkedShown = shown.filter((o) => checked.has(o.id))
+  function checkBox(o: SellerOrder) {
+    if (!deleting) return null
+    return <input type="checkbox" style={{ width: 16, height: 16, marginRight: 6, verticalAlign: 'middle' }} checked={checked.has(o.id)}
+      aria-label={`${o.orderNo}번 선택`}
+      onChange={(e) => { const next = new Set(checked); if (e.target.checked) next.add(o.id); else next.delete(o.id); setChecked(next) }} />
+  }
+  async function deleteChecked() {
+    if (!confirm(`선택한 ${checkedShown.length}건을 삭제할까요? 되돌릴 수 없습니다.`)) return
+    setError(null)
+    try {
+      await api.post(`/api/seller/group-buys/${groupBuy.id}/orders/delete`, { orderIds: checkedShown.map((o) => o.id) })
+      setChecked(new Set())
+      reload()
+    } catch (e) {
+      setError(errorMessage(e))
+    }
   }
 
   const products = groupBuy.products
@@ -234,7 +257,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
           {shown.map((o) => (
             <Fragment key={o.id}>
               <tr className={`grid-row${o.active ? '' : ' dim'}${open === o.id ? ' open' : ''}`}>
-                <td className="pin-1">{o.orderNo}</td>
+                <td className="pin-1">{checkBox(o)}{o.orderNo}</td>
                 <td className="pin-2"><b>{o.nickname || '-'}</b>{o.changes.length > 0 && <span className="chip">변경됨</span>}{warnings(o)}</td>
                 <td>{o.source === 'COMMENT' ? <span className="chip">댓글</span> : <span className="muted">링크</span>}</td>
                 <td>{o.depositorName || '-'}</td>
@@ -280,7 +303,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             <Fragment key={o.id}>
               <tr className={o.active ? '' : 'dim'}>
                 <td className="stack-title">
-                  <span className="muted">{o.orderNo}번 · </span>
+                  {checkBox(o)}<span className="muted">{o.orderNo}번 · </span>
                   <b>{o.nickname || o.depositorName}</b>
                   {o.nickname && o.depositorName && <div className="small muted">입금자 {o.depositorName}</div>}
                   {o.phone && <div className="small muted">{maskPhone(o.phone)}</div>}
@@ -327,13 +350,13 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
         </div>
       )}
       <div className="row mb">
-        <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: 170 }}>
+        <select value={filter} onChange={(e) => { setFilter(e.target.value); setChecked(new Set()) }} style={{ width: 170 }}>
           <option value="all">전체 ({orders.length - finishedCount})</option>
           <option value="active">주문 중 (취소 제외)</option>
           <option value="unpaid">미입금 (선입금)</option>
           <option value="refundreq">환불 신청 ({refundRequests})</option>
           <option value="refund">환불 필요</option>
-          <option value="finished">취소·환불 완료 ({finishedCount})</option>
+          <option value="finished">완료 ({finishedCount})</option>
           {(sameNick > 0 || filter === 'samenick') && <option value="samenick">링크·댓글 닉네임 같음 ({sameNick})</option>}
         </select>
         {mobile && (
@@ -348,6 +371,16 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
         )}
         <input type="text" placeholder="닉네임·입금자명·전화 뒷자리·주문번호 검색" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1, minWidth: 180 }} />
       </div>
+      {deleting && (
+        <div className="row mb">
+          <label className="check" style={{ margin: 0 }}>
+            <input type="checkbox" checked={shown.length > 0 && checkedShown.length === shown.length}
+              onChange={(e) => setChecked(new Set(e.target.checked ? shown.map((o) => o.id) : []))} /> 전체 선택
+          </label>
+          <button className="btn small danger" disabled={checkedShown.length === 0} onClick={deleteChecked}>선택 삭제 ({checkedShown.length})</button>
+          <span className="small muted">완료된 주문만 지울 수 있고, 지우면 되돌릴 수 없습니다.</span>
+        </div>
+      )}
       <ErrorBox message={error} />
       {mobile ? cards : grid}
     </div>

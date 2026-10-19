@@ -261,7 +261,7 @@ public class CommentService {
 
         List<CustomerTotal> totals = aggregate(groupBuy, commentRepository.findByGroupBuyIdOrderBySeqAsc(groupBuy.getId()));
         LocalDateTime now = LocalDateTime.now(clock);
-        int orderNo = orderRepository.maxOrderNo(groupBuy.getId());
+        int maxOrderNo = orderRepository.maxOrderNo(groupBuy.getId());
         // 댓글 주문은 픽업 예약으로 만든다 (정리본 5장). 결제 방식은 이 공구의 픽업 결제 설정을 따른다:
         // 픽업 선입금을 받으면 선입금(입금 대조 대상), 현장결제만 받으면 현장결제.
         // 픽업을 끈 공구(배송만)는 배송·선입금으로 만들고, 주소는 판매자가 따로 받는다 [제안].
@@ -283,7 +283,7 @@ public class CommentService {
             }
             // 댓글 고객은 휴대폰을 모르므로 댓글 닉네임으로 알아본다
             Customer customer = customers.byCommentNickname(groupBuy.getSeller().getId(), t.authorName().trim(), now);
-            CustomerOrder order = new CustomerOrder(groupBuy, ++orderNo, OrderSource.COMMENT, customer,
+            CustomerOrder order = new CustomerOrder(groupBuy, groupBuy.nextOrderNo(maxOrderNo), OrderSource.COMMENT, customer,
                     Tokens.random(16), now);
             order.fillCustomer(null, t.authorName(), null);
             order.fillReceive(receive, null, payment);

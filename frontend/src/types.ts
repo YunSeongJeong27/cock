@@ -144,7 +144,7 @@ export interface SellerOrder {
   status: DisplayStatus
   statusLabel: string
   active: boolean
-  /** 처리가 끝난 주문 (취소 + 환불 필요 없음 또는 환불 완료) → "취소·환불 완료"에만 보임 */
+  /** 처리가 끝난 주문 (취소 + 환불 필요 없음/환불 완료, 또는 수령 + 입금·현장결제 완료) → "완료"에만 보임 */
   finished: boolean
   paid: boolean
   paidAt: string | null

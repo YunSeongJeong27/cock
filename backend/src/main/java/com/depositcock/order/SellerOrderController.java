@@ -19,9 +19,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class SellerOrderController {
 
     private final SellerOrderService service;
+    private final OrderDeletion deletion;
 
-    public SellerOrderController(SellerOrderService service) {
+    public SellerOrderController(SellerOrderService service, OrderDeletion deletion) {
         this.service = service;
+        this.deletion = deletion;
+    }
+
+    /** 완료된 주문 여러 건 삭제 (2026-10-19) */
+    @PostMapping("/delete")
+    public OrderDtos.DeleteOrdersResponse delete(@PathVariable Long groupBuyId,
+                                                 @Valid @RequestBody OrderDtos.DeleteOrdersRequest request) {
+        return new OrderDtos.DeleteOrdersResponse(deletion.delete(CurrentSeller.id(), groupBuyId, request.orderIds()));
     }
 
     @GetMapping

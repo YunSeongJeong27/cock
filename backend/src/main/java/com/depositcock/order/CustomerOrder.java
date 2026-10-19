@@ -334,11 +334,15 @@ public class CustomerOrder {
     }
 
     /**
-     * 처리가 끝난 주문 (2026-10-19 사용자 결정: 판매자 주문 목록에서 "취소·환불 완료"로 따로 모음, 더 바꿀 수 없음).
-     * 취소됐고 환불이 필요 없거나 환불 완료됨. 취소 + 환불 필요(아직 송금 전)는 할 일이 남아 있으므로 아님
+     * 처리가 끝난 주문 (2026-10-19 사용자 결정: 판매자 주문 목록에서 "완료"로 따로 모음, 지울 수 있음).
+     * - 취소됐고 환불이 필요 없거나 환불 완료됨 (취소 + 환불 필요는 아직 송금할 일이 남아 있으므로 아님)
+     * - 수령 완료이고 돈도 받음 (입금 확정 또는 현장결제 완료). 수령했지만 입금 확인이 안 된 선입금 주문은 받을 돈이 남아 있으므로 아님
      */
     public boolean isFinished() {
-        return status == OrderStatus.CANCELLED && (!refundRequired || refundedAt != null);
+        if (status == OrderStatus.CANCELLED) {
+            return !refundRequired || refundedAt != null;
+        }
+        return pickedUp && (isPaid() || onsitePaid);
     }
 
     /**

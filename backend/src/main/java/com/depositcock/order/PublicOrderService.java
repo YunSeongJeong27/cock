@@ -244,7 +244,7 @@ public class PublicOrderService {
 
     private CustomerOrder newOrder(GroupBuy groupBuy, Customer customer, String deviceToken, OrderUpdate.Values v,
                                    Map<Long, Product> products, LocalDateTime now) {
-        CustomerOrder order = new CustomerOrder(groupBuy, orderRepository.maxOrderNo(groupBuy.getId()) + 1,
+        CustomerOrder order = new CustomerOrder(groupBuy, groupBuy.nextOrderNo(orderRepository.maxOrderNo(groupBuy.getId())),
                 OrderSource.FORM, customer, Tokens.random(16), now);
         order.placedFrom(deviceToken);
         order.fillCustomer(v.depositorName(), v.nickname(), v.unitAddress());

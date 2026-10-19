@@ -91,6 +91,10 @@ public class SellerOrderService {
             throw ApiException.badRequest("이미 취소된 주문입니다.");
         }
         requireNoRefundPending(order);
+        // 물건을 건넨 주문을 바로 취소하면 재고가 다시 늘어난다. 잘못 체크했으면 수령 체크를 해제한 뒤 취소 (2026-10-19)
+        if (order.isPickedUp()) {
+            throw ApiException.badRequest("수령 완료된 주문입니다. 취소하려면 수령 체크를 먼저 해제해 주세요.");
+        }
         OrderCancellation.cancel(order, productRepository, entityManager, stockAlerts, LocalDateTime.now(clock));
         return OrderMapper.toSellerOrder(order, false, cipher);
     }

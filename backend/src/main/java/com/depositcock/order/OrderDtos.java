@@ -204,7 +204,7 @@ public final class OrderDtos {
             DisplayStatus status,
             String statusLabel,
             boolean active,
-            /** 처리가 끝난 주문 (취소 + 환불 필요 없음 또는 환불 완료) → 판매자 주문 목록의 "취소·환불 완료"에만 보임 (2026-10-19) */
+            /** 처리가 끝난 주문 (취소 + 환불 필요 없음/환불 완료, 또는 수령 + 입금·현장결제 완료) → 판매자 주문 목록의 "완료"에만 보임 (2026-10-19) */
             boolean finished,
             boolean paid,
             LocalDateTime paidAt,
@@ -264,6 +264,13 @@ public final class OrderDtos {
     }
 
     public record PickedUpRequest(boolean pickedUp) {
+    }
+
+    /** 완료된 주문 삭제 (여러 건) */
+    public record DeleteOrdersRequest(@NotEmpty @Size(max = 1000) List<@NotNull Long> orderIds) {
+    }
+
+    public record DeleteOrdersResponse(int deletedCount) {
     }
 
     public record ManualPaidRequest(@NotBlank @Size(max = 100) String depositorName, @Min(0) int amount) {

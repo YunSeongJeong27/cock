@@ -81,6 +81,8 @@ CREATE TABLE group_buy (
     paused                     BOOLEAN      NOT NULL DEFAULT FALSE,
     pause_message              VARCHAR(300),
     pause_link_url             VARCHAR(500),
+    -- 마지막으로 준 주문번호. 판매자가 주문을 지워도 번호를 다시 쓰지 않게 (2026-10-19)
+    last_order_no              INTEGER      NOT NULL DEFAULT 0,
     created_at                 TIMESTAMP    NOT NULL,
     updated_at                 TIMESTAMP    NOT NULL
 );
