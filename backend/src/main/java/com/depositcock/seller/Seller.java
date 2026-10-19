@@ -2,14 +2,23 @@ package com.depositcock.seller;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.Map;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.MapKeyColumn;
+import jakarta.persistence.MapKeyEnumerated;
 import jakarta.persistence.Table;
 
 @Entity
@@ -62,6 +71,14 @@ public class Seller {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    /** 판매자가 켜고 끈 알림 (2026-10-19). 없는 알림은 NotificationType 기본값 */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "seller_notification", joinColumns = @JoinColumn(name = "seller_id"))
+    @MapKeyEnumerated(EnumType.STRING)
+    @MapKeyColumn(name = "notification_type")
+    @Column(name = "enabled", nullable = false)
+    private Map<NotificationType, Boolean> notifications = new HashMap<>();
+
     protected Seller() {
     }
 
@@ -94,6 +111,28 @@ public class Seller {
         this.defaultBankName = bankName;
         this.defaultAccountNumber = accountNumber;
         this.defaultAccountHolder = accountHolder;
+    }
+
+    public boolean isNotificationOn(NotificationType type) {
+        return notifications.getOrDefault(type, type.isDefaultOn());
+    }
+
+    /** 알림 전체 (판매자가 안 정한 것은 기본값으로 채움) */
+    public Map<NotificationType, Boolean> notificationSettings() {
+        Map<NotificationType, Boolean> all = new EnumMap<>(NotificationType.class);
+        for (NotificationType type : NotificationType.values()) {
+            all.put(type, isNotificationOn(type));
+        }
+        return all;
+    }
+
+    /** 보낸 것만 바꾼다 (보내지 않은 알림은 그대로) */
+    public void changeNotifications(Map<NotificationType, Boolean> changes) {
+        changes.forEach((type, on) -> {
+            if (type != null && on != null) {
+                notifications.put(type, on);
+            }
+        });
     }
 
     public void changeDailyCaptureLimit(Integer dailyCaptureLimit) {

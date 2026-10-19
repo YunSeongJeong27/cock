@@ -16,7 +16,14 @@ export interface Me {
   defaultAccountHolder: string | null
   /** 댓글 주문 기능을 쓸 수 있는지 (관리자가 전체 공개했거나 이 판매자에게 허용) */
   commentFeatureEnabled: boolean
+  /** 알림 켜짐/꺼짐 (2026-10-19, 모든 종류가 옴) */
+  notifications: Record<NotificationType, boolean>
 }
+
+/** 판매자 알림 종류. MAIL_ = 가입 이메일로 보내는 메일, SCREEN_ = 판매자 화면의 알림 칸 */
+export type NotificationType =
+  | 'MAIL_STOCK' | 'MAIL_REFUND_REQUEST' | 'MAIL_NEW_ORDER' | 'MAIL_CUSTOMER_CHANGE' | 'MAIL_CUSTOMER_CANCEL' | 'MAIL_AUTO_CLOSE'
+  | 'SCREEN_STOCK' | 'SCREEN_REFUND_REQUEST' | 'SCREEN_SAME_NICKNAME'
 
 export type GroupBuyStatus = 'DRAFT' | 'OPEN' | 'CLOSED'
 export type ShippingFeeType = 'NONE' | 'FIXED'

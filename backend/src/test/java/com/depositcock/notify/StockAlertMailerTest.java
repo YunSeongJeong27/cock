@@ -30,7 +30,7 @@ class StockAlertMailerTest {
     void sendsHtmlMailWithAbuseWarning() throws Exception {
         JavaMailSender sender = mock(JavaMailSender.class);
         when(sender.createMimeMessage()).thenReturn(new MimeMessage(Session.getInstance(new Properties())));
-        StockAlertMailer mailer = new StockAlertMailer(provider(sender), "", "alert@gmail.com", "https://example.com/");
+        StockAlertMailer mailer = new StockAlertMailer(new SellerMail(provider(sender), "", "alert@gmail.com", "https://example.com/"));
         mailer.onStockAlert(new StockAlertEvent("seller@test.local", 7L, "홍게 공구", "홍게", 3));
         ArgumentCaptor<MimeMessage> sent = ArgumentCaptor.forClass(MimeMessage.class);
         verify(sender).send(sent.capture());
@@ -51,8 +51,8 @@ class StockAlertMailerTest {
     @Test
     void skipsWhenMailNotConfigured() {
         JavaMailSender sender = mock(JavaMailSender.class);
-        new StockAlertMailer(provider(null), "", "", "").onStockAlert(new StockAlertEvent("a", 1L, "t", "홍게", 1));
-        new StockAlertMailer(provider(sender), "", "", "").onStockAlert(new StockAlertEvent("a", 1L, "t", "홍게", 1));
+        new StockAlertMailer(new SellerMail(provider(null), "", "", "")).onStockAlert(new StockAlertEvent("a", 1L, "t", "홍게", 1));
+        new StockAlertMailer(new SellerMail(provider(sender), "", "", "")).onStockAlert(new StockAlertEvent("a", 1L, "t", "홍게", 1));
         verify(sender, never()).send(any(MimeMessage.class));
     }
 }

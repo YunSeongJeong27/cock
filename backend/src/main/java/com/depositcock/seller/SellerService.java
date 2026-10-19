@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.AppProperties;
@@ -71,6 +72,13 @@ public class SellerService {
         Seller seller = get(sellerId);
         seller.updateDefaults(request.displayName().trim(), blankToNull(request.defaultBankName()),
                 blankToNull(request.defaultAccountNumber()), blankToNull(request.defaultAccountHolder()));
+        return seller;
+    }
+
+    @Transactional
+    public Seller updateNotifications(Long sellerId, Map<NotificationType, Boolean> notifications) {
+        Seller seller = get(sellerId);
+        seller.changeNotifications(notifications);
         return seller;
     }
 

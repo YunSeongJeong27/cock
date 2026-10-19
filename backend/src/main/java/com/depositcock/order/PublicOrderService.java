@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.DataCipher;
@@ -26,6 +27,7 @@ import com.depositcock.groupbuy.PickupPoint;
 import com.depositcock.groupbuy.Product;
 import com.depositcock.groupbuy.ProductRepository;
 import com.depositcock.groupbuy.ShippingFeeType;
+import com.depositcock.notify.SellerNotices;
 import com.depositcock.order.OrderDtos.AccountInfo;
 import com.depositcock.order.OrderDtos.CancelRequest;
 import com.depositcock.order.OrderDtos.FinalOrder;
@@ -38,6 +40,7 @@ import com.depositcock.order.OrderDtos.Prefill;
 import com.depositcock.order.OrderDtos.PublicGroupBuy;
 import com.depositcock.order.OrderDtos.PublicProduct;
 import com.depositcock.order.OrderDtos.RefundRequest;
+import com.depositcock.seller.NotificationType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import jakarta.persistence.EntityManager;
@@ -62,11 +65,14 @@ public class PublicOrderService {
     private final Clock clock;
     private final StockAlerts stockAlerts;
     private final DataCipher cipher;
+    private final SellerNotices notices;
 
     public PublicOrderService(GroupBuyRepository groupBuyRepository, ProductRepository productRepository,
                               CustomerOrderRepository orderRepository, CustomerDeviceRepository deviceRepository,
                               CustomerRepository customerRepository, Customers customers,
-                              EntityManager entityManager, Clock clock, StockAlerts stockAlerts, DataCipher cipher) {
+                              EntityManager entityManager, Clock clock, StockAlerts stockAlerts, DataCipher cipher,
+                              SellerNotices notices) {
+        this.notices = notices;
         this.cipher = cipher;
         this.stockAlerts = stockAlerts;
         this.customerRepository = customerRepository;
@@ -203,14 +209,18 @@ public class PublicOrderService {
             order = target;
             // 번호만 알면 남이 바꿀 수도 있어서, 주문한 기기가 아닌 곳에서 바꾸면 판매자 기록에 표시한다
             boolean otherDevice = !Objects.equals(target.getDeviceToken(), newCookie != null ? newCookie : cookieToken);
-            OrderUpdate.apply(order, values, ChangeActor.CUSTOMER, otherDevice ? "(주문한 기기와 다른 기기에서 바꿈)" : null,
-                    productRepository, entityManager, stockAlerts, now);
+            String summary = OrderUpdate.apply(order, values, ChangeActor.CUSTOMER,
+                    otherDevice ? "(주문한 기기와 다른 기기에서 바꿈)" : null, productRepository, entityManager, stockAlerts, now);
             orderRepository.flush();
+            notices.notify(groupBuy, NotificationType.MAIL_CUSTOMER_CHANGE,
+                    order.getOrderNo() + "번 주문을 고객이 수정했습니다.", List.of(summary));
         } else {
             Customer customer = customers.byPhone(sellerId, phone, now);
             // 새 주문만으로는 본인 확인으로 치지 않는다 (남의 번호로 주문해 그 사람의 다른 주문을 보는 것 방지)
             newCookie = rememberDevice(groupBuy, cookieToken, customer.getId(), false, now);
             order = newOrder(groupBuy, customer, newCookie != null ? newCookie : cookieToken, values, products, now);
+            notices.notify(groupBuy, NotificationType.MAIL_NEW_ORDER, order.getOrderNo() + "번 새 주문이 들어왔습니다.",
+                    List.of(noticeLine(order)));
         }
 
         String deviceToken = newCookie != null ? newCookie : cookieToken;
@@ -224,6 +234,12 @@ public class PublicOrderService {
         return new WithCookie<>(new PlaceOrderResponse(order.getOrderNo(), order.getExpectedAmount(),
                 order.getPaymentMethod(), order.getDepositorName(), account, myOrders, target != null, finalOrder),
                 newCookie);
+    }
+
+    /** 알림 메일 한 줄: 상품·금액만 (이름·연락처·계좌는 메일에 넣지 않는다, 판매자 화면에서 봄) */
+    private static String noticeLine(CustomerOrder order) {
+        return order.getItems().stream().map(i -> i.getProductNameSnapshot() + " " + i.getQuantity() + "개")
+                .collect(Collectors.joining(", ")) + " · " + String.format("%,d원", order.getExpectedAmount());
     }
 
     private CustomerOrder newOrder(GroupBuy groupBuy, Customer customer, String deviceToken, OrderUpdate.Values v,
@@ -339,6 +355,8 @@ public class PublicOrderService {
             throw refundInstead();
         }
         OrderCancellation.cancel(order, productRepository, entityManager, stockAlerts, now);
+        notices.notify(groupBuy, NotificationType.MAIL_CUSTOMER_CANCEL, order.getOrderNo() + "번 주문을 고객이 취소했습니다.",
+                List.of(noticeLine(order)));
         // 응답은 이 기기가 볼 수 있는 주문만 (취소 정보를 안다고 그 사람의 다른 주문까지 보여주지 않음)
         return toPublic(groupBuy, device(groupBuy, cookieToken).orElse(null), now);
     }
@@ -376,6 +394,10 @@ public class PublicOrderService {
                     : "환불 신청이 반려된 주문입니다. 판매자에게 문의해 주세요.");
         }
         order.requestRefund(r.bankName().trim(), cipher.encrypt(account), r.accountHolder().trim(), now);
+        notices.notify(groupBuy, NotificationType.MAIL_REFUND_REQUEST, order.getOrderNo() + "번 주문에 환불 신청이 들어왔습니다.",
+                List.of(noticeLine(order),
+                        order.isConfirmed() ? "주문 확정된 주문입니다." : "주문 확정 전 주문입니다. 입금 내역을 먼저 확인해 주세요.",
+                        "주문 목록에서 [취소하고 환불] 또는 [취소 안 함]을 눌러 주세요. 환불 계좌는 판매자 화면에서 볼 수 있습니다."));
         return toPublic(groupBuy, device(groupBuy, cookieToken).orElse(null), now);
     }
 

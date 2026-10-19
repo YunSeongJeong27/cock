@@ -1,5 +1,6 @@
 package com.depositcock.groupbuy;
 
+import com.depositcock.seller.NotificationType;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -7,6 +8,7 @@ import org.springframework.stereotype.Service;
  * 재고 알림 (2026-10-16 사용자 결정). 남은 수량이 판매자가 정한 기준 이하가 되면 한 번 알린다(메일).
  * 화면 알림은 판매자 화면이 현재 남은 수량으로 직접 보여 준다. 남은 수량이 기준보다 다시 많아지면(취소, 재고 늘림)
  * 다시 알릴 수 있게 되돌린다. 판매 수량을 바꾼 뒤(공구 잠금 안에서) 호출한다.
+ * 판매자가 알림 설정에서 재고 메일을 껐으면 메일만 안 보낸다 (보낸 것으로 표시는 그대로, 2026-10-19).
  */
 @Service
 public class StockAlerts {
@@ -34,6 +36,9 @@ public class StockAlerts {
         if (remaining <= threshold && !product.isStockAlertSent()) {
             product.markStockAlertSent(true);
             GroupBuy groupBuy = product.getGroupBuy();
+            if (!groupBuy.getSeller().isNotificationOn(NotificationType.MAIL_STOCK)) {
+                return;
+            }
             events.publishEvent(new StockAlertEvent(groupBuy.getSeller().getEmail(), groupBuy.getId(),
                     groupBuy.getTitle(), product.getName(), remaining));
         } else if (remaining > threshold && product.isStockAlertSent()) {

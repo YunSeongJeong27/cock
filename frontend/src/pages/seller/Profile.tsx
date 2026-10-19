@@ -3,14 +3,47 @@ import { useNavigate } from 'react-router-dom'
 import { api, errorMessage } from '../../api'
 import { useAuth } from '../../auth'
 import { ErrorBox } from '../../components/Ui'
-import type { Me } from '../../types'
+import type { Me, NotificationType } from '../../types'
+
+/** 알림 설정 (2026-10-19). 처음에는 꼭 필요한 것만 켜져 있다 (서버 NotificationType 기본값) */
+const MAIL_ITEMS: { type: NotificationType; label: string; note: string }[] = [
+  { type: 'MAIL_REFUND_REQUEST', label: '고객 환불 신청', note: '신청마다 1통' },
+  { type: 'MAIL_STOCK', label: '재고 알림 기준 도달', note: '기준 이하가 될 때 1통' },
+  { type: 'MAIL_NEW_ORDER', label: '새 주문', note: '주문마다 1통' },
+  { type: 'MAIL_CUSTOMER_CHANGE', label: '고객 주문 수정', note: '수정마다 1통' },
+  { type: 'MAIL_CUSTOMER_CANCEL', label: '고객 바로 취소', note: '취소마다 1통' },
+  { type: 'MAIL_AUTO_CLOSE', label: '마감 시각 자동 마감', note: '공구마다 1통' },
+]
+const SCREEN_ITEMS: { type: NotificationType; label: string }[] = [
+  { type: 'SCREEN_REFUND_REQUEST', label: '주문 목록 위 "고객 환불 신청 N건" 칸' },
+  { type: 'SCREEN_STOCK', label: '공구 화면 맨 위 재고 알림 칸' },
+  { type: 'SCREEN_SAME_NICKNAME', label: '주문 목록 위 "링크·댓글 닉네임 같은 주문 N건" 칸' },
+]
 
 export default function Profile() {
   const { me, setMe } = useAuth()
   const [form, setForm] = useState({ displayName: '', defaultBankName: '', defaultAccountNumber: '', defaultAccountHolder: '' })
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [notifyError, setNotifyError] = useState<string | null>(null)
+  const [notifySaving, setNotifySaving] = useState(false)
   const navigate = useNavigate()
+
+  /** 체크하면 화면에 먼저 반영하고 바로 저장. 실패하면 되돌린다 */
+  async function toggle(type: NotificationType, on: boolean) {
+    if (!me) return
+    setNotifyError(null)
+    setNotifySaving(true)
+    setMe({ ...me, notifications: { ...me.notifications, [type]: on } })
+    try {
+      setMe(await api.put<Me>('/api/seller/notifications', { notifications: { [type]: on } }))
+    } catch (err) {
+      setMe(me)
+      setNotifyError(errorMessage(err))
+    } finally {
+      setNotifySaving(false)
+    }
+  }
 
   async function withdraw() {
     const password = prompt('탈퇴하면 모든 공구·주문·입금 정보가 삭제되고 되돌릴 수 없습니다. 필요한 주문 정리표는 먼저 내려받으세요.\n계속하려면 비밀번호를 입력하세요.')
@@ -67,6 +100,28 @@ export default function Profile() {
         {saved && <div className="success-box">저장했습니다.</div>}
         <button className="btn primary mt">저장</button>
       </form>
+      <div className="card">
+        <h3>알림 설정</h3>
+        <div className="muted small">처음에는 꼭 필요한 알림만 켜져 있습니다. 체크하면 바로 저장됩니다.</div>
+        <h4 className="mt">메일 ({me.email})</h4>
+        {MAIL_ITEMS.map((item) => (
+          <label key={item.type} className="check">
+            <input type="checkbox" checked={me.notifications[item.type]} disabled={notifySaving}
+              onChange={(e) => toggle(item.type, e.target.checked)} />
+            <span>{item.label} <span className="muted small">— {item.note}</span></span>
+          </label>
+        ))}
+        <h4 className="mt">화면</h4>
+        {SCREEN_ITEMS.map((item) => (
+          <label key={item.type} className="check">
+            <input type="checkbox" checked={me.notifications[item.type]} disabled={notifySaving}
+              onChange={(e) => toggle(item.type, e.target.checked)} />
+            <span>{item.label}</span>
+          </label>
+        ))}
+        <div className="muted small mt">주문 줄의 표시(환불 신청·환불 필요 등)와 대시보드 숫자는 처리할 일을 놓치지 않게 항상 보입니다.</div>
+        <ErrorBox message={notifyError} />
+      </div>
       {me.role !== 'ADMIN' && (
         <div className="card">
           <h3>탈퇴</h3>

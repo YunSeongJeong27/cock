@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { api, dateTime, errorMessage, maskPhone, shortTime, won } from '../../api'
+import { useAuth } from '../../auth'
 import { CopyButton, ErrorBox, StatusBadge, useIsMobile } from '../../components/Ui'
 import type { GroupBuy, SellerOrder } from '../../types'
 import OrderEditForm, { changeReply } from './OrderEditForm'
@@ -98,6 +99,10 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
 
   const sameNick = orders.filter((o) => o.sameNicknameOrderNos.length > 0).length
   const refundRequests = orders.filter(refundPending).length
+  // 판매자 알림 설정 (2026-10-19). 꺼도 필터·주문 줄 표시는 그대로
+  const { me } = useAuth()
+  const showRefundBanner = me?.notifications.SCREEN_REFUND_REQUEST !== false
+  const showNickBanner = me?.notifications.SCREEN_SAME_NICKNAME !== false
 
   /** 환불받을 계좌 (복사 버튼). 키가 바뀌어 못 읽으면 안내 */
   const refundAccount = (o: SellerOrder) => (
@@ -158,7 +163,8 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             {o.active && !o.pickedUp && <button className="btn small" onClick={() => startEdit(o)}>주문 변경</button>}
             {o.active && o.paymentMethod === 'PREPAID' && !o.paid && <button className="btn small" onClick={() => manualPaid(o)}>수동 입금 확정</button>}
             {o.paid && <button className="btn small" onClick={() => post(`${o.id}/unconfirm-paid`, undefined, '입금 확정을 취소할까요?')}>입금 확정 취소</button>}
-            {o.refundRequired && !o.refundedAt && <button className="btn small ok" onClick={() => post(`${o.id}/refunded`)}>환불 완료</button>}
+            {o.refundRequired && !o.refundedAt && <button className="btn small ok" onClick={() => post(`${o.id}/refunded`, undefined,
+              `${o.orderNo}번 주문에 돈을 돌려보냈나요? [환불 완료]는 되돌릴 수 없습니다.${o.refundBank ? ' 고객 환불 계좌도 지워집니다.' : ''}`)}>환불 완료</button>}
             {o.active && <button className="btn small danger" onClick={() => post(`${o.id}/cancel`, undefined, `${o.orderNo}번 주문을 취소할까요?${o.paid ? ' (입금 확정된 주문이라 환불 필요로 표시됩니다)' : ''}`)}>주문 취소</button>}
           </div>
         )}
@@ -296,13 +302,13 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
 
   return (
     <div>
-      {refundRequests > 0 && filter !== 'refundreq' && (
+      {showRefundBanner && refundRequests > 0 && filter !== 'refundreq' && (
         <div className="warn-box row between mb">
           <span className="small">고객 환불 신청이 {refundRequests}건 있습니다. 상세에서 [취소하고 환불] 또는 [취소 안 함]을 눌러 주세요.</span>
           <button className="btn small" onClick={() => setFilter('refundreq')}>모아 보기</button>
         </div>
       )}
-      {sameNick > 0 && filter !== 'samenick' && (
+      {showNickBanner && sameNick > 0 && filter !== 'samenick' && (
         <div className="warn-box row between mb">
           <span className="small">⚠ 링크 주문과 댓글 주문의 닉네임이 같은 주문이 {sameNick}건 있습니다. 같은 사람이 두 번 주문한 것이면 하나를 취소하거나 바꿔 주세요.</span>
           <button className="btn small" onClick={() => setFilter('samenick')}>모아 보기</button>

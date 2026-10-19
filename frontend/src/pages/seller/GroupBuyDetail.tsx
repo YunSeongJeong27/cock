@@ -122,7 +122,7 @@ export default function GroupBuyDetail() {
           {dashboard.refundPendingCount > 0 && <Stat label="환불 필요" value={dashboard.refundPendingCount} tone="danger" />}
         </div>
       )}
-      <StockStatus products={groupBuy.products} />
+      <StockStatus products={groupBuy.products} showAlert={me?.notifications.SCREEN_STOCK !== false} />
       <ErrorBox message={error} />
 
       {/* 주문 링크만 쓰는 공구는 댓글 집계를 숨긴다 (저장된 탭이 댓글이었으면 주문 목록으로) */}
@@ -168,16 +168,16 @@ function stockHeadline(p: Product): string {
 
 /**
  * 판매자용 상품별 재고 현황 + 알림 (2026-10-16 사용자 결정). 재고로 주문을 막지 않으므로 초과 수량까지 그대로 보여 주고,
- * 남은 수량이 알림 기준 이하이거나 초과되면 맨 위에 알린다.
+ * 남은 수량이 알림 기준 이하이거나 초과되면 맨 위에 알린다. 알림 칸은 판매자가 알림 설정에서 끌 수 있다 (표는 그대로, 2026-10-19).
  */
-function StockStatus({ products }: { products: Product[] }) {
+function StockStatus({ products, showAlert }: { products: Product[]; showAlert: boolean }) {
   const stocked = products.filter((p) => p.stockLimit != null)
   if (stocked.length === 0) return null
   const alerts = stocked.filter((p) => (p.remaining ?? 0) < 0
     || (p.stockAlertThreshold != null && p.remaining != null && p.remaining <= p.stockAlertThreshold))
   return (
     <>
-      {alerts.length > 0 && (
+      {showAlert && alerts.length > 0 && (
         <div className="warn-box">
           {alerts.map((p) => <div key={p.id}><b>{stockHeadline(p)}</b></div>)}
           <div className="small" style={{ color: 'var(--danger)', marginTop: 4 }}>악용하는 고객이 있을 수 있으니 계좌 입금내역 대조를 통해 확인하십시오.</div>

@@ -23,6 +23,14 @@ CREATE TABLE seller (
     created_at             TIMESTAMP    NOT NULL
 );
 
+-- 판매자 알림 켜고 끄기 (2026-10-19). 줄이 없는 알림은 기본값(NotificationType.defaultOn)을 따른다
+CREATE TABLE seller_notification (
+    seller_id         BIGINT      NOT NULL REFERENCES seller (id) ON DELETE CASCADE,
+    notification_type VARCHAR(40) NOT NULL,
+    enabled           BOOLEAN     NOT NULL,
+    PRIMARY KEY (seller_id, notification_type)
+);
+
 -- 서비스 전체 설정 (관리자가 바꿈). 예: comment_feature_open = true/false (댓글 주문 기능 전체 공개, 없으면 꺼짐)
 CREATE TABLE app_setting (
     setting_key   VARCHAR(100) PRIMARY KEY,

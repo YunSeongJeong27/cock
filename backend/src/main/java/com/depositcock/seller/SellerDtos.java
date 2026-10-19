@@ -2,6 +2,7 @@ package com.depositcock.seller;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
@@ -45,13 +46,20 @@ public final class SellerDtos {
             String defaultAccountNumber,
             String defaultAccountHolder,
             /** 댓글 주문 기능을 쓸 수 있는지 (전체 공개 또는 판매자별 허용) */
-            boolean commentFeatureEnabled) {
+            boolean commentFeatureEnabled,
+            /** 알림 켜짐/꺼짐 (모든 종류, 안 정한 것은 기본값) */
+            Map<NotificationType, Boolean> notifications) {
 
         public static MeResponse of(Seller s, LocalDateTime now, boolean commentFeatureEnabled) {
             return new MeResponse(s.getId(), s.getEmail(), s.getDisplayName(), s.getRole(), s.getPlan(),
                     s.getTrialEndsAt(), s.getPaidUntil(), s.isExpired(now), s.isSuspended(),
-                    s.getDefaultBankName(), s.getDefaultAccountNumber(), s.getDefaultAccountHolder(), commentFeatureEnabled);
+                    s.getDefaultBankName(), s.getDefaultAccountNumber(), s.getDefaultAccountHolder(), commentFeatureEnabled,
+                    s.notificationSettings());
         }
+    }
+
+    /** 알림 켜고 끄기. 보낸 종류만 바뀐다 */
+    public record UpdateNotificationsRequest(@NotNull Map<NotificationType, Boolean> notifications) {
     }
 
     public record AdminSellerRow(

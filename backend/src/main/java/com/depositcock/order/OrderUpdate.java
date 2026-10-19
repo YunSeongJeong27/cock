@@ -57,8 +57,9 @@ final class OrderUpdate {
      * 예외가 나면 트랜잭션 롤백으로 앞서 바꾼 판매 수량도 되돌아간다.
      *
      * @param note 기록 끝에 붙일 말 (없으면 null)
+     * @return 남긴 기록 문장 (예: "사과 2→3개, 금액 2,000원→3,000원")
      */
-    static void apply(CustomerOrder order, Values v, ChangeActor actor, String note, ProductRepository productRepository,
+    static String apply(CustomerOrder order, Values v, ChangeActor actor, String note, ProductRepository productRepository,
                       EntityManager em, StockAlerts stockAlerts, LocalDateTime now) {
         GroupBuy groupBuy = order.getGroupBuy();
         Map<Long, Product> products = new LinkedHashMap<>();
@@ -150,7 +151,9 @@ final class OrderUpdate {
         if (note != null) {
             changes.add(note);
         }
-        order.recordChange(String.join(", ", changes), actor, now);
+        String summary = String.join(", ", changes);
+        order.recordChange(summary, actor, now);
+        return summary;
     }
 
     private static String soldOutMessage(Product product, int before, ChangeActor actor) {

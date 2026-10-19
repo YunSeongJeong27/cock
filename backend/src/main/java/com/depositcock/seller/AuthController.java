@@ -8,6 +8,7 @@ import com.depositcock.security.TokenService;
 import com.depositcock.seller.SellerDtos.LoginRequest;
 import com.depositcock.seller.SellerDtos.MeResponse;
 import com.depositcock.seller.SellerDtos.SignupRequest;
+import com.depositcock.seller.SellerDtos.UpdateNotificationsRequest;
 import com.depositcock.seller.SellerDtos.UpdateProfileRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -68,6 +69,11 @@ public class AuthController {
     @PutMapping("/api/seller/profile")
     public MeResponse updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         return toMe(sellerService.updateProfile(CurrentSeller.id(), request));
+    }
+
+    @PutMapping("/api/seller/notifications")
+    public MeResponse updateNotifications(@Valid @RequestBody UpdateNotificationsRequest request) {
+        return toMe(sellerService.updateNotifications(CurrentSeller.id(), request.notifications()));
     }
 
     private MeResponse toMe(Seller seller) {

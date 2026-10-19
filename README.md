@@ -110,7 +110,7 @@ docker run -p 8080:8080 \
 | `ANTHROPIC_API_KEY` | 위가 `anthropic` 일 때 필요 |
 | `APP_VISION_MODEL` | 비전 모델 (기본 `claude-haiku-5-5`) |
 | `APP_VISION_DAILY_CAPTURE_LIMIT` | 판매자별 하루 캡처 장수 기본 제한 (기본 30, 관리자 화면에서 판매자별 변경) |
-| `SPRING_MAIL_HOST`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` | 재고 알림 메일 (SMTP). 없으면 메일을 보내지 않음 (화면 알림만). Gmail 예: `smtp.gmail.com`, 보내는 Gmail 주소, 구글 계정의 "앱 비밀번호" |
+| `SPRING_MAIL_HOST`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` | 판매자 알림 메일 (SMTP: 재고·환불 신청 등, 판매자가 "내 정보 → 알림 설정"에서 켠 것). 없으면 메일을 보내지 않음 (화면 알림만, 아직 설정 전). Gmail 예: `smtp.gmail.com`, 보내는 Gmail 주소, 구글 계정의 "앱 비밀번호" |
 | `SPRING_MAIL_PORT` | SMTP 포트 (기본 587, STARTTLS) |
 | `APP_MAIL_FROM` | 보내는 사람 주소 (비우면 `SPRING_MAIL_USERNAME`) |
 | `APP_PUBLIC_BASE_URL` | 메일 속 "공구 화면 열기" 링크용 서비스 주소 (예: `https://example.com`, 비우면 링크 없음) |
