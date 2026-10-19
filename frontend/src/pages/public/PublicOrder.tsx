@@ -447,6 +447,8 @@ export default function PublicOrder() {
         <form className="card" id="order-form" onSubmit={(e) => submit(e)}>
           <h3>{editing ? `${editing.orderNo}번 주문 수정` : replaceTarget ? '주문서' : view.myOrders.length > 0 ? '추가 주문하기' : '주문서'}</h3>
           {editing && editing.paymentMethod === 'PREPAID' && <div className="small mb"><b>주문 확정 전이에요.</b></div>}
+          {/* 수정은 휴대폰 번호 + 입금자명이 기존 주문과 같아야 한다 (2026-10-19). 그래서 둘은 고칠 수 없다 */}
+          {editing && <div className="small muted mb">휴대폰 번호·입금자명은 수정할 수 없어요. (바꾸려면 판매자에게 문의)</div>}
           {!editing && replaceTarget && (
             <div className="small mb">주문을 고치려면 위 <b>주문 수정</b>을 눌러 주세요.{replaceTarget.paymentMethod === 'PREPAID' && ' (주문 확정 전까지)'}</div>
           )}
@@ -523,7 +525,8 @@ export default function PublicOrder() {
           <div className="mt">
             <label className="field"><span>휴대폰 번호 *</span><input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} required placeholder="010-0000-0000"
               readOnly={!!(editing && editing.editValues?.phone)} /></label>
-            <label className="field"><span>입금자명 *</span><input type="text" value={form.depositorName} onChange={(e) => set('depositorName', e.target.value)} required placeholder="통장에 찍힐 이름" />
+            <label className="field"><span>입금자명 *</span><input type="text" value={form.depositorName} onChange={(e) => set('depositorName', e.target.value)} required placeholder="통장에 찍힐 이름"
+              readOnly={!!(editing && editing.editValues?.depositorName)} />
               <span className="muted small" style={{ fontWeight: 400 }}>{payment === 'ONSITE' ? '주문 확인용 이름입니다.' : '계좌이체할 때 받는 분 통장 표시에 이 이름을 적어주세요.'}</span>
             </label>
             <label className="field"><span>{view.nicknameRequired ? '닉네임 (밴드·카톡) *' : '닉네임 (밴드·카톡, 선택)'}</span><input type="text" value={form.nickname} onChange={(e) => set('nickname', e.target.value)} required={view.nicknameRequired} /></label>

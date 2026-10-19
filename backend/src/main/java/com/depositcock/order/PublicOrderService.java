@@ -143,11 +143,20 @@ public class PublicOrderService {
                 .filter(CustomerOrder::isActive)
                 .toList();
         // 같은 번호로 다시 주문하면 새 주문을 더하지 않고 주문 확정 전 주문을 이 내용으로 수정한다 (2026-10-18 사용자 결정).
-        // "내 주문"의 [주문 수정]으로 고른 주문(replaceOrderNo)이 수정할 수 있는 주문이면 그 주문,
-        // 아니면 가장 최근의 수정할 수 있는 주문 (여러 건: 판매자가 입금 확정을 취소한 경우 등)
+        // "내 주문"의 [주문 수정]으로 고른 주문(replaceOrderNo)이 수정할 수 있는 주문이면 그 주문, 아니면 입금자명이 같은
+        // 가장 최근 주문, 아니면 가장 최근 주문(아래에서 입금자명 불일치로 막힘). 여러 건: 판매자가 입금 확정을 취소한 경우 등
         List<CustomerOrder> replaceable = previous.stream().filter(CustomerOrder::isReplaceableByCustomer).toList();
+        String name = squash(depositorName);
         CustomerOrder target = replaceable.stream().filter(o -> Objects.equals(o.getOrderNo(), r.replaceOrderNo()))
-                .findFirst().orElse(replaceable.isEmpty() ? null : replaceable.get(replaceable.size() - 1));
+                .findFirst()
+                .or(() -> replaceable.stream().filter(o -> name.equals(squash(o.getDepositorName()))).reduce((a, b) -> b))
+                .orElse(replaceable.isEmpty() ? null : replaceable.get(replaceable.size() - 1));
+        // 수정은 휴대폰 번호 + 입금자명이 기존 주문과 같아야 한다 (2026-10-19 사용자 결정, 취소·환불 신청과 같은 기준).
+        // 그래서 고객은 수정으로 입금자명을 바꿀 수 없다 (판매자 "주문 변경"으로). 기존 주문 내용도 이름이 맞을 때만 보여준다
+        if (target != null && !name.equals(squash(target.getDepositorName()))) {
+            throw ApiException.badRequest("이 번호로 주문 확정 전인 주문이 있습니다. 수정하려면 그 주문의 입금자명을 똑같이 적어 주세요. "
+                    + "(입금자명을 바꾸려면 판매자에게 문의해 주세요)");
+        }
         checkPerPersonLimit(products, quantities, previous, target);
 
         // 배송 정보 검사는 경고(409)보다 먼저 한다 (경고를 확인한 뒤에 입력 오류가 나오지 않게)

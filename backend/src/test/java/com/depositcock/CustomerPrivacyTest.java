@@ -50,11 +50,12 @@ class CustomerPrivacyTest extends IntegrationTest {
     }
 
     /**
-     * 같은 번호로 다시 주문하면 기존 주문이 바뀐다 (2026-10-18 사용자 결정). 번호를 아는 남도 바꿀 수 있는 것은 받아들인 위험이고,
-     * 그래도 피해자의 휴대폰·주소는 다른 기기로 나가지 않으며, 판매자 기록에 "다른 기기에서 바꿈"이 남는다.
+     * 같은 번호로 다시 주문하면 기존 주문이 바뀐다 (2026-10-18). 단 휴대폰 번호 + 입금자명이 기존 주문과 같아야 한다 (2026-10-19).
+     * 입금자명이 다르면 막히고 기존 주문 내용도 보여주지 않는다. 둘 다 아는 남은 바꿀 수 있지만(받아들인 위험),
+     * 피해자의 휴대폰·주소는 다른 기기로 나가지 않으며, 판매자 기록에 "다른 기기에서 바꿈"이 남는다.
      */
     @Test
-    void reorderWithSomeoneElsesPhoneDoesNotRevealTheirPersonalInfo() throws Exception {
+    void reorderWithSomeoneElsesPhoneNeedsTheirDepositorNameAndDoesNotRevealPersonalInfo() throws Exception {
         Opened g = open();
         String url = "/api/public/g/" + g.token();
         String cookieName = "dcg_" + g.token();
@@ -65,15 +66,24 @@ class CustomerPrivacyTest extends IntegrationTest {
         Cookie victimDevice = victim.getResponse().getCookie(cookieName);
         int victimOrderNo = read(victim).get("orderNo").asInt();
 
-        // 다른 기기에서 피해자 번호로 주문: 바뀔 주문을 알려주는 경고(409). "내 주문 찾기"와 같은 정보만, 주소·휴대폰은 없다
+        // 다른 기기에서 피해자 번호 + 다른 입금자명: 막힘, 기존 주문 내용은 응답에 없다
         Map<String, Object> attack = delivery(g.productId(), "010-6100-0001", "아무개", "공격자 주소");
+        MvcResult blocked = mvc.perform(withJson(post(url + "/orders"), attack))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+        assertThat(blocked.getResponse().getContentAsString()).doesNotContain("피해자").doesNotContain("replaceOrder");
+        attack.put("replaceOrderNo", victimOrderNo);
+        mvc.perform(withJson(post(url + "/orders"), attack)).andExpect(status().isBadRequest());
+
+        // 입금자명까지 맞히면 경고(409) 후 수정됨. 경고·응답에 피해자 주소·휴대폰은 없다
+        attack.put("depositorName", "피해자 이름"); // 띄어쓰기는 무시
+        attack.remove("replaceOrderNo");
         MvcResult warned = mvc.perform(withJson(post(url + "/orders"), attack))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.replaceOrderNo").value(victimOrderNo))
                 .andReturn();
         assertThat(warned.getResponse().getContentAsString()).doesNotContain("피해자로").doesNotContain("010-6100-0001")
                 .doesNotContain("01061000001");
-
         attack.put("replaceOrderNo", victimOrderNo);
         MvcResult replaced = mvc.perform(withJson(post(url + "/orders"), attack))
                 .andExpect(status().isOk())
@@ -94,7 +104,6 @@ class CustomerPrivacyTest extends IntegrationTest {
         // 피해자 기기: 주문이 바뀐 것이 보인다 (고객 변경 시각)
         mvc.perform(get(url).cookie(victimDevice))
                 .andExpect(jsonPath("$.myOrders.length()").value(1))
-                .andExpect(jsonPath("$.myOrders[0].depositorName").value("아무개"))
                 .andExpect(jsonPath("$.myOrders[0].customerChangedAt").isNotEmpty())
                 .andExpect(jsonPath("$.myOrders[0].changedAt").isEmpty());
 
@@ -102,8 +111,7 @@ class CustomerPrivacyTest extends IntegrationTest {
         JsonNode orders = read(mvc.perform(get("/api/seller/group-buys/" + g.id() + "/orders").cookie(g.seller())).andReturn());
         JsonNode change = orders.get(0).get("changes").get(0);
         assertThat(change.get("changedBy").asText()).isEqualTo("CUSTOMER");
-        assertThat(change.get("summary").asText()).contains("입금자명 피해자이름→아무개").contains("배송지 변경")
-                .contains("다른 기기");
+        assertThat(change.get("summary").asText()).contains("배송지 변경").contains("다른 기기");
     }
 
     @Test
