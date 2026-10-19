@@ -14,6 +14,7 @@ import com.depositcock.groupbuy.GroupBuyDtos.Dashboard;
 import com.depositcock.groupbuy.GroupBuyDtos.GroupBuyRequest;
 import com.depositcock.groupbuy.GroupBuyDtos.GroupBuyResponse;
 import com.depositcock.groupbuy.GroupBuyDtos.GroupBuySummary;
+import com.depositcock.groupbuy.GroupBuyDtos.PauseRequest;
 import com.depositcock.groupbuy.GroupBuyDtos.PickupPointRequest;
 import com.depositcock.groupbuy.GroupBuyDtos.ProductRequest;
 import com.depositcock.order.CustomerOrder;
@@ -91,7 +92,7 @@ public class GroupBuyService {
         return groupBuyRepository.findBySellerIdOrderByIdDesc(sellerId).stream()
                 .map(g -> new GroupBuySummary(g.getId(), g.getTitle(), g.getStatus(), g.isAcceptingOrders(now),
                         g.getCloseAt(), g.getPublicToken(), g.getCreatedAt(),
-                        dashboard(orderRepository.findByGroupBuyIdOrderByOrderNoAsc(g.getId()))))
+                        dashboard(orderRepository.findByGroupBuyIdOrderByOrderNoAsc(g.getId())), g.isPaused()))
                 .toList();
     }
 
@@ -143,6 +144,24 @@ public class GroupBuyService {
         GroupBuy groupBuy = lockOwned(sellerId, groupBuyId);
         LocalDateTime now = LocalDateTime.now(clock);
         groupBuy.changeStatus(GroupBuyStatus.CLOSED, now);
+        return GroupBuyResponse.of(groupBuy, now);
+    }
+
+    /**
+     * 주문 잠시 멈춤 (2026-10-18 사용자 요청): 판매자가 입금 대조 중에 주문이 바뀌지 않게 고객의 새 주문·수정·취소·환불 신청을
+     * 막는다. 판매자는 언제든 바로 푼다. 판매자 쪽 기능(주문 변경·대조 등)은 그대로 쓴다
+     */
+    @Transactional
+    public GroupBuyResponse pause(Long sellerId, Long groupBuyId, PauseRequest r) {
+        GroupBuy groupBuy = lockOwned(sellerId, groupBuyId);
+        LocalDateTime now = LocalDateTime.now(clock);
+        String link = blankToNull(r.linkUrl());
+        if (link != null && !link.matches("(?i)^https?://\\S+$")) {
+            throw ApiException.badRequest("링크는 http:// 또는 https:// 로 시작하는 주소만 넣을 수 있습니다.");
+        }
+        String message = blankToNull(r.message());
+        groupBuy.changePause(r.paused(), message == null || message.equals(GroupBuy.DEFAULT_PAUSE_MESSAGE) ? null : message,
+                link, now);
         return GroupBuyResponse.of(groupBuy, now);
     }
 
@@ -280,6 +299,7 @@ public class GroupBuyService {
         int onsite = 0;
         int pickedUp = 0;
         int refundPending = 0;
+        int refundRequests = 0;
         int cancelled = 0;
         for (CustomerOrder o : orders) {
             if (!o.isActive()) {
@@ -290,6 +310,9 @@ public class GroupBuyService {
                 continue;
             }
             orderCount++;
+            if (o.isRefundPending()) {
+                refundRequests++;
+            }
             totalQuantity += o.totalQuantity();
             totalAmount += o.getExpectedAmount();
             if (o.isPrepaid()) {
@@ -310,7 +333,7 @@ public class GroupBuyService {
             }
         }
         return new Dashboard(orderCount, totalQuantity, totalAmount, prepaid, paid, unpaid, reported, onsite, pickedUp,
-                refundPending, cancelled);
+                refundPending, refundRequests, cancelled);
     }
 
     private static String blankToNull(String value) {

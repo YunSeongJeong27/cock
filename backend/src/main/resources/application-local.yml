@@ -14,5 +14,6 @@ spring:
 
 app:
   jwt-secret: ${APP_JWT_SECRET:local-dev-secret-change-me-0123456789abcdef}
+  data-key: ${APP_DATA_KEY:local-dev-data-key-change-me-0123456789abcdef}
   admin-email: ${APP_ADMIN_EMAIL:admin@depositcock.local}
   admin-password: ${APP_ADMIN_PASSWORD:admin1234}

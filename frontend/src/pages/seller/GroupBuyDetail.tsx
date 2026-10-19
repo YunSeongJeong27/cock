@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, dateTime, errorMessage, won } from '../../api'
 import { useAuth } from '../../auth'
 import { CopyButton, ErrorBox, Stat, StatusBadge } from '../../components/Ui'
-import type { Dashboard, GroupBuy, Product, SellerOrder } from '../../types'
+import { DEFAULT_PAUSE_MESSAGE, type Dashboard, type GroupBuy, type Product, type SellerOrder } from '../../types'
 import OrdersTab from './OrdersTab'
 import DepositTab from './DepositTab'
 import PickupTab from './PickupTab'
@@ -107,6 +107,8 @@ export default function GroupBuyDetail() {
         </div>
       </div>
 
+      {groupBuy.status !== 'DRAFT' && <PauseCard key={groupBuy.id} groupBuy={groupBuy} onChange={setGroupBuy} />}
+
       {dashboard && (
         <div className="stats">
           <Stat label="주문" value={`${dashboard.orderCount}건`} />
@@ -117,6 +119,7 @@ export default function GroupBuyDetail() {
           <Stat label="고객 입금 신고" value={dashboard.depositReportedCount} />
           <Stat label="현장결제" value={dashboard.onsiteCount} />
           <Stat label="수령" value={`${dashboard.pickedUpCount}/${dashboard.orderCount}`} />
+          {dashboard.refundRequestCount > 0 && <Stat label="환불 신청" value={dashboard.refundRequestCount} tone="warn" />}
           {dashboard.refundPendingCount > 0 && <Stat label="환불 필요" value={dashboard.refundPendingCount} tone="danger" />}
         </div>
       )}
@@ -208,5 +211,67 @@ function StockStatus({ products }: { products: Product[] }) {
         </div>
       </div>
     </>
+  )
+}
+
+/**
+ * 주문 잠시 멈춤 (2026-10-18 사용자 요청): 입금 대조 중에 고객의 새 주문·주문 수정·취소·환불 신청을 막고 판매자가 바로 푼다.
+ * 고객 화면 문구·링크(밴드 글 등)는 판매자가 정하고, 풀어도 남겨서 다음에 다시 쓴다
+ */
+function PauseCard({ groupBuy, onChange }: { groupBuy: GroupBuy; onChange: (g: GroupBuy) => void }) {
+  const [message, setMessage] = useState(groupBuy.pauseMessage ?? DEFAULT_PAUSE_MESSAGE)
+  const [link, setLink] = useState(groupBuy.pauseLinkUrl ?? '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save(paused: boolean) {
+    setBusy(true)
+    setError(null)
+    try {
+      onChange(await api.put<GroupBuy>(`/api/seller/group-buys/${groupBuy.id}/pause`, { paused, message, linkUrl: link || null }))
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const fields = (
+    <>
+      <label className="field mt"><span>고객 화면 문구</span>
+        <textarea rows={2} maxLength={300} value={message} onChange={(e) => setMessage(e.target.value)} />
+      </label>
+      <label className="field"><span>링크 (선택, 밴드 공지 글 등)</span>
+        <input type="url" placeholder="https://" value={link} onChange={(e) => setLink(e.target.value)} />
+      </label>
+    </>
+  )
+
+  if (groupBuy.paused) {
+    return (
+      <div className="card" style={{ borderColor: 'var(--warn)', background: 'var(--warn-weak)' }}>
+        <div className="row between">
+          <b>⏸ 고객 주문을 잠시 멈춘 상태입니다</b>
+          <button className="btn primary" disabled={busy} onClick={() => save(false)}>다시 받기</button>
+        </div>
+        <div className="small mt">고객 화면에서 새 주문·주문 수정·취소·환불 신청이 막혀 있습니다. "입금했어요"와 내 주문 보기는 됩니다.</div>
+        {fields}
+        <button className="btn small" disabled={busy} onClick={() => save(true)}>문구 저장</button>
+        <ErrorBox message={error} />
+      </div>
+    )
+  }
+  return (
+    <div className="card">
+      <div className="row between">
+        <span><b>주문 잠시 멈춤</b> <span className="small muted">입금 대조 중에 주문이 바뀌지 않게</span></span>
+        <button className="btn small" disabled={busy} onClick={() => save(true)}>잠시 멈추기</button>
+      </div>
+      <details className="small mt">
+        <summary>멈추면 고객 화면에 보일 문구·링크</summary>
+        {fields}
+      </details>
+      <ErrorBox message={error} />
+    </div>
   )
 }

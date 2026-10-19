@@ -4,6 +4,7 @@ import java.time.Duration;
 
 import com.depositcock.common.AppProperties;
 import com.depositcock.order.OrderDtos.CancelRequest;
+import com.depositcock.order.OrderDtos.RefundRequest;
 import com.depositcock.order.OrderDtos.IdentifyRequest;
 import com.depositcock.order.OrderDtos.PlaceOrderRequest;
 import com.depositcock.order.OrderDtos.PlaceOrderResponse;
@@ -70,6 +71,13 @@ public class PublicOrderController {
     public PublicGroupBuy cancel(@PathVariable String token, @Valid @RequestBody CancelRequest body,
                                  HttpServletRequest request) {
         return service.cancel(token, readCookie(request, token), body);
+    }
+
+    /** 입금 후 환불 신청 (판매자가 확인 후 취소·환불) */
+    @PostMapping("/refund-request")
+    public PublicGroupBuy refundRequest(@PathVariable String token, @Valid @RequestBody RefundRequest body,
+                                        HttpServletRequest request) {
+        return service.requestRefund(token, readCookie(request, token), body);
     }
 
     static String cookieName(String token) {

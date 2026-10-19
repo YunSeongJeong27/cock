@@ -44,6 +44,9 @@ app:
   # JWT 서명 키. 운영에서는 반드시 환경변수 APP_JWT_SECRET 로 32바이트 이상 값을 넣는다.
   jwt-secret: ${APP_JWT_SECRET:}
   jwt-ttl-hours: 168
+  # 환불 계좌번호 암호화 키 (DataCipher). 운영에서는 반드시 환경변수 APP_DATA_KEY 로 32바이트 이상 값을 넣는다.
+  # 바꾸면 전에 저장한 계좌번호를 못 읽으므로 한 번 정하면 바꾸지 않는다.
+  data-key: ${APP_DATA_KEY:}
   cookie-secure: false
   trial-days: 30
   # 최초 관리자 계정. 비어 있으면 만들지 않는다.

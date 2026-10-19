@@ -89,6 +89,16 @@ public class GroupBuy {
     /** 2단계 댓글 집계에서 제외할 관리자 닉네임 (쉼표 구분) */
     private String adminNames;
 
+    /** 주문 잠시 멈춤: 고객의 새 주문·수정·취소·환불 신청을 막는다 ("입금했어요"·내 주문 보기는 됨, 2026-10-18) */
+    @Column(nullable = false)
+    private boolean paused;
+
+    /** 멈춤 중 고객 화면 문구 (비우면 기본 문구) */
+    private String pauseMessage;
+
+    /** 멈춤 중 고객 화면에 보여줄 링크 (밴드 글 등, 선택) */
+    private String pauseLinkUrl;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -138,6 +148,34 @@ public class GroupBuy {
     public void changeStatus(GroupBuyStatus status, LocalDateTime now) {
         this.status = status;
         this.updatedAt = now;
+    }
+
+    /** 멈춤 기본 문구 (2026-10-18 사용자 결정) */
+    public static final String DEFAULT_PAUSE_MESSAGE = "현재 주문 집계 중입니다. 판매자에게 문의해 주시면 감사하겠습니다.";
+
+    /** 멈추거나 푼다. 문구·링크는 풀어도 남겨서 다음에 다시 쓴다 */
+    public void changePause(boolean paused, String message, String linkUrl, LocalDateTime now) {
+        this.paused = paused;
+        this.pauseMessage = message;
+        this.pauseLinkUrl = linkUrl;
+        this.updatedAt = now;
+    }
+
+    public boolean isPaused() {
+        return paused;
+    }
+
+    public String getPauseMessage() {
+        return pauseMessage;
+    }
+
+    /** 고객 화면에 보일 문구 */
+    public String effectivePauseMessage() {
+        return pauseMessage == null ? DEFAULT_PAUSE_MESSAGE : pauseMessage;
+    }
+
+    public String getPauseLinkUrl() {
+        return pauseLinkUrl;
     }
 
     /** 고객이 지금 주문·취소할 수 있는지 (OPEN 이고 마감 시각 전) */

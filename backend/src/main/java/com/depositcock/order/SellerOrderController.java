@@ -51,4 +51,16 @@ public class SellerOrderController {
     public SellerOrder refunded(@PathVariable Long groupBuyId, @PathVariable Long orderId) {
         return service.markRefunded(CurrentSeller.id(), groupBuyId, orderId);
     }
+
+    /** 고객의 환불 신청: [취소하고 환불] */
+    @PostMapping("/{orderId}/refund-request/approve")
+    public SellerOrder approveRefund(@PathVariable Long groupBuyId, @PathVariable Long orderId) {
+        return service.decideRefund(CurrentSeller.id(), groupBuyId, orderId, true);
+    }
+
+    /** 고객의 환불 신청: [취소 안 함] */
+    @PostMapping("/{orderId}/refund-request/reject")
+    public SellerOrder rejectRefund(@PathVariable Long groupBuyId, @PathVariable Long orderId) {
+        return service.decideRefund(CurrentSeller.id(), groupBuyId, orderId, false);
+    }
 }

@@ -23,7 +23,12 @@ interface MyOrder {
   status: string
   statusLabel: string
   canReportDeposit: boolean
+  /** 입금 전 바로 취소 가능 (입금 전, 수령 전, 주문 받는 중) */
   cancellable: boolean
+  /** 환불 신청 가능 (선입금, 수령 전, 신청한 적 없음. 마감 뒤에도 됨) */
+  refundRequestable: boolean
+  /** REQUESTED: 판매자 확인 중 / REJECTED: 반려 */
+  refundState: 'REQUESTED' | 'REJECTED' | null
   refundRequired: boolean
   orderedAt: string
   /** 판매자가 주문을 마지막으로 바꾼 시각 */
@@ -48,6 +53,15 @@ interface View {
   pickupEnabled: boolean; pickupPrepayEnabled: boolean; pickupOnsiteEnabled: boolean; deliveryEnabled: boolean
   shippingFeeType: ShippingFeeType; shippingFee: number; nicknameRequired: boolean; unitAddressFieldEnabled: boolean
   kakaoInquiryUrl: string | null; account: Account | null; myOrders: MyOrder[]; prefill: Prefill | null
+  /** 판매자가 주문을 잠시 멈춤: 주문·수정·취소·환불 신청이 막힘 ("입금했어요"·내 주문 보기는 됨) */
+  paused: boolean; pauseMessage: string | null; pauseLinkUrl: string | null
+}
+
+/** 입금 전은 바로 취소, 입금 후는 환불 신청 (판매자가 확인 후 취소·환불, 2026-10-18) */
+type CancelMode = 'cancel' | 'refund'
+const emptyCancel = {
+  mode: 'cancel' as CancelMode, orderNo: '', phone: '', depositorName: '', bankName: '', accountNumber: '', accountHolder: '',
+  open: false, notice: '', error: '', choices: [] as MyOrder[],
 }
 /** 방금 넣거나 바꾼 주문의 최종 내용 (이번에 적은 값만 들어 있음) */
 interface FinalOrder {
@@ -136,8 +150,7 @@ export default function PublicOrder() {
   const [placed, setPlaced] = useState<Placed | null>(null)
   const [busy, setBusy] = useState(false)
   const [identify, setIdentify] = useState({ open: false, phone: '', error: '' })
-  const [cancel, setCancel] = useState<{ orderNo: string; phone: string; depositorName: string; open: boolean; error: string; choices: MyOrder[] }>(
-    { orderNo: '', phone: '', depositorName: '', open: false, error: '', choices: [] })
+  const [cancel, setCancel] = useState(emptyCancel)
 
   const applyView = useCallback((v: View) => {
     setView(v)
@@ -197,7 +210,7 @@ export default function PublicOrder() {
 
   async function reportDeposit(orderNo: number) {
     // 입금 신고 뒤에는 주문 수정이 안 되므로 여기서도 알린다 (입금 전에만 수정, 2026-10-18)
-    if (!confirm('입금하셨나요? 누르면 이 주문은 더 이상 수정할 수 없어요.\n(판매자가 입금내역을 확인한 뒤 "입금 확인됨"으로 바뀝니다)')) return
+    if (!confirm('입금하셨나요? 누르면 이 주문은 더 이상 수정·바로 취소할 수 없어요. (취소는 환불 신청으로)\n(판매자가 입금내역을 확인한 뒤 "입금 확인됨"으로 바뀝니다)')) return
     try {
       setView(await api.post<View>(`${base}/orders/${orderNo}/report-deposit`))
     } catch (e) {
@@ -215,22 +228,31 @@ export default function PublicOrder() {
     }
   }
 
+  /**
+   * 입금 전 바로 취소(/cancel) 또는 입금 후 환불 신청(/refund-request). 인터뷰 결과 4번: 휴대폰 번호 + 입금자명으로 확인.
+   * 주문이 여러 건이면 서버가 목록을 주고 고르게 한다. 입금한 주문을 바로 취소하려 하면 서버가 환불 신청으로 돌린다.
+   */
   async function doCancel(e: FormEvent | null, orderNo?: number) {
     e?.preventDefault()
     if (busy) return // 두 번 눌러도 한 번만 보낸다
     setBusy(true)
+    const refund = cancel.mode === 'refund'
     try {
-      // 인터뷰 결과 4번: 휴대폰 번호 + 입금자명으로 취소. 주문이 여러 건이면 서버가 목록을 주고 고르게 한다.
-      const v = await api.post<View>(`${base}/cancel`, {
-        orderNo: orderNo ?? (cancel.orderNo ? Number(cancel.orderNo) : null), phone: cancel.phone, depositorName: cancel.depositorName,
-      })
+      const target = { orderNo: orderNo ?? (cancel.orderNo ? Number(cancel.orderNo) : null), phone: cancel.phone, depositorName: cancel.depositorName }
+      const v = refund
+        ? await api.post<View>(`${base}/refund-request`, {
+          ...target, bankName: cancel.bankName, accountNumber: cancel.accountNumber, accountHolder: cancel.accountHolder,
+        })
+        : await api.post<View>(`${base}/cancel`, target)
       applyView(v)
-      setCancel({ orderNo: '', phone: '', depositorName: '', open: false, error: '', choices: [] })
+      setCancel(emptyCancel)
       setPlaced(null)
-      alert('주문을 취소했습니다.')
+      alert(refund ? '환불 신청을 했습니다. 판매자가 확인한 뒤 주문을 취소하고 환불합니다.' : '주문을 취소했습니다.')
     } catch (err) {
       if (err instanceof ApiError && err.status === 409 && Array.isArray(err.body?.orders)) {
         setCancel({ ...cancel, error: '', choices: err.body.orders })
+      } else if (err instanceof ApiError && err.status === 409 && err.body?.refundRequired) {
+        setCancel({ ...cancel, mode: 'refund', notice: errorMessage(err), error: '', choices: [], accountHolder: cancel.accountHolder || cancel.depositorName })
       } else {
         setCancel({ ...cancel, error: errorMessage(err), choices: [] })
       }
@@ -255,15 +277,21 @@ export default function PublicOrder() {
     setForm(view?.prefill ? formFrom(view.prefill) : emptyForm)
   }
 
-  function openCancel(orderNo?: number) {
-    setCancel({ orderNo: orderNo ? String(orderNo) : '', phone: form.phone, depositorName: form.depositorName, open: true, error: '', choices: [] })
+  function openCancel(orderNo?: number, mode: CancelMode = 'cancel') {
+    setCancel({
+      ...emptyCancel, mode, open: true, orderNo: orderNo ? String(orderNo) : '', phone: form.phone, depositorName: form.depositorName,
+      accountHolder: form.depositorName,
+    })
     setTimeout(() => document.getElementById('cancel-form')?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
 
-  /** 주문 변경 안내: 입금 전에는 [주문 수정], 입금 후에는 취소 후 다시 주문 (2026-10-18 사용자 결정) */
+  /** 입금 후(고객 신고 또는 판매자 확인) 주문: 바로 취소 대신 환불 신청 */
+  const afterDeposit = (o: MyOrder) => o.refundRequestable && (o.status === 'DEPOSIT_REPORTED' || o.status === 'PAID')
+
+  /** 주문 변경 안내: 입금 전에는 [주문 수정], 입금 후에는 환불 신청 후 다시 주문 (2026-10-18 사용자 결정) */
   const changeNote = (
     <p className="small mt" style={{ marginBottom: 0 }}>
-      주문 변경: 입금 전에는 <b style={{ fontWeight: 800 }}>주문 수정</b>, 입금 후에는 <b style={{ fontWeight: 800 }}>주문 취소</b> 후 다시 주문해 주세요.
+      주문 변경: 입금 전에는 <b style={{ fontWeight: 800 }}>주문 수정</b>, 입금 후에는 <b style={{ fontWeight: 800 }}>환불 신청</b> 후 다시 주문해 주세요.
     </p>
   )
 
@@ -313,12 +341,27 @@ export default function PublicOrder() {
         <h1>{view.title}</h1>
         {view.description && <p className="pre">{view.description}</p>}
         <div className="small">
-          {view.acceptingOrders
-            ? <span style={{ color: 'var(--ok)', fontWeight: 700 }}>주문 받는 중{view.closeAt ? ` · ${dateTime(view.closeAt)} 마감` : ''}</span>
-            : <span style={{ color: 'var(--danger)', fontWeight: 700 }}>{view.closedReason}</span>}
+          {view.paused ? <span style={{ color: 'var(--warn)', fontWeight: 700 }}>⏸ 주문 잠시 멈춤</span>
+            : view.acceptingOrders
+              ? <span style={{ color: 'var(--ok)', fontWeight: 700 }}>주문 받는 중{view.closeAt ? ` · ${dateTime(view.closeAt)} 마감` : ''}</span>
+              : <span style={{ color: 'var(--danger)', fontWeight: 700 }}>{view.closedReason}</span>}
         </div>
         {view.kakaoInquiryUrl && <a className="btn small mt" href={view.kakaoInquiryUrl} target="_blank" rel="noreferrer">💬 카톡 문의</a>}
       </div>
+
+      {/* 판매자가 주문을 잠시 멈춤 (입금 대조 중 등). 문구·링크는 판매자가 정함 */}
+      {view.paused && (
+        <div className="card" style={{ borderColor: 'var(--warn)', background: 'var(--warn-weak)' }}>
+          <div className="pre"><b>⏸ {view.pauseMessage}</b></div>
+          {(view.pauseLinkUrl || view.kakaoInquiryUrl) && (
+            <div className="row mt">
+              {view.pauseLinkUrl && <a className="btn small" href={view.pauseLinkUrl} target="_blank" rel="noreferrer">🔗 링크 열기</a>}
+              {view.kakaoInquiryUrl && <a className="btn small" href={view.kakaoInquiryUrl} target="_blank" rel="noreferrer">💬 카톡 문의</a>}
+            </div>
+          )}
+          <div className="small muted mt">지금은 주문·주문 수정·취소·환불 신청을 잠시 받지 않습니다. "입금했어요"와 내 주문 보기는 됩니다.</div>
+        </div>
+      )}
 
       {placed && (
         <div className="card" style={{ borderColor: 'var(--ok)' }}>
@@ -356,18 +399,19 @@ export default function PublicOrder() {
               {o.changedAt && <div className="small" style={{ color: 'var(--warn)' }}>판매자가 주문을 변경했어요 ({dateTime(o.changedAt)}). 위 내용·금액을 확인해 주세요.</div>}
               {o.customerChangedAt && <div className="small muted">주문 수정됨 ({dateTime(o.customerChangedAt)})</div>}
               {o.refundRequired && <div className="small" style={{ color: 'var(--danger)' }}>취소됨 · 판매자가 환불할 예정입니다.</div>}
+              {o.refundState === 'REQUESTED' && <div className="small" style={{ color: 'var(--warn)' }}>환불 신청됨 · 판매자가 확인 중입니다.</div>}
+              {o.refundState === 'REJECTED' && <div className="small" style={{ color: 'var(--danger)' }}>환불 신청이 반려됐어요. 판매자에게 문의해 주세요.</div>}
               {o.canReportDeposit && view.account && (
                 <div className="small mt">입금 계좌: {view.account.bankName} {view.account.accountNumber} ({view.account.accountHolder}) <CopyButton text={view.account.accountNumber} label="복사" /></div>
               )}
               <div className="row mt">
                 {o.canReportDeposit && <button className="btn small primary" onClick={() => reportDeposit(o.orderNo)}>입금했어요</button>}
-                {o.replaceable && o.editValues && <button className="btn small" onClick={() => startEdit(o)}>주문 수정</button>}
-                {o.cancellable && <button className="btn small danger" onClick={() => openCancel(o.orderNo)}>주문 취소</button>}
+                {!view.paused && o.replaceable && o.editValues && <button className="btn small" onClick={() => startEdit(o)}>주문 수정</button>}
+                {!view.paused && o.cancellable && <button className="btn small danger" onClick={() => openCancel(o.orderNo)}>주문 취소</button>}
+                {!view.paused && afterDeposit(o) && <button className="btn small danger" onClick={() => openCancel(o.orderNo, 'refund')}>환불 신청</button>}
               </div>
               {o.replaceable && o.paymentMethod === 'PREPAID' && <div className="small muted mt">주문 수정은 입금 전에만 할 수 있어요.</div>}
-              {!o.replaceable && o.cancellable && o.paymentMethod === 'PREPAID' && (
-                <div className="small muted mt">입금 후에는 수정할 수 없어요. 변경은 주문 취소 후 다시 주문해 주세요.</div>
-              )}
+              {afterDeposit(o) && <div className="small muted mt">입금 후에는 수정할 수 없어요. 변경은 환불 신청 후 다시 주문해 주세요.</div>}
             </div>
           ))}
         </div>
@@ -397,7 +441,7 @@ export default function PublicOrder() {
         </div>
       )}
 
-      {view.acceptingOrders && (
+      {view.acceptingOrders && !view.paused && (
         <form className="card" id="order-form" onSubmit={(e) => submit(e)}>
           <h3>{editing ? `${editing.orderNo}번 주문 수정` : replaceTarget ? '주문서' : view.myOrders.length > 0 ? '추가 주문하기' : '주문서'}</h3>
           {editing && editing.paymentMethod === 'PREPAID' && <div className="small mb"><b>입금 전에만 수정할 수 있어요.</b> 이미 입금하셨다면 판매자에게 문의해 주세요.</div>}
@@ -520,34 +564,69 @@ export default function PublicOrder() {
       )}
 
       <div className="card" id="cancel-form">
-        {!view.acceptingOrders ? (
-          <div className="small muted">주문이 마감되어 여기서는 취소할 수 없습니다. 취소가 필요하면 판매자에게 문의해 주세요.</div>
+        {view.paused ? (
+          <div className="small muted">판매자가 주문을 잠시 멈춰서 지금은 취소·환불 신청을 할 수 없습니다.</div>
         ) : !cancel.open ? (
           <>
-            <div className="row between"><span className="small">주문을 취소하시려면</span><button className="btn small danger" onClick={() => openCancel()}>주문 취소</button></div>
-            {changeNote}
+            <div className="row between">
+              <b className="small">주문 취소·환불 신청</b>
+              <div className="row">
+                {view.acceptingOrders && <button className="btn small danger" onClick={() => openCancel()}>주문 취소</button>}
+                {view.account && <button className="btn small" onClick={() => openCancel(undefined, 'refund')}>환불 신청</button>}
+              </div>
+            </div>
+            <p className="small muted mt" style={{ marginBottom: 0 }}>
+              {view.acceptingOrders ? '입금 전에는 바로 취소됩니다. ' : '주문이 마감되어 입금 전 주문은 여기서 취소할 수 없습니다. 판매자에게 문의해 주세요. '}
+              {view.account && '입금 후에는 환불 신청을 하면 판매자가 확인한 뒤 취소·환불합니다.'}
+            </p>
+            {view.acceptingOrders && changeNote}
           </>
         ) : (
           <form onSubmit={(e) => doCancel(e)}>
-            <h3>주문 취소</h3>
-            {changeNote}
-            <p className="small muted">주문할 때 적은 휴대폰 번호와 입금자명을 입력하세요. 주문이 여러 건이면 취소할 주문을 고르게 됩니다. 입금 확인된 주문은 취소 후 판매자가 환불합니다.</p>
-            <label className="field"><span>휴대폰 번호</span><input type="tel" value={cancel.phone} onChange={(e) => setCancel({ ...cancel, phone: e.target.value, choices: [] })} required /></label>
-            <label className="field"><span>입금자명</span><input type="text" value={cancel.depositorName} onChange={(e) => setCancel({ ...cancel, depositorName: e.target.value, choices: [] })} required /></label>
-            {cancel.orderNo && cancel.choices.length === 0 && <div className="small muted mb">{cancel.orderNo}번 주문을 취소합니다.</div>}
+            {cancel.mode === 'cancel' ? (
+              <>
+                <h3>주문 취소 (입금 전)</h3>
+                <p className="small">입금 전 주문은 바로 취소됩니다. 이미 입금하셨다면 환불 신청을 해 주세요.</p>
+              </>
+            ) : (
+              <>
+                <h3>환불 신청 (입금 후)</h3>
+                <p className="small">판매자가 확인한 뒤 주문을 취소하고 아래 계좌로 환불합니다. 계좌는 환불에만 쓰고, 환불이 끝나면 지웁니다.</p>
+              </>
+            )}
+            {cancel.notice && <div className="warn-box">{cancel.notice}</div>}
+            <label className="field"><span>휴대폰 번호 (주문할 때 적은 번호)</span><input type="tel" value={cancel.phone} onChange={(e) => setCancel({ ...cancel, phone: e.target.value, choices: [] })} required /></label>
+            <label className="field"><span>입금자명 (주문할 때 적은 이름)</span><input type="text" value={cancel.depositorName} onChange={(e) => setCancel({ ...cancel, depositorName: e.target.value, choices: [] })} required /></label>
+            {cancel.mode === 'refund' && (
+              <>
+                <label className="field"><span>환불받을 은행</span><input type="text" value={cancel.bankName} onChange={(e) => setCancel({ ...cancel, bankName: e.target.value })} required maxLength={30} placeholder="예: 국민은행" /></label>
+                <label className="field"><span>계좌번호</span><input type="text" inputMode="numeric" value={cancel.accountNumber} onChange={(e) => setCancel({ ...cancel, accountNumber: e.target.value })} required maxLength={30} placeholder="숫자만 (- 있어도 됨)" /></label>
+                <label className="field"><span>예금주</span><input type="text" value={cancel.accountHolder} onChange={(e) => setCancel({ ...cancel, accountHolder: e.target.value })} required maxLength={30} /></label>
+              </>
+            )}
+            {cancel.orderNo && cancel.choices.length === 0 && <div className="small muted mb">{cancel.orderNo}번 주문</div>}
             <ErrorBox message={cancel.error} />
             {cancel.choices.length > 0 ? (
               <div>
-                <div className="small mb"><b>취소할 주문을 골라주세요.</b></div>
+                <div className="small mb"><b>{cancel.mode === 'refund' ? '환불 신청할' : '취소할'} 주문을 골라주세요.</b></div>
                 {cancel.choices.map((o) => (
                   <div key={o.orderNo} className="row between" style={{ borderTop: '1px solid var(--line)', padding: '8px 0' }}>
                     <span className="small">{o.orderNo}번 · {o.items.map((i) => `${i.productName} ${i.quantity}개`).join(', ')} · {won(o.expectedAmount)} · {o.statusLabel}</span>
-                    <button type="button" className="btn small danger" disabled={busy} onClick={() => doCancel(null, o.orderNo)}>이 주문 취소</button>
+                    <button type="button" className="btn small danger" disabled={busy} onClick={() => doCancel(null, o.orderNo)}>{cancel.mode === 'refund' ? '이 주문 환불 신청' : '이 주문 취소'}</button>
                   </div>
                 ))}
               </div>
+            ) : cancel.mode === 'cancel' ? (
+              <div className="row">
+                <button className="btn danger" disabled={busy}>입금 전이에요, 바로 취소</button>
+                <button type="button" className="btn" disabled={busy}
+                  onClick={() => setCancel({ ...cancel, mode: 'refund', notice: '', error: '', accountHolder: cancel.accountHolder || cancel.depositorName })}>
+                  이미 입금했어요 → 환불 신청
+                </button>
+                <button type="button" className="btn" onClick={() => setCancel(emptyCancel)}>닫기</button>
+              </div>
             ) : (
-              <div className="row"><button className="btn danger" disabled={busy}>취소하기</button><button type="button" className="btn" onClick={() => setCancel({ ...cancel, open: false })}>닫기</button></div>
+              <div className="row"><button className="btn danger" disabled={busy}>환불 신청</button><button type="button" className="btn" onClick={() => setCancel(emptyCancel)}>닫기</button></div>
             )}
           </form>
         )}

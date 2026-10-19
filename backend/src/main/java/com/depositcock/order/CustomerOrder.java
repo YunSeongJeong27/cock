@@ -112,6 +112,18 @@ public class CustomerOrder {
     private boolean refundRequired;
     private LocalDateTime refundedAt;
 
+    /**
+     * 고객의 환불 신청 (입금 후 취소, 2026-10-18). 판매자가 [취소하고 환불]하면 취소 + 환불 필요,
+     * [취소 안 함]이면 refundRejectedAt (주문은 그대로)
+     */
+    private LocalDateTime refundRequestedAt;
+    private LocalDateTime refundRejectedAt;
+
+    /** 환불받을 계좌. 계좌번호(refundAccount)는 암호화된 값. 환불 완료·반려·환불 없는 취소 때 지운다 */
+    private String refundBank;
+    private String refundAccount;
+    private String refundHolder;
+
     /** 이 주문을 넣은 고객 기기의 쿠키 토큰. 그 기기에만 주문 내용·이전 입력값을 보여준다 (댓글 주문 등은 null) */
     private String deviceToken;
 
@@ -201,7 +213,7 @@ public class CustomerOrder {
      * (사용자 결정: 이미 보낸 금액과 주문 금액이 어긋나지 않게. 입금 후 변경은 취소 후 다시 주문)
      */
     public boolean isReplaceableByCustomer() {
-        return isActive() && source == OrderSource.FORM && !isPaid() && depositReportedAt == null && !pickedUp;
+        return isActive() && source == OrderSource.FORM && isBeforeDeposit() && !pickedUp;
     }
 
     public boolean isPrepaid() {
@@ -254,6 +266,7 @@ public class CustomerOrder {
         if (status == OrderStatus.CANCELLED) {
             this.refundRequired = false;
             this.refundedAt = null;
+            clearRefundAccount();
         }
         activeConfirmation().ifPresent(c -> c.cancel(now));
         this.updatedAt = now;
@@ -281,11 +294,90 @@ public class CustomerOrder {
         if (isPaid()) {
             this.refundRequired = true;
         }
+        if (!refundRequired) {
+            clearRefundAccount(); // 환불하지 않으면 계좌가 필요 없다
+        }
+    }
+
+    /** 판매자가 환불 신청을 받아들임: 취소 + 환불 필요 (입금 확인 전 신고만 된 주문도 고객이 입금했다고 했으므로) */
+    public void cancelForRefund(LocalDateTime now) {
+        this.refundRequired = true;
+        cancel(now);
     }
 
     public void markRefunded(LocalDateTime now) {
         this.refundedAt = now;
         this.updatedAt = now;
+        clearRefundAccount();
+    }
+
+    /**
+     * 고객의 환불 신청. 환불 신청은 "입금했어요" 신고도 겸한다 (입금했다고 해야 환불을 신청하므로).
+     *
+     * @param encryptedAccount 암호화한 계좌번호
+     */
+    public void requestRefund(String bank, String encryptedAccount, String holder, LocalDateTime now) {
+        this.refundRequestedAt = now;
+        this.refundRejectedAt = null;
+        this.refundBank = bank;
+        this.refundAccount = encryptedAccount;
+        this.refundHolder = holder;
+        if (depositReportedAt == null && !isPaid()) {
+            this.depositReportedAt = now;
+        }
+        this.updatedAt = now;
+    }
+
+    /** 판매자가 환불 신청을 받아들이지 않음 (주문은 그대로). 계좌는 지운다 */
+    public void rejectRefund(LocalDateTime now) {
+        this.refundRejectedAt = now;
+        clearRefundAccount();
+        this.updatedAt = now;
+    }
+
+    /** 판매자 확인을 기다리는 환불 신청이 있는지 */
+    public boolean isRefundPending() {
+        return isActive() && refundRequestedAt != null && refundRejectedAt == null;
+    }
+
+    /**
+     * 고객이 환불 신청을 할 수 있는지: 주문 링크의 선입금 주문, 취소·수령 전, 아직 신청한 적 없음 (반려된 뒤 다시 신청은 안 받음).
+     * 마감 뒤에도 된다 (판매자가 확인하므로, 2026-10-18)
+     */
+    public boolean canRequestRefund() {
+        return isActive() && source == OrderSource.FORM && isPrepaid() && !pickedUp && refundRequestedAt == null;
+    }
+
+    /** 입금 전 = 고객이 "입금했어요"를 누르지 않았고 판매자 입금 확인도 없음 (수정·바로 취소 기준, 2026-10-18) */
+    public boolean isBeforeDeposit() {
+        return depositReportedAt == null && !isPaid();
+    }
+
+    private void clearRefundAccount() {
+        this.refundBank = null;
+        this.refundAccount = null;
+        this.refundHolder = null;
+    }
+
+    public LocalDateTime getRefundRequestedAt() {
+        return refundRequestedAt;
+    }
+
+    public LocalDateTime getRefundRejectedAt() {
+        return refundRejectedAt;
+    }
+
+    public String getRefundBank() {
+        return refundBank;
+    }
+
+    /** 암호화된 계좌번호 */
+    public String getRefundAccount() {
+        return refundAccount;
+    }
+
+    public String getRefundHolder() {
+        return refundHolder;
     }
 
     public int totalQuantity() {

@@ -50,8 +50,18 @@ public final class OrderDtos {
     public record IdentifyRequest(@NotBlank String phone) {
     }
 
-    /** orderNo 는 같은 정보의 주문이 여러 건일 때만 필요 */
+    /** 입금 전 바로 취소. orderNo 는 같은 정보의 주문이 여러 건일 때만 필요 */
     public record CancelRequest(@Min(1) Integer orderNo, @NotBlank String phone, @NotBlank String depositorName) {
+    }
+
+    /** 입금 후 환불 신청 (판매자가 확인 후 취소·환불). orderNo 는 같은 정보의 주문이 여러 건일 때만 필요 */
+    public record RefundRequest(
+            @Min(1) Integer orderNo,
+            @NotBlank String phone,
+            @NotBlank String depositorName,
+            @NotBlank @Size(max = 30) String bankName,
+            @NotBlank @Size(max = 30) String accountNumber,
+            @NotBlank @Size(max = 30) String accountHolder) {
     }
 
     /**
@@ -81,7 +91,12 @@ public final class OrderDtos {
             DisplayStatus status,
             String statusLabel,
             boolean canReportDeposit,
+            /** 입금 전 바로 취소할 수 있는지 (입금 전, 수령 전, 주문 받는 중) */
             boolean cancellable,
+            /** 환불 신청을 할 수 있는지 (선입금 주문, 수령 전, 신청한 적 없음. 마감 뒤에도 됨) */
+            boolean refundRequestable,
+            /** 환불 신청 상태: REQUESTED(판매자 확인 중) / REJECTED(반려) / null */
+            String refundState,
             boolean refundRequired,
             LocalDateTime orderedAt,
             /** 판매자가 주문을 마지막으로 바꾼 시각 (안 바꿨으면 null) */
@@ -127,7 +142,11 @@ public final class OrderDtos {
             String kakaoInquiryUrl,
             AccountInfo account,
             List<MyOrder> myOrders,
-            Prefill prefill) {
+            Prefill prefill,
+            /** 판매자가 주문을 잠시 멈췄는지. 멈춤 중에는 주문·수정·취소·환불 신청이 막힌다 ("입금했어요"는 됨) */
+            boolean paused,
+            String pauseMessage,
+            String pauseLinkUrl) {
     }
 
     public record PlaceOrderResponse(
@@ -191,6 +210,13 @@ public final class OrderDtos {
             LocalDateTime pickedUpAt,
             boolean refundRequired,
             LocalDateTime refundedAt,
+            /** 고객의 환불 신청 (판매자 확인 대기면 refundRejectedAt 이 null 이고 주문이 살아 있음) */
+            LocalDateTime refundRequestedAt,
+            LocalDateTime refundRejectedAt,
+            /** 환불받을 계좌 (계좌번호는 복호화한 값. 키가 바뀌어 못 읽으면 null) */
+            String refundBank,
+            String refundAccount,
+            String refundHolder,
             /** 같은 공구에 같은 연락처의 다른 주문이 있음 (경고 표시용) */
             boolean duplicateContact,
             LocalDateTime orderedAt,

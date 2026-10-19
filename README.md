@@ -95,6 +95,7 @@ docker run -p 8080:8080 \
   -e SPRING_PROFILES_ACTIVE=prod \
   -e DB_URL=jdbc:postgresql://호스트:5432/depositcock -e DB_USERNAME=... -e DB_PASSWORD=... \
   -e APP_JWT_SECRET=32바이트이상의임의문자열 \
+  -e APP_DATA_KEY=32바이트이상의다른임의문자열 \
   -e APP_ADMIN_EMAIL=... -e APP_ADMIN_PASSWORD=... \
   depositcock
 ```
@@ -103,6 +104,7 @@ docker run -p 8080:8080 \
 |---|---|
 | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | PostgreSQL 접속 정보 |
 | `APP_JWT_SECRET` | 로그인 토큰 서명 키 (32바이트 이상, 필수) |
+| `APP_DATA_KEY` | 환불 계좌번호 암호화 키 (32바이트 이상, 필수). 한 번 정하면 바꾸지 않는다 (바꾸면 저장된 계좌번호를 못 읽음) |
 | `APP_ADMIN_EMAIL`, `APP_ADMIN_PASSWORD` | 최초 관리자 계정 (이미 있으면 그대로 둠) |
 | `APP_VISION_PROVIDER` | `anthropic` 이면 스크린샷 글자 읽기 켬 (기본 `fake` = 꺼짐) |
 | `ANTHROPIC_API_KEY` | 위가 `anthropic` 일 때 필요 |

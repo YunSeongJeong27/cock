@@ -13,6 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.DataCipher;
 import com.depositcock.common.Tokens;
 import com.depositcock.customer.Customer;
 import com.depositcock.customer.CustomerRepository;
@@ -36,6 +37,7 @@ import com.depositcock.order.OrderDtos.PlaceOrderResponse;
 import com.depositcock.order.OrderDtos.Prefill;
 import com.depositcock.order.OrderDtos.PublicGroupBuy;
 import com.depositcock.order.OrderDtos.PublicProduct;
+import com.depositcock.order.OrderDtos.RefundRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import jakarta.persistence.EntityManager;
@@ -59,11 +61,13 @@ public class PublicOrderService {
     private final EntityManager entityManager;
     private final Clock clock;
     private final StockAlerts stockAlerts;
+    private final DataCipher cipher;
 
     public PublicOrderService(GroupBuyRepository groupBuyRepository, ProductRepository productRepository,
                               CustomerOrderRepository orderRepository, CustomerDeviceRepository deviceRepository,
                               CustomerRepository customerRepository, Customers customers,
-                              EntityManager entityManager, Clock clock, StockAlerts stockAlerts) {
+                              EntityManager entityManager, Clock clock, StockAlerts stockAlerts, DataCipher cipher) {
+        this.cipher = cipher;
         this.stockAlerts = stockAlerts;
         this.customerRepository = customerRepository;
         this.customers = customers;
@@ -96,6 +100,7 @@ public class PublicOrderService {
         if (!groupBuy.isAcceptingOrders(now)) {
             throw ApiException.badRequest("주문이 마감되었습니다.");
         }
+        requireNotPaused(groupBuy);
 
         String phone = PhoneNumbers.normalize(r.phone());
         if (phone == null) {
@@ -308,54 +313,121 @@ public class PublicOrderService {
     }
 
     /**
-     * 주문 취소: 휴대폰 번호 + 입금자명이 맞아야 한다 (개발 전 인터뷰 결과 4번). 마감 후에는 불가.
-     * 같은 정보의 취소 가능한 주문이 여러 건이면 409 와 함께 주문 목록(orders)을 돌려주고, 주문번호를 골라 다시 요청한다.
-     * 입금 확정된 주문은 바로 취소하고 판매자 화면에 "환불 필요"로 표시한다.
+     * 입금 전 바로 취소: 휴대폰 번호 + 입금자명이 맞아야 한다 (개발 전 인터뷰 결과 4번). 마감 후·멈춤 중에는 불가.
+     * 입금 후(고객이 "입금했어요"를 눌렀거나 판매자가 입금 확인) 주문은 바로 취소하지 않고 환불 신청으로 안내한다
+     * (409 + refundRequired, 2026-10-18 사용자 결정). 같은 정보의 주문이 여러 건이면 409 + 주문 목록(orders).
      */
     @Transactional
     public PublicGroupBuy cancel(String publicToken, String cookieToken, CancelRequest r) {
         // 같은 주문을 동시에 두 번 취소해도 재고가 한 번만 돌아오게 공구를 잠근다
         GroupBuy groupBuy = lock(findVisible(publicToken));
         LocalDateTime now = LocalDateTime.now(clock);
+        requireNotPaused(groupBuy);
         if (!groupBuy.isAcceptingOrders(now)) {
-            throw ApiException.badRequest("마감된 공구는 취소할 수 없습니다. 판매자에게 문의해 주세요.");
+            throw ApiException.badRequest("마감된 공구는 여기서 취소할 수 없습니다. 판매자에게 문의해 주세요. "
+                    + "(입금한 주문은 환불 신청을 할 수 있습니다)");
         }
-        String phone = PhoneNumbers.normalize(r.phone());
-        String depositorName = squash(r.depositorName());
-        List<CustomerOrder> matches = orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()).stream()
-                .filter(o -> phone != null && phone.equals(o.getPhone()))
-                .filter(o -> depositorName.equals(squash(o.getDepositorName())))
-                .toList();
-        if (matches.isEmpty()) {
-            throw ApiException.notFound("휴대폰 번호와 입금자명이 일치하는 주문이 없습니다.");
+        List<CustomerOrder> matches = matchByPhoneAndName(groupBuy, r.phone(), r.depositorName());
+        if (r.orderNo() == null && matches.stream().noneMatch(PublicOrderService::cancellableBeforeDeposit)
+                && matches.stream().anyMatch(o -> o.isActive() && !o.isPickedUp())) {
+            throw refundInstead();
         }
-        List<CustomerOrder> cancellable = matches.stream()
-                .filter(o -> o.isActive() && !o.isPickedUp())
-                .toList();
-        CustomerOrder order;
-        if (r.orderNo() != null) {
-            order = matches.stream().filter(o -> o.getOrderNo() == r.orderNo()).findFirst()
-                    .orElseThrow(() -> ApiException.notFound("주문번호를 확인해 주세요."));
-        } else if (cancellable.size() == 1) {
-            order = cancellable.get(0);
-        } else if (cancellable.isEmpty()) {
-            throw ApiException.badRequest("취소할 수 있는 주문이 없습니다. (이미 취소했거나 수령한 주문)");
-        } else {
-            ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
-                    "주문이 여러 건 있습니다. 취소할 주문을 골라주세요.");
-            problem.setProperty("orders", cancellable.stream()
-                    .map(o -> OrderMapper.toMyOrder(o, true)).toList());
-            throw new ErrorResponseException(HttpStatus.CONFLICT, problem, null);
-        }
+        CustomerOrder order = pick(matches, r.orderNo(), PublicOrderService::cancellableBeforeDeposit,
+                "주문이 여러 건 있습니다. 취소할 주문을 골라주세요.",
+                "취소할 수 있는 주문이 없습니다. (이미 취소했거나 수령한 주문)");
         if (!order.isActive()) {
             throw ApiException.badRequest("이미 취소된 주문입니다.");
         }
         if (order.isPickedUp()) {
             throw ApiException.badRequest("이미 수령한 주문은 취소할 수 없습니다.");
         }
+        if (!order.isBeforeDeposit()) {
+            throw refundInstead();
+        }
         OrderCancellation.cancel(order, productRepository, entityManager, stockAlerts, now);
         // 응답은 이 기기가 볼 수 있는 주문만 (취소 정보를 안다고 그 사람의 다른 주문까지 보여주지 않음)
         return toPublic(groupBuy, device(groupBuy, cookieToken).orElse(null), now);
+    }
+
+    /**
+     * 입금 후 환불 신청 (2026-10-18 사용자 결정): 바로 취소하지 않고 판매자가 확인한 뒤 취소하고 이 계좌로 돌려보낸다.
+     * 휴대폰 번호 + 입금자명이 맞아야 한다. 마감 뒤에도 되고(판매자가 확인하므로), 멈춤 중에는 안 된다.
+     * 계좌번호는 암호화해서 저장하고 환불 완료·반려 때 지운다. "입금했어요"를 안 누른 주문이면 입금 신고도 같이 된다.
+     */
+    @Transactional
+    public PublicGroupBuy requestRefund(String publicToken, String cookieToken, RefundRequest r) {
+        GroupBuy groupBuy = lock(findVisible(publicToken));
+        LocalDateTime now = LocalDateTime.now(clock);
+        requireNotPaused(groupBuy);
+        String account = r.accountNumber().replaceAll("[\\s-]", "");
+        if (!account.matches("\\d{8,20}")) {
+            throw ApiException.badRequest("계좌번호를 숫자로 입력해 주세요. (8~20자리)");
+        }
+        List<CustomerOrder> matches = matchByPhoneAndName(groupBuy, r.phone(), r.depositorName());
+        CustomerOrder order = pick(matches, r.orderNo(), CustomerOrder::canRequestRefund,
+                "주문이 여러 건 있습니다. 환불 신청할 주문을 골라주세요.",
+                "환불 신청할 수 있는 주문이 없습니다. (이미 신청했거나 취소·수령한 주문)");
+        if (!order.isActive()) {
+            throw ApiException.badRequest("이미 취소된 주문입니다.");
+        }
+        if (order.isPickedUp()) {
+            throw ApiException.badRequest("이미 수령한 주문은 환불 신청을 할 수 없습니다. 판매자에게 문의해 주세요.");
+        }
+        if (!order.isPrepaid()) {
+            throw ApiException.badRequest("현장결제 주문은 입금이 없어 환불 신청이 필요 없습니다. 주문 취소를 눌러 주세요.");
+        }
+        if (order.getRefundRequestedAt() != null) {
+            throw ApiException.badRequest(order.getRefundRejectedAt() == null
+                    ? "이미 환불 신청한 주문입니다. 판매자가 확인 중입니다."
+                    : "환불 신청이 반려된 주문입니다. 판매자에게 문의해 주세요.");
+        }
+        order.requestRefund(r.bankName().trim(), cipher.encrypt(account), r.accountHolder().trim(), now);
+        return toPublic(groupBuy, device(groupBuy, cookieToken).orElse(null), now);
+    }
+
+    private static boolean cancellableBeforeDeposit(CustomerOrder o) {
+        return o.isActive() && !o.isPickedUp() && o.isBeforeDeposit();
+    }
+
+    /** 입금한 주문은 바로 취소 대신 환불 신청 (화면이 환불 신청 칸으로 바뀜) */
+    private static ErrorResponseException refundInstead() {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "입금한 주문입니다. 주문 취소 대신 환불 신청을 해 주세요.");
+        problem.setProperty("refundRequired", true);
+        return new ErrorResponseException(HttpStatus.CONFLICT, problem, null);
+    }
+
+    private List<CustomerOrder> matchByPhoneAndName(GroupBuy groupBuy, String rawPhone, String rawName) {
+        String phone = PhoneNumbers.normalize(rawPhone);
+        String name = squash(rawName);
+        List<CustomerOrder> matches = orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()).stream()
+                .filter(o -> phone != null && phone.equals(o.getPhone()))
+                .filter(o -> name.equals(squash(o.getDepositorName())))
+                .toList();
+        if (matches.isEmpty()) {
+            throw ApiException.notFound("휴대폰 번호와 입금자명이 일치하는 주문이 없습니다.");
+        }
+        return matches;
+    }
+
+    /** 고른 주문번호의 주문, 아니면 조건에 맞는 주문이 하나일 때 그 주문. 여러 건이면 409 + 주문 목록(orders) */
+    private static CustomerOrder pick(List<CustomerOrder> matches, Integer orderNo,
+                                      java.util.function.Predicate<CustomerOrder> eligible, String chooseMessage,
+                                      String noneMessage) {
+        if (orderNo != null) {
+            return matches.stream().filter(o -> o.getOrderNo() == orderNo).findFirst()
+                    .orElseThrow(() -> ApiException.notFound("주문번호를 확인해 주세요."));
+        }
+        List<CustomerOrder> candidates = matches.stream().filter(eligible).toList();
+        if (candidates.size() == 1) {
+            return candidates.get(0);
+        }
+        if (candidates.isEmpty()) {
+            throw ApiException.badRequest(noneMessage);
+        }
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, chooseMessage);
+        problem.setProperty("orders", candidates.stream().map(o -> OrderMapper.toMyOrder(o, true)).toList());
+        throw new ErrorResponseException(HttpStatus.CONFLICT, problem, null);
     }
 
     // ---------- 내부 ----------
@@ -367,6 +439,13 @@ public class PublicOrderService {
             throw ApiException.notFound("아직 열리지 않은 공구입니다.");
         }
         return groupBuy;
+    }
+
+    /** 판매자가 주문을 잠시 멈췄으면 고객 요청(주문·수정·취소·환불 신청)을 막는다. 잠근 뒤 확인해서 멈춘 직후 요청도 막힌다 */
+    private static void requireNotPaused(GroupBuy groupBuy) {
+        if (groupBuy.isPaused()) {
+            throw ApiException.conflict(groupBuy.effectivePauseMessage());
+        }
     }
 
     private GroupBuy lock(GroupBuy groupBuy) {
@@ -472,7 +551,8 @@ public class PublicOrderService {
                 g.sortedPickupPoints().stream().map(PickupPointResponse::of).toList(),
                 g.isPickupEnabled(), g.isPickupPrepayEnabled(), g.isPickupOnsiteEnabled(), g.isDeliveryEnabled(),
                 g.getShippingFeeType(), g.getShippingFee(), g.isNicknameRequired(), g.isUnitAddressFieldEnabled(),
-                g.getKakaoInquiryUrl(), g.usesPrepay() ? account(g) : null, myOrders, prefill);
+                g.getKakaoInquiryUrl(), g.usesPrepay() ? account(g) : null, myOrders, prefill, g.isPaused(),
+                g.isPaused() ? g.effectivePauseMessage() : null, g.isPaused() ? g.getPauseLinkUrl() : null);
     }
 
     private List<MyOrder> myOrders(GroupBuy g, CustomerDevice device, LocalDateTime now) {

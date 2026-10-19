@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.depositcock.common.DataCipher;
 import com.depositcock.order.OrderDtos.ChangeRecord;
 import com.depositcock.order.OrderDtos.MyOrder;
 import com.depositcock.order.OrderDtos.PaymentRecord;
@@ -30,7 +31,9 @@ final class OrderMapper {
                 o.getPickupPoint() == null ? null : o.getPickupPoint().getName(), o.getPaymentMethod(),
                 o.getDepositorName(), status, status.getLabel(),
                 status == DisplayStatus.AWAITING_DEPOSIT,
-                o.isActive() && acceptingOrders && !o.isPickedUp(), // 수령한 주문은 서버도 취소를 거절한다
+                o.isActive() && acceptingOrders && !o.isPickedUp() && o.isBeforeDeposit(),
+                o.canRequestRefund(),
+                o.isRefundPending() ? "REQUESTED" : o.isActive() && o.getRefundRejectedAt() != null ? "REJECTED" : null,
                 o.isRefundRequired() && o.getRefundedAt() == null,
                 o.getOrderedAt(),
                 lastChange(o, ChangeActor.SELLER), lastChange(o, ChangeActor.CUSTOMER),
@@ -42,7 +45,7 @@ final class OrderMapper {
                 .reduce((a, b) -> b).orElse(null);
     }
 
-    static List<SellerOrder> toSellerOrders(List<CustomerOrder> orders) {
+    static List<SellerOrder> toSellerOrders(List<CustomerOrder> orders, DataCipher cipher) {
         Map<Long, Long> activeByKey = orders.stream().filter(CustomerOrder::isActive)
                 .filter(o -> o.getSource() == OrderSource.FORM)
                 .collect(Collectors.groupingBy(CustomerOrder::getCustomerId, Collectors.counting()));
@@ -51,7 +54,7 @@ final class OrderMapper {
                 .filter(o -> Nicknames.key(o.getNickname()) != null)
                 .collect(Collectors.groupingBy(o -> Nicknames.key(o.getNickname())));
         return orders.stream().map(o -> toSellerOrder(o, activeByKey.getOrDefault(o.getCustomerId(), 0L) > 1,
-                sameNicknameOtherSource(o, byNickname))).toList();
+                sameNicknameOtherSource(o, byNickname), cipher)).toList();
     }
 
     private static List<Integer> sameNicknameOtherSource(CustomerOrder o, Map<String, List<CustomerOrder>> byNickname) {
@@ -63,11 +66,12 @@ final class OrderMapper {
                 .map(CustomerOrder::getOrderNo).toList();
     }
 
-    static SellerOrder toSellerOrder(CustomerOrder o, boolean duplicateContact) {
-        return toSellerOrder(o, duplicateContact, List.of());
+    static SellerOrder toSellerOrder(CustomerOrder o, boolean duplicateContact, DataCipher cipher) {
+        return toSellerOrder(o, duplicateContact, List.of(), cipher);
     }
 
-    static SellerOrder toSellerOrder(CustomerOrder o, boolean duplicateContact, List<Integer> sameNicknameOrderNos) {
+    static SellerOrder toSellerOrder(CustomerOrder o, boolean duplicateContact, List<Integer> sameNicknameOrderNos,
+                                     DataCipher cipher) {
         DisplayStatus status = o.displayStatus();
         return new SellerOrder(o.getId(), o.getOrderNo(), o.getSource(), o.getCustomerId(),
                 PhoneNumbers.format(o.getPhone()), o.getDepositorName(), o.getNickname(), o.getUnitAddress(),
@@ -80,7 +84,8 @@ final class OrderMapper {
                 o.totalQuantity(), o.getItemsAmount(), o.getShippingFee(), o.getExpectedAmount(), status,
                 status.getLabel(), o.isActive(), o.getDepositReportedAt(), o.isPaid(), o.getPaidAt(),
                 o.getPaidDepositorName(), o.getPaidAmount(), o.isOnsitePaid(), o.isPickedUp(), o.getPickedUpAt(),
-                o.isRefundRequired(), o.getRefundedAt(), duplicateContact, o.getOrderedAt(), o.getUpdatedAt(), o.getCancelledAt(),
+                o.isRefundRequired(), o.getRefundedAt(), o.getRefundRequestedAt(), o.getRefundRejectedAt(),
+                o.getRefundBank(), cipher.decrypt(o.getRefundAccount()), o.getRefundHolder(), duplicateContact, o.getOrderedAt(), o.getUpdatedAt(), o.getCancelledAt(),
                 o.getConfirmations().stream().map(c -> new PaymentRecord(c.getDepositorName(), c.getAmount(),
                         c.isManual(), c.getConfirmedAt(), c.getCancelledAt())).toList(),
                 o.getChanges().stream().map(c -> new ChangeRecord(c.getSummary(), c.getChangedBy(), c.getChangedAt())).toList(),

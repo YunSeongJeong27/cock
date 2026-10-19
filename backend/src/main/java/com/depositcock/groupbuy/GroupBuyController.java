@@ -6,6 +6,7 @@ import com.depositcock.groupbuy.GroupBuyDtos.Dashboard;
 import com.depositcock.groupbuy.GroupBuyDtos.GroupBuyRequest;
 import com.depositcock.groupbuy.GroupBuyDtos.GroupBuyResponse;
 import com.depositcock.groupbuy.GroupBuyDtos.GroupBuySummary;
+import com.depositcock.groupbuy.GroupBuyDtos.PauseRequest;
 import com.depositcock.security.CurrentSeller;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -55,6 +56,12 @@ public class GroupBuyController {
     @PostMapping("/{id}/close")
     public GroupBuyResponse close(@PathVariable Long id) {
         return groupBuyService.close(CurrentSeller.id(), id);
+    }
+
+    /** 주문 잠시 멈춤 / 다시 받기 */
+    @PutMapping("/{id}/pause")
+    public GroupBuyResponse pause(@PathVariable Long id, @Valid @RequestBody PauseRequest request) {
+        return groupBuyService.pause(CurrentSeller.id(), id, request);
     }
 
     @DeleteMapping("/{id}")

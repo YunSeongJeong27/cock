@@ -137,12 +137,22 @@ class M3DepositFlowTest extends IntegrationTest {
         JsonNode after = read(mvc.perform(get("/api/seller/group-buys/" + id + "/deposits/match").cookie(seller)).andReturn());
         assertThat(after.get("used").size()).isEqualTo(1);
 
-        // 입금 확정된 주문을 고객이 취소 → 환불 필요
+        // 입금 확정된 주문은 고객이 바로 취소하지 못하고 환불 신청 → 판매자가 취소하고 환불 → 환불 필요 (2026-10-18)
         JsonNode g = groupBuy(seller, id);
-        mvc.perform(withJson(post("/api/public/g/" + g.get("publicToken").asText() + "/cancel"),
-                Map.of("orderNo", 1, "phone", "01010000001", "depositorName", "김지영"))).andExpect(status().isOk());
+        String pub = "/api/public/g/" + g.get("publicToken").asText();
+        mvc.perform(withJson(post(pub + "/cancel"), Map.of("orderNo", 1, "phone", "01010000001", "depositorName", "김지영")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.refundRequired").value(true));
+        mvc.perform(withJson(post(pub + "/refund-request"), Map.of("orderNo", 1, "phone", "01010000001",
+                "depositorName", "김지영", "bankName", "국민", "accountNumber", "123-456-7890", "accountHolder", "김지영")))
+                .andExpect(status().isOk());
+        long refundOrderId = read(mvc.perform(get("/api/seller/group-buys/" + id + "/orders").cookie(seller)).andReturn())
+                .get(0).get("id").asLong();
+        mvc.perform(post("/api/seller/group-buys/" + id + "/orders/" + refundOrderId + "/refund-request/approve").cookie(seller))
+                .andExpect(status().isOk());
         JsonNode orders = read(mvc.perform(get("/api/seller/group-buys/" + id + "/orders").cookie(seller)).andReturn());
         assertThat(orders.get(0).get("refundRequired").asBoolean()).isTrue();
+        assertThat(orders.get(0).get("refundAccount").asText()).isEqualTo("1234567890");
         mvc.perform(post("/api/seller/group-buys/" + id + "/orders/" + orders.get(0).get("id").asLong() + "/refunded")
                 .cookie(seller)).andExpect(status().isOk());
 

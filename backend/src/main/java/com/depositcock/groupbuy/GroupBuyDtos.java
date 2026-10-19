@@ -95,7 +95,11 @@ public final class GroupBuyDtos {
             String adminNames,
             LocalDateTime createdAt,
             List<ProductResponse> products,
-            List<PickupPointResponse> pickupPoints) {
+            List<PickupPointResponse> pickupPoints,
+            boolean paused,
+            /** 판매자가 적은 멈춤 문구 (null 이면 기본 문구를 씀) */
+            String pauseMessage,
+            String pauseLinkUrl) {
 
         public static GroupBuyResponse of(GroupBuy g, LocalDateTime now) {
             return new GroupBuyResponse(g.getId(), g.getTitle(), g.getDescription(), g.getPublicToken(), g.getStatus(),
@@ -104,8 +108,13 @@ public final class GroupBuyDtos {
                     g.isDeliveryEnabled(), g.getShippingFeeType(), g.getShippingFee(), g.getOrderChannel(),
                     g.isUnitAddressFieldEnabled(), g.getKakaoInquiryUrl(), g.getAdminNames(), g.getCreatedAt(),
                     g.sortedProducts().stream().map(ProductResponse::of).toList(),
-                    g.sortedPickupPoints().stream().map(PickupPointResponse::of).toList());
+                    g.sortedPickupPoints().stream().map(PickupPointResponse::of).toList(),
+                    g.isPaused(), g.getPauseMessage(), g.getPauseLinkUrl());
         }
+    }
+
+    /** 주문 잠시 멈춤 켜기/끄기 (문구·링크는 비우면 기본 문구, 링크 없음) */
+    public record PauseRequest(boolean paused, @Size(max = 300) String message, @Size(max = 500) String linkUrl) {
     }
 
     /** 대시보드 (정리본 9장): 총 수량, 총 금액, 입금 완료 수, 미입금 수, 수령 수 */
@@ -120,6 +129,8 @@ public final class GroupBuyDtos {
             int onsiteCount,
             int pickedUpCount,
             int refundPendingCount,
+            /** 판매자 확인을 기다리는 고객 환불 신청 수 */
+            int refundRequestCount,
             int cancelledCount) {
     }
 
@@ -131,6 +142,8 @@ public final class GroupBuyDtos {
             LocalDateTime closeAt,
             String publicToken,
             LocalDateTime createdAt,
-            Dashboard dashboard) {
+            Dashboard dashboard,
+            /** 주문 잠시 멈춤 중 (목록에서 풀어야 할 공구가 보이게) */
+            boolean paused) {
     }
 }

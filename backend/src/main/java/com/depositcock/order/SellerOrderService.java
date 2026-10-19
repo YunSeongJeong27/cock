@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.DataCipher;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.GroupBuyService;
 import com.depositcock.groupbuy.PickupPoint;
@@ -34,9 +35,12 @@ public class SellerOrderService {
     private final EntityManager entityManager;
     private final Clock clock;
     private final StockAlerts stockAlerts;
+    private final DataCipher cipher;
 
     public SellerOrderService(GroupBuyService groupBuyService, CustomerOrderRepository orderRepository,
-                              ProductRepository productRepository, EntityManager entityManager, Clock clock, StockAlerts stockAlerts) {
+                              ProductRepository productRepository, EntityManager entityManager, Clock clock, StockAlerts stockAlerts,
+                              DataCipher cipher) {
+        this.cipher = cipher;
         this.stockAlerts = stockAlerts;
         this.entityManager = entityManager;
         this.groupBuyService = groupBuyService;
@@ -47,7 +51,7 @@ public class SellerOrderService {
 
     public List<SellerOrder> list(Long sellerId, Long groupBuyId) {
         GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
-        return OrderMapper.toSellerOrders(orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()));
+        return OrderMapper.toSellerOrders(orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()), cipher);
     }
 
     /** 다른 판매자의 주문이면 404. 주문을 바꾸는 요청이므로 공구를 잠근 뒤 최신 주문을 읽는다 */
@@ -64,7 +68,7 @@ public class SellerOrderService {
             throw ApiException.badRequest("취소된 주문입니다.");
         }
         order.markPickedUp(pickedUp, LocalDateTime.now(clock));
-        return OrderMapper.toSellerOrder(order, false);
+        return OrderMapper.toSellerOrder(order, false, cipher);
     }
 
     @Transactional
@@ -74,7 +78,26 @@ public class SellerOrderService {
             throw ApiException.badRequest("이미 취소된 주문입니다.");
         }
         OrderCancellation.cancel(order, productRepository, entityManager, stockAlerts, LocalDateTime.now(clock));
-        return OrderMapper.toSellerOrder(order, false);
+        return OrderMapper.toSellerOrder(order, false, cipher);
+    }
+
+    /**
+     * 고객의 환불 신청 처리 (2026-10-18 사용자 결정: 판매자가 확인 후 취소). 판매자가 직접 계좌로 돈을 돌려보내야 하므로
+     * approve = 주문 취소 + "환불 필요"(판매자가 송금 후 "환불 완료"), reject = 취소 안 함 (주문 그대로, 고객 화면에 반려 표시)
+     */
+    @Transactional
+    public SellerOrder decideRefund(Long sellerId, Long groupBuyId, Long orderId, boolean approve) {
+        CustomerOrder order = getOwnedOrderForUpdate(sellerId, groupBuyId, orderId);
+        if (!order.isRefundPending()) {
+            throw ApiException.badRequest("확인을 기다리는 환불 신청이 없습니다.");
+        }
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (approve) {
+            OrderCancellation.cancelForRefund(order, productRepository, entityManager, stockAlerts, now);
+        } else {
+            order.rejectRefund(now);
+        }
+        return OrderMapper.toSellerOrder(order, false, cipher);
     }
 
     @Transactional
@@ -84,7 +107,7 @@ public class SellerOrderService {
             throw ApiException.badRequest("환불이 필요한 주문이 아닙니다.");
         }
         order.markRefunded(LocalDateTime.now(clock));
-        return OrderMapper.toSellerOrder(order, false);
+        return OrderMapper.toSellerOrder(order, false, cipher);
     }
 
     /**
@@ -149,7 +172,7 @@ public class SellerOrderService {
                 delivery ? r.address().trim() : null, delivery ? trimToNull(r.addressDetail()) : null),
                 ChangeActor.SELLER, null, productRepository, entityManager, stockAlerts, now);
         orderRepository.flush();
-        return OrderMapper.toSellerOrder(order, false);
+        return OrderMapper.toSellerOrder(order, false, cipher);
     }
 
     private static String trimToNull(String value) {

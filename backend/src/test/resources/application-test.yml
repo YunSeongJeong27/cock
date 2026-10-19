@@ -9,6 +9,7 @@ spring:
 
 app:
   jwt-secret: test-secret-0123456789abcdef0123456789abcdef
+  data-key: test-data-key-0123456789abcdef0123456789abcdef
   admin-email: admin@test.local
   admin-password: admin1234
   public-rate-limit-per-minute: 10000

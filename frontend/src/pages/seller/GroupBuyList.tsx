@@ -43,6 +43,8 @@ export default function GroupBuyList() {
               <span>입금 확인 <b>{g.dashboard.paidCount}</b></span>
               <span>미입금 <b style={{ color: g.dashboard.unpaidCount ? 'var(--warn)' : undefined }}>{g.dashboard.unpaidCount}</b></span>
               <span>수령 <b>{g.dashboard.pickedUpCount}</b></span>
+              {g.paused && <span style={{ color: 'var(--warn)' }}><b>⏸ 주문 멈춤 중</b></span>}
+              {g.dashboard.refundRequestCount > 0 && <span style={{ color: 'var(--warn)' }}>환불 신청 <b>{g.dashboard.refundRequestCount}</b></span>}
               {g.dashboard.refundPendingCount > 0 && <span style={{ color: 'var(--danger)' }}>환불 필요 <b>{g.dashboard.refundPendingCount}</b></span>}
             </div>
           </div>

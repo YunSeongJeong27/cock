@@ -72,7 +72,15 @@ export interface GroupBuy {
   createdAt: string
   products: Product[]
   pickupPoints: PickupPoint[]
+  /** 주문 잠시 멈춤 중 (고객의 주문·수정·취소·환불 신청이 막힘) */
+  paused: boolean
+  /** 판매자가 적은 멈춤 문구 (null 이면 기본 문구) */
+  pauseMessage: string | null
+  pauseLinkUrl: string | null
 }
+
+/** 주문 잠시 멈춤 기본 문구 (서버 GroupBuy.DEFAULT_PAUSE_MESSAGE 와 같음) */
+export const DEFAULT_PAUSE_MESSAGE = '현재 주문 집계 중입니다. 판매자에게 문의해 주시면 감사하겠습니다.'
 
 export interface Dashboard {
   orderCount: number
@@ -85,6 +93,8 @@ export interface Dashboard {
   onsiteCount: number
   pickedUpCount: number
   refundPendingCount: number
+  /** 판매자 확인을 기다리는 고객 환불 신청 */
+  refundRequestCount: number
   cancelledCount: number
 }
 
@@ -97,6 +107,7 @@ export interface GroupBuySummary {
   publicToken: string
   createdAt: string
   dashboard: Dashboard
+  paused: boolean
 }
 
 export type DisplayStatus = 'AWAITING_DEPOSIT' | 'DEPOSIT_REPORTED' | 'PAID' | 'RESERVED' | 'PICKED_UP' | 'CANCELLED'
@@ -137,6 +148,13 @@ export interface SellerOrder {
   pickedUpAt: string | null
   refundRequired: boolean
   refundedAt: string | null
+  /** 고객의 환불 신청 (반려 시각이 없고 주문이 살아 있으면 판매자 확인 대기) */
+  refundRequestedAt: string | null
+  refundRejectedAt: string | null
+  /** 환불받을 계좌 (계좌번호는 서버에 암호화 저장, 환불 완료·반려 때 지움) */
+  refundBank: string | null
+  refundAccount: string | null
+  refundHolder: string | null
   duplicateContact: boolean
   orderedAt: string
   /** 마지막으로 바뀐 시각 (입금 신고·확정·수령·취소·판매자 변경 등) */

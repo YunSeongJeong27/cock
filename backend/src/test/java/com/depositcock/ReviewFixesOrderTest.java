@@ -113,19 +113,20 @@ class ReviewFixesOrderTest extends IntegrationTest {
         mvc.perform(withJson(post(url + "/cancel").cookie(device), cancel)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.myOrders[0].status").value("CANCELLED"));
 
-        // 주문 2건(입금 확정된 주문 + 추가 주문): 고르라는 409 + 주문 목록 → 주문번호로 취소
+        // 주문 2건(입금 확정된 주문 + 추가 주문): 바로 취소는 입금 전 주문만 대상 → 추가 주문이 취소됨
         mvc.perform(withJson(post(url + "/orders"), order(g.productId(), 1, "010-5200-0001", "김지영", true))).andExpect(status().isOk());
         JsonNode orders = read(mvc.perform(get("/api/seller/group-buys/" + g.id() + "/orders").cookie(g.seller())).andReturn());
         mvc.perform(withJson(post("/api/seller/group-buys/" + g.id() + "/orders/" + orders.get(1).get("id").asLong()
                 + "/manual-paid").cookie(g.seller()), Map.of("depositorName", "김지영", "amount", 1000))).andExpect(status().isOk());
         mvc.perform(withJson(post(url + "/orders"), order(g.productId(), 2, "010-5200-0001", "김지영", true)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.orderNo").value(3)).andExpect(jsonPath("$.changed").value(false));
-        JsonNode conflict = read(mvc.perform(withJson(post(url + "/cancel"), cancel))
-                .andExpect(status().isConflict()).andReturn());
-        assertThat(conflict.get("orders")).hasSize(2);
-        int target = conflict.get("orders").get(0).get("orderNo").asInt();
-        cancel.put("orderNo", target);
         mvc.perform(withJson(post(url + "/cancel"), cancel)).andExpect(status().isOk());
+        JsonNode after = read(mvc.perform(get("/api/seller/group-buys/" + g.id() + "/orders").cookie(g.seller())).andReturn());
+        assertThat(after.get(1).get("active").asBoolean()).isTrue();
+        assertThat(after.get(2).get("active").asBoolean()).isFalse();
+        // 남은 건 입금 확정된 주문 → 바로 취소 대신 환불 신청 안내 (2026-10-18)
+        mvc.perform(withJson(post(url + "/cancel"), cancel)).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.refundRequired").value(true));
 
         cancel.put("depositorName", "다른사람");
         mvc.perform(withJson(post(url + "/cancel"), cancel)).andExpect(status().isNotFound());

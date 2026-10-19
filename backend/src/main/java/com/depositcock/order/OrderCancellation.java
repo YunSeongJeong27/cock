@@ -17,6 +17,18 @@ final class OrderCancellation {
     static void cancel(CustomerOrder order, ProductRepository productRepository, EntityManager em, StockAlerts stockAlerts,
                        LocalDateTime now) {
         order.cancel(now);
+        restoreStock(order, productRepository, em, stockAlerts);
+    }
+
+    /** 판매자가 환불 신청을 받아들여 취소 (환불 필요) */
+    static void cancelForRefund(CustomerOrder order, ProductRepository productRepository, EntityManager em,
+                                StockAlerts stockAlerts, LocalDateTime now) {
+        order.cancelForRefund(now);
+        restoreStock(order, productRepository, em, stockAlerts);
+    }
+
+    private static void restoreStock(CustomerOrder order, ProductRepository productRepository, EntityManager em,
+                                     StockAlerts stockAlerts) {
         for (OrderItem item : order.getItems()) {
             productRepository.decreaseSold(item.getProduct().getId(), item.getQuantity());
             em.refresh(item.getProduct());

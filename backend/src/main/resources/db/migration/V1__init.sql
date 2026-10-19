@@ -69,6 +69,10 @@ CREATE TABLE group_buy (
     unit_address_field_enabled BOOLEAN      NOT NULL,
     kakao_inquiry_url          VARCHAR(500),
     admin_names                VARCHAR(500),
+    -- 주문 잠시 멈춤 (판매자가 입금 대조 중 등): 고객의 새 주문·수정·취소·환불 신청을 막는다. 문구·링크는 판매자가 정함
+    paused                     BOOLEAN      NOT NULL DEFAULT FALSE,
+    pause_message              VARCHAR(300),
+    pause_link_url             VARCHAR(500),
     created_at                 TIMESTAMP    NOT NULL,
     updated_at                 TIMESTAMP    NOT NULL
 );
@@ -131,6 +135,13 @@ CREATE TABLE customer_order (
     picked_up_at        TIMESTAMP,
     refund_required     BOOLEAN      NOT NULL DEFAULT FALSE,
     refunded_at         TIMESTAMP,
+    -- 고객의 환불 신청 (입금 후 취소). 판매자가 [취소하고 환불]하면 취소 + refund_required, [취소 안 함]이면 rejected_at
+    refund_requested_at TIMESTAMP,
+    refund_rejected_at  TIMESTAMP,
+    -- 환불받을 계좌. 계좌번호는 암호화해서 저장 (DataCipher). 환불 완료·반려·환불 없는 취소 때 지운다
+    refund_bank         VARCHAR(50),
+    refund_account      VARCHAR(200),
+    refund_holder       VARCHAR(50),
     lookup_token        VARCHAR(40)  NOT NULL UNIQUE,
     -- 이 주문을 넣은 고객 기기의 쿠키 토큰. 그 기기에만 주문 내용·이전 입력값을 보여준다 (댓글 주문 등은 NULL)
     device_token        VARCHAR(64),

@@ -17,6 +17,9 @@ const SORT_VALUE: Record<SortKey, (o: SellerOrder) => string | number> = {
   updatedAt: (o) => o.updatedAt,
 }
 
+/** 판매자 확인을 기다리는 고객 환불 신청 */
+const refundPending = (o: SellerOrder) => o.active && o.refundRequestedAt !== null && o.refundRejectedAt === null
+
 /** 상품별 수량 (같은 상품 줄이 여러 개여도 합산) */
 const qtyOf = (o: SellerOrder, productId: number) =>
   o.items.filter((i) => i.productId === productId).reduce((sum, i) => sum + i.quantity, 0)
@@ -41,6 +44,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
       if (filter === 'active' && !o.active) return false
       if (filter === 'unpaid' && !(o.active && o.paymentMethod === 'PREPAID' && !o.paid)) return false
       if (filter === 'refund' && !(o.refundRequired && !o.refundedAt)) return false
+      if (filter === 'refundreq' && !refundPending(o)) return false
       if (filter === 'cancelled' && o.active) return false
       if (filter === 'samenick' && o.sameNicknameOrderNos.length === 0) return false
       const q = query.trim()
@@ -93,6 +97,15 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
   }
 
   const sameNick = orders.filter((o) => o.sameNicknameOrderNos.length > 0).length
+  const refundRequests = orders.filter(refundPending).length
+
+  /** 환불받을 계좌 (복사 버튼). 키가 바뀌어 못 읽으면 안내 */
+  const refundAccount = (o: SellerOrder) => (
+    <div className="row">
+      <span>환불 계좌: <b>{o.refundBank} {o.refundAccount ?? '(읽을 수 없음)'}</b> ({o.refundHolder})</span>
+      {o.refundAccount && <CopyButton text={o.refundAccount} label="계좌 복사" />}
+    </div>
+  )
 
   /** 상세: 시각·배송지·입금 이력·변경 이력 + 버튼 (그리드·카드 공통) */
   function detail(o: SellerOrder): ReactNode {
@@ -115,7 +128,22 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             <div key={i} className="change-log">{c.changedBy === 'CUSTOMER' ? '고객 변경' : '판매자 변경'} {dateTime(c.changedAt)} · {c.summary}</div>
           ))}
           {o.cancelledAt && <div>취소: {dateTime(o.cancelledAt)}</div>}
+          {o.refundRejectedAt && <div className="muted">환불 신청 {dateTime(o.refundRequestedAt)} → {dateTime(o.refundRejectedAt)} 취소 안 함</div>}
         </div>
+        {refundPending(o) && (
+          <div className="edit-box mt">
+            <div><b>환불 신청</b> <span className="small muted">{dateTime(o.refundRequestedAt)}</span></div>
+            <div className="small mt">{refundAccount(o)}</div>
+            {!o.paid && <div className="small mt" style={{ color: 'var(--warn)' }}>아직 입금 확인 전입니다. 통장에서 입금을 확인한 뒤 처리해 주세요.</div>}
+            <div className="row mt">
+              <button className="btn small danger" onClick={() => post(`${o.id}/refund-request/approve`, undefined,
+                `${o.orderNo}번 주문을 취소하고 "환불 필요"로 표시할까요? 위 계좌로 직접 돈을 보낸 뒤 [환불 완료]를 눌러 주세요.`)}>취소하고 환불</button>
+              <button className="btn small" onClick={() => post(`${o.id}/refund-request/reject`, undefined,
+                '환불 신청을 받지 않을까요? 주문은 그대로 남고, 고객 화면에 "환불 신청이 반려됐어요"가 보입니다.')}>취소 안 함</button>
+            </div>
+          </div>
+        )}
+        {o.refundRequired && !o.refundedAt && o.refundBank && <div className="small mt">{refundAccount(o)}</div>}
         {reply?.orderId === o.id && (
           <div className="edit-box mt">
             <div className="small"><b>변경했습니다.</b> 댓글 답글 예시 (고쳐서 복사해 쓰세요)</div>
@@ -201,6 +229,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
                 <td>{deposit(o)}</td>
                 <td>
                   <StatusBadge status={o.status} label={o.statusLabel} />
+                  {refundPending(o) && <span className="sub"><span className="badge badge-AWAITING_DEPOSIT">환불 신청</span></span>}
                   {o.refundRequired && !o.refundedAt && <span className="sub"><span className="badge badge-CANCELLED">환불 필요</span></span>}
                   {o.refundedAt && <span className="sub">환불 완료</span>}
                 </td>
@@ -251,6 +280,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
                 <td className="small" data-label="입금">{deposit(o)}</td>
                 <td data-label="상태">
                   <StatusBadge status={o.status} label={o.statusLabel} />
+                  {refundPending(o) && <> <span className="badge badge-AWAITING_DEPOSIT">환불 신청</span></>}
                   {o.refundRequired && !o.refundedAt && <> <span className="badge badge-CANCELLED">환불 필요</span></>}
                   {o.refundedAt && <span className="small muted"> 환불 완료</span>}
                 </td>
@@ -268,6 +298,12 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
 
   return (
     <div>
+      {refundRequests > 0 && filter !== 'refundreq' && (
+        <div className="warn-box row between mb">
+          <span className="small">고객 환불 신청이 {refundRequests}건 있습니다. 상세에서 [취소하고 환불] 또는 [취소 안 함]을 눌러 주세요.</span>
+          <button className="btn small" onClick={() => setFilter('refundreq')}>모아 보기</button>
+        </div>
+      )}
       {sameNick > 0 && filter !== 'samenick' && (
         <div className="warn-box row between mb">
           <span className="small">⚠ 링크 주문과 댓글 주문의 닉네임이 같은 주문이 {sameNick}건 있습니다. 같은 사람이 두 번 주문한 것이면 하나를 취소하거나 바꿔 주세요.</span>
@@ -279,6 +315,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
           <option value="all">전체 ({orders.length})</option>
           <option value="active">주문 중 (취소 제외)</option>
           <option value="unpaid">미입금 (선입금)</option>
+          <option value="refundreq">환불 신청 ({refundRequests})</option>
           <option value="refund">환불 필요</option>
           <option value="cancelled">취소됨</option>
           {(sameNick > 0 || filter === 'samenick') && <option value="samenick">링크·댓글 닉네임 같음 ({sameNick})</option>}
