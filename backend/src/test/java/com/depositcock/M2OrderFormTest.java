@@ -78,7 +78,7 @@ class M2OrderFormTest extends IntegrationTest {
         // 재방문: 쿠키로 알아보고 이전 입력값을 채운다
         mvc.perform(get("/api/public/g/" + token).cookie(device))
                 .andExpect(jsonPath("$.myOrders[0].orderNo").value(1))
-                .andExpect(jsonPath("$.myOrders[0].statusLabel").value("입금 대기 중"))
+                .andExpect(jsonPath("$.myOrders[0].statusLabel").value("주문 확정 전"))
                 .andExpect(jsonPath("$.prefill.depositorName").value("김지영"))
                 .andExpect(jsonPath("$.prefill.phone").value("010-1234-5678"))
                 .andExpect(jsonPath("$.products[0].remaining").value(8));
@@ -89,8 +89,7 @@ class M2OrderFormTest extends IntegrationTest {
         mvc.perform(withJson(post(orders).cookie(device), again))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.replaceOrderNo").value(1))
-                .andExpect(jsonPath("$.warnings[0]").value("이 번호로 입금 전인 주문이 있습니다. 계속하면 지금 내용으로 수정됩니다. "
-                        + "이미 입금하셨다면 판매자에게 문의해 주세요."))
+                .andExpect(jsonPath("$.warnings[0]").value("이 번호로 주문 확정 전인 주문이 있습니다. 계속하면 지금 내용으로 수정됩니다."))
                 .andExpect(jsonPath("$.replaceOrder.orderNo").value(1))
                 .andExpect(jsonPath("$.replaceOrder.items[0].quantity").value(2))
                 .andExpect(jsonPath("$.replaceOrder.expectedAmount").value(3800));
@@ -119,7 +118,7 @@ class M2OrderFormTest extends IntegrationTest {
         mvc.perform(post("/api/public/g/" + token + "/orders/1/report-deposit").cookie(device))
                 .andExpect(status().isOk());
         mvc.perform(get("/api/public/g/" + token).cookie(device))
-                .andExpect(jsonPath("$.myOrders[1].statusLabel").value("입금 신고됨 (확인 대기)"));
+                .andExpect(jsonPath("$.myOrders[1].statusLabel").value("주문 확정 전 (입금 알림 보냄)"));
         // 쿠키 없이 입금 신고 불가
         mvc.perform(post("/api/public/g/" + token + "/orders/2/report-deposit")).andExpect(status().isForbidden());
 

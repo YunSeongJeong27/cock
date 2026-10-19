@@ -209,11 +209,16 @@ public class CustomerOrder {
 
     /**
      * 고객이 이 주문을 수정할 수 있는지 ([주문 수정] 또는 같은 휴대폰 번호로 다시 주문, 2026-10-18).
-     * 주문 링크 주문이고, 취소·수령 전이고, 입금 전 = 고객이 "입금했어요"를 누르지 않았고 판매자 입금 확인도 없음
-     * (사용자 결정: 이미 보낸 금액과 주문 금액이 어긋나지 않게. 입금 후 변경은 취소 후 다시 주문)
+     * 주문 링크 주문이고, 취소·수령 전이고, 주문 확정 전 (2026-10-19 사용자 결정: 주문 확정 = 판매자가 대조해서 입금 확정한 상태.
+     * 고객의 "입금했어요"는 실제 입금 여부를 알 수 없으므로 판단에 쓰지 않음)
      */
     public boolean isReplaceableByCustomer() {
-        return isActive() && source == OrderSource.FORM && isBeforeDeposit() && !pickedUp;
+        return isActive() && source == OrderSource.FORM && !isConfirmed() && !pickedUp;
+    }
+
+    /** 주문 확정 = 판매자가 입금 대조로(또는 수동으로) 입금 확정한 상태. 고객 수정·바로 취소는 확정 전에만 */
+    public boolean isConfirmed() {
+        return isPaid();
     }
 
     public boolean isPrepaid() {
@@ -312,7 +317,7 @@ public class CustomerOrder {
     }
 
     /**
-     * 고객의 환불 신청. 환불 신청은 "입금했어요" 신고도 겸한다 (입금했다고 해야 환불을 신청하므로).
+     * 고객의 환불 신청 (입금한 고객이 취소하려는 경우. 주문 확정 전후 언제든).
      *
      * @param encryptedAccount 암호화한 계좌번호
      */
@@ -322,9 +327,6 @@ public class CustomerOrder {
         this.refundBank = bank;
         this.refundAccount = encryptedAccount;
         this.refundHolder = holder;
-        if (depositReportedAt == null && !isPaid()) {
-            this.depositReportedAt = now;
-        }
         this.updatedAt = now;
     }
 
@@ -346,11 +348,6 @@ public class CustomerOrder {
      */
     public boolean canRequestRefund() {
         return isActive() && source == OrderSource.FORM && isPrepaid() && !pickedUp && refundRequestedAt == null;
-    }
-
-    /** 입금 전 = 고객이 "입금했어요"를 누르지 않았고 판매자 입금 확인도 없음 (수정·바로 취소 기준, 2026-10-18) */
-    public boolean isBeforeDeposit() {
-        return depositReportedAt == null && !isPaid();
     }
 
     private void clearRefundAccount() {

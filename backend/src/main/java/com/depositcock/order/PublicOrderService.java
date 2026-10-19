@@ -142,7 +142,7 @@ public class PublicOrderService {
                 .findByGroupBuyIdAndCustomer_IdOrderByOrderNoAsc(groupBuy.getId(), existingCustomerId).stream()
                 .filter(CustomerOrder::isActive)
                 .toList();
-        // 같은 번호로 다시 주문하면 새 주문을 더하지 않고 입금 전 주문을 이 내용으로 수정한다 (2026-10-18 사용자 결정).
+        // 같은 번호로 다시 주문하면 새 주문을 더하지 않고 주문 확정 전 주문을 이 내용으로 수정한다 (2026-10-18 사용자 결정).
         // "내 주문"의 [주문 수정]으로 고른 주문(replaceOrderNo)이 수정할 수 있는 주문이면 그 주문,
         // 아니면 가장 최근의 수정할 수 있는 주문 (여러 건: 판매자가 입금 확정을 취소한 경우 등)
         List<CustomerOrder> replaceable = previous.stream().filter(CustomerOrder::isReplaceableByCustomer).toList();
@@ -166,7 +166,7 @@ public class PublicOrderService {
         if (!confirmed) {
             List<String> messages = new ArrayList<>();
             if (mismatch) {
-                messages.add("이 주문은 수정할 수 없습니다. 이미 입금했거나 휴대폰 번호가 다릅니다.");
+                messages.add("이 주문은 수정할 수 없습니다. 주문이 확정됐거나 휴대폰 번호가 다릅니다.");
             }
             messages.addAll(warnings(previous, target));
             if (!messages.isEmpty()) {
@@ -313,9 +313,11 @@ public class PublicOrderService {
     }
 
     /**
-     * 입금 전 바로 취소: 휴대폰 번호 + 입금자명이 맞아야 한다 (개발 전 인터뷰 결과 4번). 마감 후·멈춤 중에는 불가.
-     * 입금 후(고객이 "입금했어요"를 눌렀거나 판매자가 입금 확인) 주문은 바로 취소하지 않고 환불 신청으로 안내한다
-     * (409 + refundRequired, 2026-10-18 사용자 결정). 같은 정보의 주문이 여러 건이면 409 + 주문 목록(orders).
+     * 바로 취소 (주문 확정 전): 휴대폰 번호 + 입금자명이 맞아야 한다 (개발 전 인터뷰 결과 4번). 마감 후·멈춤 중에는 불가.
+     * 확정된 주문(판매자가 대조해서 입금 확정)은 바로 취소하지 않고 환불 신청으로 안내한다 (409 + refundRequired).
+     * 확정 전이면 입금했어도 바로 취소가 되므로, 화면에서 "입금하셨다면 환불 신청"을 안내한다. 입금하고 바로 취소한 경우는
+     * 입금 대조 화면이 "취소된 주문의 입금자 → 환불 필요?"로 알려준다 (2026-10-19 사용자 결정).
+     * 같은 정보의 주문이 여러 건이면 409 + 주문 목록(orders).
      */
     @Transactional
     public PublicGroupBuy cancel(String publicToken, String cookieToken, CancelRequest r) {
@@ -328,11 +330,11 @@ public class PublicOrderService {
                     + "(입금한 주문은 환불 신청을 할 수 있습니다)");
         }
         List<CustomerOrder> matches = matchByPhoneAndName(groupBuy, r.phone(), r.depositorName());
-        if (r.orderNo() == null && matches.stream().noneMatch(PublicOrderService::cancellableBeforeDeposit)
+        if (r.orderNo() == null && matches.stream().noneMatch(PublicOrderService::cancellableBeforeConfirm)
                 && matches.stream().anyMatch(o -> o.isActive() && !o.isPickedUp())) {
             throw refundInstead();
         }
-        CustomerOrder order = pick(matches, r.orderNo(), PublicOrderService::cancellableBeforeDeposit,
+        CustomerOrder order = pick(matches, r.orderNo(), PublicOrderService::cancellableBeforeConfirm,
                 "주문이 여러 건 있습니다. 취소할 주문을 골라주세요.",
                 "취소할 수 있는 주문이 없습니다. (이미 취소했거나 수령한 주문)");
         if (!order.isActive()) {
@@ -341,7 +343,7 @@ public class PublicOrderService {
         if (order.isPickedUp()) {
             throw ApiException.badRequest("이미 수령한 주문은 취소할 수 없습니다.");
         }
-        if (!order.isBeforeDeposit()) {
+        if (order.isConfirmed()) {
             throw refundInstead();
         }
         OrderCancellation.cancel(order, productRepository, entityManager, stockAlerts, now);
@@ -350,9 +352,9 @@ public class PublicOrderService {
     }
 
     /**
-     * 입금 후 환불 신청 (2026-10-18 사용자 결정): 바로 취소하지 않고 판매자가 확인한 뒤 취소하고 이 계좌로 돌려보낸다.
-     * 휴대폰 번호 + 입금자명이 맞아야 한다. 마감 뒤에도 되고(판매자가 확인하므로), 멈춤 중에는 안 된다.
-     * 계좌번호는 암호화해서 저장하고 환불 완료·반려 때 지운다. "입금했어요"를 안 누른 주문이면 입금 신고도 같이 된다.
+     * 환불 신청 (2026-10-18 사용자 결정): 입금한 고객이 취소할 때. 주문 확정 전후 언제든 되고, 바로 취소하지 않고 판매자가
+     * 확인한 뒤 취소하고 이 계좌로 돌려보낸다. 휴대폰 번호 + 입금자명이 맞아야 한다. 마감 뒤에도 되고(판매자가 확인하므로),
+     * 멈춤 중에는 안 된다. 계좌번호는 암호화해서 저장하고 환불 완료·반려 때 지운다.
      */
     @Transactional
     public PublicGroupBuy requestRefund(String publicToken, String cookieToken, RefundRequest r) {
@@ -385,14 +387,14 @@ public class PublicOrderService {
         return toPublic(groupBuy, device(groupBuy, cookieToken).orElse(null), now);
     }
 
-    private static boolean cancellableBeforeDeposit(CustomerOrder o) {
-        return o.isActive() && !o.isPickedUp() && o.isBeforeDeposit();
+    private static boolean cancellableBeforeConfirm(CustomerOrder o) {
+        return o.isActive() && !o.isPickedUp() && !o.isConfirmed();
     }
 
-    /** 입금한 주문은 바로 취소 대신 환불 신청 (화면이 환불 신청 칸으로 바뀜) */
+    /** 확정된 주문은 바로 취소 대신 환불 신청 (화면이 환불 신청 칸으로 바뀜) */
     private static ErrorResponseException refundInstead() {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
-                "입금한 주문입니다. 주문 취소 대신 환불 신청을 해 주세요.");
+                "확정된 주문입니다. 바로 취소 대신 환불 신청을 해 주세요.");
         problem.setProperty("refundRequired", true);
         return new ErrorResponseException(HttpStatus.CONFLICT, problem, null);
     }
@@ -525,16 +527,15 @@ public class PublicOrderService {
      * @param target   같은 번호로 다시 주문해서 수정될 주문 (없으면 null)
      */
     private static List<String> warnings(List<CustomerOrder> previous, CustomerOrder target) {
-        // 수정은 입금 전에만: 시스템은 고객이 송금만 하고 "입금했어요"를 안 누른 것은 모르므로, 화면 버튼
-        // "입금 전이에요, 수정하기"로 고객이 직접 확인한다. 수정될 주문 내용은 화면의 "기존 주문 확인"으로 본다
+        // 수정은 주문 확정 전에만 (2026-10-19). 수정될 주문 내용은 화면의 "기존 주문 확인"으로 본다
         if (target != null) {
             return List.of(target.isPrepaid()
-                    ? "이 번호로 입금 전인 주문이 있습니다. 계속하면 지금 내용으로 수정됩니다. 이미 입금하셨다면 판매자에게 문의해 주세요."
+                    ? "이 번호로 주문 확정 전인 주문이 있습니다. 계속하면 지금 내용으로 수정됩니다."
                     : "이 번호로 주문한 내역이 있습니다. 계속하면 지금 내용으로 수정됩니다.");
         }
         if (!previous.isEmpty()) {
-            boolean deposited = previous.stream().anyMatch(o -> o.getDepositReportedAt() != null || o.isPaid());
-            return List.of("이 번호로 " + (deposited ? "입금한" : "수령한") + " 주문이 있어, 이번 주문은 새 주문으로 추가됩니다.");
+            boolean confirmed = previous.stream().anyMatch(CustomerOrder::isConfirmed);
+            return List.of("이 번호로 " + (confirmed ? "확정된" : "수령한") + " 주문이 있어, 이번 주문은 새 주문으로 추가됩니다.");
         }
         return List.of();
     }

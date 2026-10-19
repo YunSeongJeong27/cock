@@ -31,7 +31,7 @@ final class OrderMapper {
                 o.getPickupPoint() == null ? null : o.getPickupPoint().getName(), o.getPaymentMethod(),
                 o.getDepositorName(), status, status.getLabel(),
                 status == DisplayStatus.AWAITING_DEPOSIT,
-                o.isActive() && acceptingOrders && !o.isPickedUp() && o.isBeforeDeposit(),
+                o.isActive() && acceptingOrders && !o.isPickedUp() && !o.isConfirmed(),
                 o.canRequestRefund(),
                 o.isRefundPending() ? "REQUESTED" : o.isActive() && o.getRefundRejectedAt() != null ? "REJECTED" : null,
                 o.isRefundRequired() && o.getRefundedAt() == null,

@@ -134,7 +134,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
           <div className="edit-box mt">
             <div><b>환불 신청</b> <span className="small muted">{dateTime(o.refundRequestedAt)}</span></div>
             <div className="small mt">{refundAccount(o)}</div>
-            {!o.paid && <div className="small mt" style={{ color: 'var(--warn)' }}>아직 입금 확인 전입니다. 통장에서 입금을 확인한 뒤 처리해 주세요.</div>}
+            {!o.paid && <div className="small mt" style={{ color: 'var(--warn)' }}>아직 주문 확정 전입니다. 통장에서 입금을 확인한 뒤 처리해 주세요.</div>}
             <div className="row mt">
               <button className="btn small danger" onClick={() => post(`${o.id}/refund-request/approve`, undefined,
                 `${o.orderNo}번 주문을 취소하고 "환불 필요"로 표시할까요? 위 계좌로 직접 돈을 보낸 뒤 [환불 완료]를 눌러 주세요.`)}>취소하고 환불</button>

@@ -20,7 +20,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 2026-10-18 사용자 결정
- * - 고객 취소: 입금 전은 바로 취소, 입금 후("입금했어요" 또는 입금 확인)는 환불 신청 → 판매자가 확인 후 취소·환불
+ * - 고객 취소: 주문 확정 전은 바로 취소(입금했으면 고객이 환불 신청을 고름), 확정 후는 환불 신청만 → 판매자가 확인 후 취소·환불
+ *   (2026-10-19: 기준은 주문 확정 = 판매자가 대조해서 입금 확정. "입금했어요"는 판단에 안 씀)
  * - 주문 잠시 멈춤: 판매자가 고객의 주문·수정·취소·환불 신청을 잠시 막는다 ("입금했어요"·내 주문 보기는 됨)
  */
 class CancelRefundPauseTest extends IntegrationTest {
@@ -73,25 +74,29 @@ class CancelRefundPauseTest extends IntegrationTest {
     }
 
     @Test
-    void beforeDepositCancelsImmediatelyAfterDepositNeedsRefundRequest() throws Exception {
+    void unconfirmedCancelsImmediatelyConfirmedNeedsRefundRequest() throws Exception {
         Opened g = open(false);
         Cookie device = place(g, "010-8800-0001", "김바로");
+        // "입금했어요"를 눌러도 주문 확정 전이면 바로 취소 가능, 환불 없음
+        mvc.perform(post(g.pub() + "/orders/1/report-deposit").cookie(device)).andExpect(status().isOk());
         mvc.perform(get(g.pub()).cookie(device))
                 .andExpect(jsonPath("$.myOrders[0].cancellable").value(true))
                 .andExpect(jsonPath("$.myOrders[0].refundRequestable").value(true));
-        // 입금 전: 바로 취소, 환불 없음
         mvc.perform(withJson(post(g.pub() + "/cancel").cookie(device), Map.of("phone", "01088000001", "depositorName", "김바로")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.myOrders[0].status").value("CANCELLED"))
                 .andExpect(jsonPath("$.myOrders[0].refundRequired").value(false));
 
-        // "입금했어요"를 누르면 입금 후: 바로 취소 대신 환불 신청 안내
-        Cookie other = place(g, "010-8800-0002", "이입금");
-        mvc.perform(post(g.pub() + "/orders/2/report-deposit").cookie(other)).andExpect(status().isOk());
+        // 판매자가 입금 확정(주문 확정)하면 바로 취소 대신 환불 신청 안내
+        Cookie other = place(g, "010-8800-0002", "이확정");
+        long orderId = sellerOrder(g, 1).get("id").asLong();
+        mvc.perform(withJson(post(g.sellerBase() + "/orders/" + orderId + "/manual-paid").cookie(g.seller()),
+                Map.of("depositorName", "이확정", "amount", 1000))).andExpect(status().isOk());
         mvc.perform(get(g.pub()).cookie(other))
+                .andExpect(jsonPath("$.myOrders[0].statusLabel").value("주문 확정"))
                 .andExpect(jsonPath("$.myOrders[0].cancellable").value(false))
                 .andExpect(jsonPath("$.myOrders[0].refundRequestable").value(true));
-        mvc.perform(withJson(post(g.pub() + "/cancel"), Map.of("phone", "01088000002", "depositorName", "이입금")))
+        mvc.perform(withJson(post(g.pub() + "/cancel"), Map.of("phone", "01088000002", "depositorName", "이확정")))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.refundRequired").value(true));
     }
@@ -104,11 +109,11 @@ class CancelRefundPauseTest extends IntegrationTest {
         // 계좌번호 검사
         mvc.perform(withJson(post(g.pub() + "/refund-request"), refund(phone, "박환불", "12")))
                 .andExpect(status().isBadRequest());
-        // "입금했어요"를 안 눌렀어도 환불 신청 = 입금 신고 겸함
+        // 주문 확정 전에도 환불 신청 가능 (입금한 고객이 고름). "입금했어요" 상태는 건드리지 않음
         mvc.perform(withJson(post(g.pub() + "/refund-request").cookie(device), refund(phone, "박환불", "110-123-456789")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.myOrders[0].refundState").value("REQUESTED"))
-                .andExpect(jsonPath("$.myOrders[0].status").value("DEPOSIT_REPORTED"))
+                .andExpect(jsonPath("$.myOrders[0].status").value("AWAITING_DEPOSIT"))
                 .andExpect(jsonPath("$.myOrders[0].refundRequestable").value(false));
         mvc.perform(withJson(post(g.pub() + "/refund-request"), refund(phone, "박환불", "110123456789")))
                 .andExpect(status().isBadRequest());

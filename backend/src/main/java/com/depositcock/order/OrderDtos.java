@@ -50,11 +50,11 @@ public final class OrderDtos {
     public record IdentifyRequest(@NotBlank String phone) {
     }
 
-    /** 입금 전 바로 취소. orderNo 는 같은 정보의 주문이 여러 건일 때만 필요 */
+    /** 주문 확정 전 바로 취소. orderNo 는 같은 정보의 주문이 여러 건일 때만 필요 */
     public record CancelRequest(@Min(1) Integer orderNo, @NotBlank String phone, @NotBlank String depositorName) {
     }
 
-    /** 입금 후 환불 신청 (판매자가 확인 후 취소·환불). orderNo 는 같은 정보의 주문이 여러 건일 때만 필요 */
+    /** 환불 신청 (입금한 고객, 주문 확정 전후 언제든. 판매자가 확인 후 취소·환불). orderNo 는 주문이 여러 건일 때만 필요 */
     public record RefundRequest(
             @Min(1) Integer orderNo,
             @NotBlank String phone,
@@ -91,7 +91,7 @@ public final class OrderDtos {
             DisplayStatus status,
             String statusLabel,
             boolean canReportDeposit,
-            /** 입금 전 바로 취소할 수 있는지 (입금 전, 수령 전, 주문 받는 중) */
+            /** 바로 취소할 수 있는지 (주문 확정 전, 수령 전, 주문 받는 중) */
             boolean cancellable,
             /** 환불 신청을 할 수 있는지 (선입금 주문, 수령 전, 신청한 적 없음. 마감 뒤에도 됨) */
             boolean refundRequestable,
@@ -103,7 +103,7 @@ public final class OrderDtos {
             LocalDateTime changedAt,
             /** 고객이 같은 번호로 다시 주문해서 마지막으로 바꾼 시각 (안 바꿨으면 null) */
             LocalDateTime customerChangedAt,
-            /** 고객이 수정할 수 있는지 (주문 링크 주문, 입금 전 = "입금했어요"·입금 확인 전, 수령 전, 주문 받는 중) */
+            /** 고객이 수정할 수 있는지 (주문 링크 주문, 주문 확정 전, 수령 전, 주문 받는 중) */
             boolean replaceable,
             /**
              * [주문 수정]을 누르면 주문서에 채울 값 (수정할 수 있는 주문만, 그 외 null).
