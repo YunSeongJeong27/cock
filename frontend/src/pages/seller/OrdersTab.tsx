@@ -163,8 +163,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             {o.active && !o.pickedUp && <button className="btn small" onClick={() => startEdit(o)}>주문 변경</button>}
             {o.active && o.paymentMethod === 'PREPAID' && !o.paid && <button className="btn small" onClick={() => manualPaid(o)}>수동 입금 확정</button>}
             {o.paid && <button className="btn small" onClick={() => post(`${o.id}/unconfirm-paid`, undefined, '입금 확정을 취소할까요?')}>입금 확정 취소</button>}
-            {o.refundRequired && !o.refundedAt && <button className="btn small ok" onClick={() => post(`${o.id}/refunded`, undefined,
-              `${o.orderNo}번 주문에 돈을 돌려보냈나요? [환불 완료]는 되돌릴 수 없습니다.${o.refundBank ? ' 고객 환불 계좌도 지워집니다.' : ''}`)}>환불 완료</button>}
+            {o.refundRequired && !o.refundedAt && <button className="btn small ok" onClick={() => post(`${o.id}/refunded`)}>환불 완료</button>}
             {o.active && <button className="btn small danger" onClick={() => post(`${o.id}/cancel`, undefined, `${o.orderNo}번 주문을 취소할까요?${o.paid ? ' (입금 확정된 주문이라 환불 필요로 표시됩니다)' : ''}`)}>주문 취소</button>}
           </div>
         )}
