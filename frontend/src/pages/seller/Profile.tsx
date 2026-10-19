@@ -14,10 +14,10 @@ const MAIL_ITEMS: { type: NotificationType; label: string; note: string }[] = [
   { type: 'MAIL_CUSTOMER_CANCEL', label: '고객 바로 취소', note: '취소마다 1통' },
   { type: 'MAIL_AUTO_CLOSE', label: '마감 시각 자동 마감', note: '공구마다 1통' },
 ]
-const SCREEN_ITEMS: { type: NotificationType; label: string }[] = [
-  { type: 'SCREEN_REFUND_REQUEST', label: '주문 목록 위 "고객 환불 신청 N건" 칸' },
-  { type: 'SCREEN_STOCK', label: '공구 화면 맨 위 재고 알림 칸' },
-  { type: 'SCREEN_SAME_NICKNAME', label: '주문 목록 위 "링크·댓글 닉네임 같은 주문 N건" 칸' },
+const SCREEN_ITEMS: { type: NotificationType; label: string; note: string }[] = [
+  { type: 'SCREEN_REFUND_REQUEST', label: '고객 환불 신청', note: '주문 목록 위에 표시' },
+  { type: 'SCREEN_STOCK', label: '재고 알림 기준 도달', note: '공구 화면 위에 표시' },
+  { type: 'SCREEN_SAME_NICKNAME', label: '같은 닉네임 중복 주문', note: '주문 목록 위에 표시 (링크 주문과 댓글 주문)' },
 ]
 
 export default function Profile() {
@@ -111,15 +111,15 @@ export default function Profile() {
             <span>{item.label} <span className="muted small">— {item.note}</span></span>
           </label>
         ))}
-        <h4 className="mt">화면</h4>
+        <h4 className="mt">화면 (노란 안내 칸)</h4>
         {SCREEN_ITEMS.map((item) => (
           <label key={item.type} className="check">
             <input type="checkbox" checked={me.notifications[item.type]} disabled={notifySaving}
               onChange={(e) => toggle(item.type, e.target.checked)} />
-            <span>{item.label}</span>
+            <span>{item.label} <span className="muted small">— {item.note}</span></span>
           </label>
         ))}
-        <div className="muted small mt">주문 줄의 표시(환불 신청·환불 필요 등)와 대시보드 숫자는 처리할 일을 놓치지 않게 항상 보입니다.</div>
+        <div className="muted small mt">화면 안내를 꺼도 주문 목록의 표시와 숫자는 그대로 보입니다.</div>
         <ErrorBox message={notifyError} />
       </div>
       {me.role !== 'ADMIN' && (
