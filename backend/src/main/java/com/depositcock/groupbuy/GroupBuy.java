@@ -89,7 +89,7 @@ public class GroupBuy {
     /** 2단계 댓글 집계에서 제외할 관리자 닉네임 (쉼표 구분) */
     private String adminNames;
 
-    /** 주문 잠시 멈춤: 고객의 새 주문·수정·취소·환불 신청을 막는다 ("입금했어요"·내 주문 보기는 됨, 2026-10-18) */
+    /** 주문 잠시 멈춤: 고객의 새 주문·수정·취소·환불 신청을 막는다 (내 주문 보기는 됨, 2026-10-18) */
     @Column(nullable = false)
     private boolean paused;
 

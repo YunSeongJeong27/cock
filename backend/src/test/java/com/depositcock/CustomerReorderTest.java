@@ -133,14 +133,13 @@ class CustomerReorderTest extends IntegrationTest {
      * (2026-10-19 사용자 결정: 시스템은 "입금했어요"가 사실인지 모르므로 판단에 쓰지 않음)
      */
     @Test
-    void depositReportDoesNotBlockEditOnlyConfirmationDoes() throws Exception {
+    void onlyConfirmationBlocksEdit() throws Exception {
         Opened g = open(false);
         String url = "/api/public/g/" + g.token();
         Cookie device = mvc.perform(withJson(post(url + "/orders"), order(Map.of(g.apple(), 1), "010-7300-0001", "박입금", null)))
                 .andExpect(status().isOk()).andReturn().getResponse().getCookie("dcg_" + g.token());
-        mvc.perform(post(url + "/orders/1/report-deposit").cookie(device)).andExpect(status().isOk());
         mvc.perform(get(url).cookie(device))
-                .andExpect(jsonPath("$.myOrders[0].statusLabel").value("주문 확정 전 (입금 알림 보냄)"))
+                .andExpect(jsonPath("$.myOrders[0].statusLabel").value("주문 확정 전"))
                 .andExpect(jsonPath("$.myOrders[0].replaceable").value(true))
                 .andExpect(jsonPath("$.myOrders[0].editValues.phone").value("010-7300-0001"));
         mvc.perform(withJson(post(url + "/orders").cookie(device), order(Map.of(g.apple(), 2), "010-7300-0001", "박입금", 1)))

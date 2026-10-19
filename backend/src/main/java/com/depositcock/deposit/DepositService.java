@@ -39,7 +39,6 @@ import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.GroupBuyService;
 import com.depositcock.order.CustomerOrder;
 import com.depositcock.order.CustomerOrderRepository;
-import com.depositcock.order.DisplayStatus;
 import com.depositcock.order.DepositConfirmation;
 import com.depositcock.order.DepositConfirmationRepository;
 import com.depositcock.order.PhoneNumbers;
@@ -430,8 +429,7 @@ public class DepositService {
             return null;
         }
         return new OrderBrief(o.getId(), o.getOrderNo(), o.getDepositorName(), o.getNickname(),
-                PhoneNumbers.last4(o.getPhone()), o.getExpectedAmount(), o.getOrderedAt(),
-                o.displayStatus() == DisplayStatus.DEPOSIT_REPORTED);
+                PhoneNumbers.last4(o.getPhone()), o.getExpectedAmount(), o.getOrderedAt());
     }
 
     private static String blankToNull(String value) {

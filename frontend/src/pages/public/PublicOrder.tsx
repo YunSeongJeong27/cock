@@ -22,7 +22,8 @@ interface MyOrder {
   depositorName: string
   status: string
   statusLabel: string
-  canReportDeposit: boolean
+  /** 선입금 주문이 주문 확정 전 (입금 계좌를 보여줌) */
+  awaitingConfirm: boolean
   /** 바로 취소 가능 (주문 확정 전, 수령 전, 주문 받는 중) */
   cancellable: boolean
   /** 환불 신청 가능 (선입금, 수령 전, 신청한 적 없음. 마감 뒤에도 됨) */
@@ -55,13 +56,13 @@ interface View {
   pickupEnabled: boolean; pickupPrepayEnabled: boolean; pickupOnsiteEnabled: boolean; deliveryEnabled: boolean
   shippingFeeType: ShippingFeeType; shippingFee: number; nicknameRequired: boolean; unitAddressFieldEnabled: boolean
   kakaoInquiryUrl: string | null; account: Account | null; myOrders: MyOrder[]; prefill: Prefill | null
-  /** 판매자가 주문을 잠시 멈춤: 주문·수정·취소·환불 신청이 막힘 ("입금했어요"·내 주문 보기는 됨) */
+  /** 판매자가 주문을 잠시 멈춤: 주문·수정·취소·환불 신청이 막힘 (내 주문 보기는 됨) */
   paused: boolean; pauseMessage: string | null; pauseLinkUrl: string | null
 }
 
 /**
  * 주문 확정 전은 바로 취소 또는 (입금했으면) 환불 신청, 확정 후는 환불 신청만 (판매자가 확인 후 취소·환불).
- * 주문 확정 = 판매자가 대조해서 입금 확정한 상태. "입금했어요"는 판단에 쓰지 않음 (2026-10-19 사용자 결정)
+ * 주문 확정 = 판매자가 대조해서 입금 확정한 상태 (2026-10-19 사용자 결정. 고객 "입금했어요" 신고는 없앰)
  */
 type CancelMode = 'cancel' | 'refund'
 const emptyCancel = {
@@ -213,15 +214,6 @@ export default function PublicOrder() {
     }
   }
 
-  async function reportDeposit(orderNo: number) {
-    if (!confirm('입금하셨나요? 판매자가 입금내역을 확인하면 "주문 확정"으로 바뀝니다.')) return
-    try {
-      setView(await api.post<View>(`${base}/orders/${orderNo}/report-deposit`))
-    } catch (e) {
-      setError(errorMessage(e))
-    }
-  }
-
   async function doIdentify(e: FormEvent) {
     e.preventDefault()
     try {
@@ -363,7 +355,7 @@ export default function PublicOrder() {
               {view.kakaoInquiryUrl && <a className="btn small" href={view.kakaoInquiryUrl} target="_blank" rel="noreferrer">💬 카톡 문의</a>}
             </div>
           )}
-          <div className="small muted mt">지금은 주문·주문 수정·취소·환불 신청을 잠시 받지 않습니다. "입금했어요"와 내 주문 보기는 됩니다.</div>
+          <div className="small muted mt">지금은 주문·주문 수정·취소·환불 신청을 잠시 받지 않습니다. 내 주문 보기는 됩니다.</div>
         </div>
       )}
 
@@ -379,10 +371,7 @@ export default function PublicOrder() {
               <div>아래 계좌로 <b>{won(placed.expectedAmount)}</b>을 보내주세요.</div>
               <div className="row mt"><b>{placed.account.bankName} {placed.account.accountNumber}</b> ({placed.account.accountHolder}) <CopyButton text={placed.account.accountNumber} label="계좌 복사" /></div>
               <div className="warn-box">받는 분 통장 표시(입금자명)를 꼭 <b>{placed.depositorName}</b>(으)로 해주세요. 입금 확인이 빨라집니다.</div>
-              <div className="row mt">
-                <span className="small grow">입금하셨나요? 입금 후 눌러주세요. (판매자가 입금내역을 확인하면 "주문 확정"으로 바뀝니다)</span>
-                <button className="btn small primary" onClick={() => reportDeposit(placed.orderNo)}>입금했어요</button>
-              </div>
+              <div className="small muted mt">판매자가 입금을 확인하면 "주문 확정"으로 바뀝니다.</div>
             </div>
           ) : <div className="mt">현장에서 결제해 주세요.</div>}
           <p className="small muted">이 화면 위쪽 "내 주문"에서 언제든 상태를 확인할 수 있습니다. 이 링크를 다시 열면 됩니다.</p>
@@ -406,11 +395,10 @@ export default function PublicOrder() {
               {o.refundedAt && <div className="small muted">취소됨 · 환불 완료 ({dateTime(o.refundedAt)})</div>}
               {o.refundState === 'REQUESTED' && <div className="small" style={{ color: 'var(--warn)' }}>환불 신청됨 · 판매자가 확인 중입니다.</div>}
               {o.refundState === 'REJECTED' && <div className="small" style={{ color: 'var(--danger)' }}>환불 신청이 반려됐어요. 판매자에게 문의해 주세요.</div>}
-              {o.canReportDeposit && view.account && (
+              {o.awaitingConfirm && view.account && (
                 <div className="small mt">입금 계좌: {view.account.bankName} {view.account.accountNumber} ({view.account.accountHolder}) <CopyButton text={view.account.accountNumber} label="복사" /></div>
               )}
               <div className="row mt">
-                {o.canReportDeposit && <button className="btn small primary" onClick={() => reportDeposit(o.orderNo)}>입금했어요</button>}
                 {!view.paused && o.replaceable && o.editValues && <button className="btn small" onClick={() => startEdit(o)}>주문 수정</button>}
                 {!view.paused && o.cancellable && <button className="btn small danger" onClick={() => openCancel(o.orderNo)}>주문 취소</button>}
                 {!view.paused && confirmedOrder(o) && <button className="btn small danger" onClick={() => openCancel(o.orderNo, 'refund')}>환불 신청</button>}
@@ -545,6 +533,7 @@ export default function PublicOrder() {
           {warnings && (
             <div className="warn-box">
               {warnings.list.map((w) => <div key={w}>⚠ {w}</div>)}
+              {warnings.replaceOrder?.paymentMethod === 'PREPAID' && <div className="small mt">입금하신 경우에는 환불 후 재주문 하셔야 합니다.</div>}
               {warnings.replaceOrder && showExisting && (
                 <OrderSummary o={warnings.replaceOrder}
                   title={<><b>기존 주문</b> <span className="muted">({warnings.replaceOrder.statusLabel})</span></>} />
@@ -565,6 +554,14 @@ export default function PublicOrder() {
             <div className="row">
               <button className="btn primary grow" disabled={busy || itemsAmount === 0}>수정하기</button>
               <button type="button" className="btn" onClick={stopEdit} disabled={busy}>수정 취소</button>
+            </div>
+          )}
+          {/* 입금한 고객은 수정 대신 환불 후 재주문 (금액이 바뀌면 입금액과 어긋나므로, 2026-10-19 사용자 요청) */}
+          {editing && editing.paymentMethod === 'PREPAID' && editing.refundRequestable && (
+            <div className="row mt">
+              <span className="small muted grow">입금하신 경우에는 환불 후 재주문 하셔야 합니다.</span>
+              <button type="button" className="btn small danger" disabled={busy}
+                onClick={() => { openCancel(editing.orderNo, 'refund'); stopEdit() }}>환불 신청</button>
             </div>
           )}
           <p className="muted small mt">주문하면 <a href="/privacy" target="_blank">개인정보처리방침</a>에 따라 주문 처리에 필요한 정보(연락처·입금자명·배송지)를 판매자에게 전달하는 데 동의하는 것으로 봅니다. 주문 후 이 링크에서 내 주문 상태를 볼 수 있도록 이 기기에 쿠키를 저장합니다.</p>

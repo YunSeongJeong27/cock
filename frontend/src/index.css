@@ -116,7 +116,6 @@ tr.dim td { color: var(--muted); }
 
 .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
 .badge-AWAITING_DEPOSIT { background: var(--warn-weak); color: #92400e; }
-.badge-DEPOSIT_REPORTED { background: #ede9fe; color: #5b21b6; }
 .badge-PAID { background: var(--ok-weak); color: #166534; }
 .badge-RESERVED { background: var(--primary-weak); color: #1e40af; }
 .badge-PICKED_UP { background: #e5e7eb; color: #374151; }

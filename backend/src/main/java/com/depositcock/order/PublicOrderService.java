@@ -301,26 +301,6 @@ public class PublicOrderService {
         return new WithCookie<>(toPublic(groupBuy, device, now), newCookie);
     }
 
-    /** 고객의 "입금했어요". 확정이 아니라 신고이며, 확정은 판매자가 입금내역 대조 후 누른다. */
-    @Transactional
-    public PublicGroupBuy reportDeposit(String publicToken, String cookieToken, int orderNo) {
-        GroupBuy groupBuy = findVisible(publicToken);
-        LocalDateTime now = LocalDateTime.now(clock);
-        CustomerDevice device = device(groupBuy, cookieToken)
-                .orElseThrow(() -> ApiException.forbidden("본인 확인이 필요합니다."));
-        CustomerOrder order = visibleOrders(groupBuy, device).stream()
-                .filter(o -> o.getOrderNo() == orderNo).findFirst()
-                .orElseThrow(() -> ApiException.notFound("주문을 찾을 수 없습니다."));
-        if (!order.isActive() || !order.isPrepaid()) {
-            throw ApiException.badRequest("입금 신고를 할 수 없는 주문입니다.");
-        }
-        if (order.isPaid()) {
-            throw ApiException.badRequest("이미 입금이 확인된 주문입니다.");
-        }
-        order.reportDeposit(now);
-        return toPublic(groupBuy, device, now);
-    }
-
     /**
      * 바로 취소 (주문 확정 전): 휴대폰 번호 + 입금자명이 맞아야 한다 (개발 전 인터뷰 결과 4번). 마감 후·멈춤 중에는 불가.
      * 확정된 주문(판매자가 대조해서 입금 확정)은 바로 취소하지 않고 환불 신청으로 안내한다 (409 + refundRequired).

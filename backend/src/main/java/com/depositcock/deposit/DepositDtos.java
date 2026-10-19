@@ -26,7 +26,7 @@ public final class DepositDtos {
     }
 
     public record OrderBrief(Long orderId, int orderNo, String depositorName, String nickname, String phoneLast4,
-                             int expectedAmount, LocalDateTime orderedAt, boolean depositReported) {
+                             int expectedAmount, LocalDateTime orderedAt) {
     }
 
     public record CandidateView(OrderBrief order, String evidence, int amountDiff) {

@@ -146,9 +146,6 @@ public class OrderSheetExcelWriter {
             }
             return checks;
         }
-        if (o.isPrepaid() && !o.isPaid() && o.getDepositReportedAt() != null) {
-            checks.add("고객 입금 신고");
-        }
         if (o.isPrepaid() && !o.isPaid() && o.isPickedUp()) {
             checks.add("미입금 수령");
         }

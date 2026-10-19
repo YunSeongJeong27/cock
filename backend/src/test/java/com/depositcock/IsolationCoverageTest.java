@@ -156,12 +156,5 @@ class IsolationCoverageTest extends IntegrationTest {
         o.put("items", List.of(Map.of("productId", b.productId(), "quantity", 1)));
         o.put("pickupPointId", a.pickupPointId());
         mvc.perform(withJson(post("/api/public/g/" + b.token() + "/orders"), o)).andExpect(status().isBadRequest());
-
-        // 내 주문 쿠키로 남의 주문번호에 "입금했어요" → 404
-        o.put("pickupPointId", b.pickupPointId());
-        MvcResult mine = mvc.perform(withJson(post("/api/public/g/" + b.token() + "/orders"), o)).andExpect(status().isOk()).andReturn();
-        Cookie device = mine.getResponse().getCookie("dcg_" + b.token());
-        mvc.perform(post("/api/public/g/" + b.token() + "/orders/" + b.orderNo() + "/report-deposit").cookie(device))
-                .andExpect(status().isNotFound());
     }
 }

@@ -20,7 +20,6 @@ import com.depositcock.groupbuy.GroupBuyDtos.ProductRequest;
 import com.depositcock.order.CustomerOrder;
 import com.depositcock.order.OrderSource;
 import com.depositcock.order.CustomerOrderRepository;
-import com.depositcock.order.DisplayStatus;
 import com.depositcock.seller.Seller;
 import com.depositcock.seller.FeatureAccess;
 import com.depositcock.seller.SellerRepository;
@@ -295,7 +294,6 @@ public class GroupBuyService {
         int prepaid = 0;
         int paid = 0;
         int unpaid = 0;
-        int reported = 0;
         int onsite = 0;
         int pickedUp = 0;
         int refundPending = 0;
@@ -321,9 +319,6 @@ public class GroupBuyService {
                     paid++;
                 } else {
                     unpaid++;
-                    if (o.displayStatus() == DisplayStatus.DEPOSIT_REPORTED) {
-                        reported++;
-                    }
                 }
             } else {
                 onsite++;
@@ -332,7 +327,7 @@ public class GroupBuyService {
                 pickedUp++;
             }
         }
-        return new Dashboard(orderCount, totalQuantity, totalAmount, prepaid, paid, unpaid, reported, onsite, pickedUp,
+        return new Dashboard(orderCount, totalQuantity, totalAmount, prepaid, paid, unpaid, onsite, pickedUp,
                 refundPending, refundRequests, cancelled);
     }
 

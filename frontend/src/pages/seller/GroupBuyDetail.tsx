@@ -116,7 +116,6 @@ export default function GroupBuyDetail() {
           <Stat label="총 금액" value={won(dashboard.totalAmount)} />
           <Stat label="입금 확인" value={dashboard.paidCount} tone="ok" />
           <Stat label="미입금" value={dashboard.unpaidCount} tone={dashboard.unpaidCount ? 'warn' : undefined} />
-          <Stat label="고객 입금 신고" value={dashboard.depositReportedCount} />
           <Stat label="현장결제" value={dashboard.onsiteCount} />
           <Stat label="수령" value={`${dashboard.pickedUpCount}/${dashboard.orderCount}`} />
           {dashboard.refundRequestCount > 0 && <Stat label="환불 신청" value={dashboard.refundRequestCount} tone="warn" />}
@@ -254,7 +253,7 @@ function PauseCard({ groupBuy, onChange }: { groupBuy: GroupBuy; onChange: (g: G
           <b>⏸ 고객 주문을 잠시 멈춘 상태입니다</b>
           <button className="btn primary" disabled={busy} onClick={() => save(false)}>다시 받기</button>
         </div>
-        <div className="small mt">고객 화면에서 새 주문·주문 수정·취소·환불 신청이 막혀 있습니다. "입금했어요"와 내 주문 보기는 됩니다.</div>
+        <div className="small mt">고객 화면에서 새 주문·주문 수정·취소·환불 신청이 막혀 있습니다. 내 주문 보기는 됩니다.</div>
         {fields}
         <button className="btn small" disabled={busy} onClick={() => save(true)}>문구 저장</button>
         <ErrorBox message={error} />

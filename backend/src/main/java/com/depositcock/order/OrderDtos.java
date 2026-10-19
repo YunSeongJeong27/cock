@@ -90,7 +90,8 @@ public final class OrderDtos {
             String depositorName,
             DisplayStatus status,
             String statusLabel,
-            boolean canReportDeposit,
+            /** 선입금 주문이 주문 확정 전 (입금 계좌를 보여줌) */
+            boolean awaitingConfirm,
             /** 바로 취소할 수 있는지 (주문 확정 전, 수령 전, 주문 받는 중) */
             boolean cancellable,
             /** 환불 신청을 할 수 있는지 (선입금 주문, 수령 전, 신청한 적 없음. 마감 뒤에도 됨) */
@@ -146,7 +147,7 @@ public final class OrderDtos {
             AccountInfo account,
             List<MyOrder> myOrders,
             Prefill prefill,
-            /** 판매자가 주문을 잠시 멈췄는지. 멈춤 중에는 주문·수정·취소·환불 신청이 막힌다 ("입금했어요"는 됨) */
+            /** 판매자가 주문을 잠시 멈췄는지. 멈춤 중에는 주문·수정·취소·환불 신청이 막힌다 (내 주문 보기는 됨) */
             boolean paused,
             String pauseMessage,
             String pauseLinkUrl) {
@@ -203,7 +204,6 @@ public final class OrderDtos {
             DisplayStatus status,
             String statusLabel,
             boolean active,
-            LocalDateTime depositReportedAt,
             boolean paid,
             LocalDateTime paidAt,
             String paidDepositorName,

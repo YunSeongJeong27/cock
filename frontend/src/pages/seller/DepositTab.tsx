@@ -9,7 +9,7 @@ interface Props { groupBuy: GroupBuy; reload: () => void }
 const emptyMapping: ColumnMapping = { dateColumn: '', nameColumn: '', amountColumn: '', typeColumn: '' }
 
 function orderLabel(o: OrderBrief) {
-  return `${o.orderNo}번 ${o.nickname ? o.nickname + ' / ' : ''}${o.depositorName ?? ''} (${o.phoneLast4 || '-'}) ${won(o.expectedAmount)}${o.depositReported ? ' · 입금신고' : ''}`
+  return `${o.orderNo}번 ${o.nickname ? o.nickname + ' / ' : ''}${o.depositorName ?? ''} (${o.phoneLast4 || '-'}) ${won(o.expectedAmount)}`
 }
 
 export default function DepositTab({ groupBuy, reload }: Props) {

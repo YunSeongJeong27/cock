@@ -117,7 +117,6 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
           {o.unitAddress && <> · 동·호수 {o.unitAddress}</>}
           {o.receiveMethod === 'DELIVERY' && <div>배송: {o.recipientName} / {o.recipientPhone} / ({o.zipcode}) {o.address} {o.addressDetail}</div>}
           {o.shippingFee > 0 && <div>상품 {won(o.itemsAmount)} + 배송비 {won(o.shippingFee)}</div>}
-          {o.depositReportedAt && <div>고객 입금 신고: {dateTime(o.depositReportedAt)}</div>}
           {o.payments.map((p, i) => (
             <div key={i} className={p.cancelledAt ? 'muted' : undefined}>
               입금 확정{p.manual ? '(수동)' : ''}: {dateTime(p.confirmedAt)} · {p.depositorName} {won(p.amount)}
@@ -177,7 +176,6 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
   function deposit(o: SellerOrder): ReactNode {
     if (o.paymentMethod === 'ONSITE') return <span className="muted">현장결제</span>
     if (o.paid) return <>✓ {shortTime(o.paidAt)}<span className="sub">{o.paidDepositorName} {won(o.paidAmount)}</span></>
-    if (o.depositReportedAt) return <>고객 신고<span className="sub">{shortTime(o.depositReportedAt)}</span></>
     return <span className="muted">미입금</span>
   }
 

@@ -87,9 +87,6 @@ public class CustomerOrder {
     @Column(nullable = false)
     private OrderStatus status;
 
-    /** 고객이 "입금했어요"를 누른 시각 (확정 아님) */
-    private LocalDateTime depositReportedAt;
-
     /** 판매자가 주문 내용을 바꾼 기록 (오래된 순) */
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     @OrderBy("id")
@@ -239,17 +236,7 @@ public class CustomerOrder {
         if (isPaid()) {
             return DisplayStatus.PAID;
         }
-        if (depositReportedAt != null) {
-            return DisplayStatus.DEPOSIT_REPORTED;
-        }
         return DisplayStatus.AWAITING_DEPOSIT;
-    }
-
-    public void reportDeposit(LocalDateTime now) {
-        if (depositReportedAt == null) {
-            depositReportedAt = now;
-            updatedAt = now;
-        }
     }
 
     public void placedFrom(String deviceToken) {
@@ -469,10 +456,6 @@ public class CustomerOrder {
 
     public OrderStatus getStatus() {
         return status;
-    }
-
-    public LocalDateTime getDepositReportedAt() {
-        return depositReportedAt;
     }
 
     public boolean isPaid() {

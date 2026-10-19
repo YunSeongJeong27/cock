@@ -125,7 +125,6 @@ public final class GroupBuyDtos {
             int prepaidCount,
             int paidCount,
             int unpaidCount,
-            int depositReportedCount,
             int onsiteCount,
             int pickedUpCount,
             int refundPendingCount,

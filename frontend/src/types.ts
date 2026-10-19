@@ -89,7 +89,6 @@ export interface Dashboard {
   prepaidCount: number
   paidCount: number
   unpaidCount: number
-  depositReportedCount: number
   onsiteCount: number
   pickedUpCount: number
   refundPendingCount: number
@@ -110,7 +109,7 @@ export interface GroupBuySummary {
   paused: boolean
 }
 
-export type DisplayStatus = 'AWAITING_DEPOSIT' | 'DEPOSIT_REPORTED' | 'PAID' | 'RESERVED' | 'PICKED_UP' | 'CANCELLED'
+export type DisplayStatus = 'AWAITING_DEPOSIT' | 'PAID' | 'RESERVED' | 'PICKED_UP' | 'CANCELLED'
 
 export interface SellerOrder {
   id: number
@@ -138,7 +137,6 @@ export interface SellerOrder {
   status: DisplayStatus
   statusLabel: string
   active: boolean
-  depositReportedAt: string | null
   paid: boolean
   paidAt: string | null
   paidDepositorName: string | null
@@ -203,7 +201,6 @@ export interface OrderBrief {
   phoneLast4: string
   expectedAmount: number
   orderedAt: string
-  depositReported: boolean
 }
 
 export type MatchStatus = 'MATCHED' | 'SUGGESTED' | 'AMBIGUOUS' | 'UNRELATED'

@@ -77,8 +77,7 @@ class CancelRefundPauseTest extends IntegrationTest {
     void unconfirmedCancelsImmediatelyConfirmedNeedsRefundRequest() throws Exception {
         Opened g = open(false);
         Cookie device = place(g, "010-8800-0001", "김바로");
-        // "입금했어요"를 눌러도 주문 확정 전이면 바로 취소 가능, 환불 없음
-        mvc.perform(post(g.pub() + "/orders/1/report-deposit").cookie(device)).andExpect(status().isOk());
+        // 주문 확정 전이면 바로 취소 가능, 환불 없음
         mvc.perform(get(g.pub()).cookie(device))
                 .andExpect(jsonPath("$.myOrders[0].cancellable").value(true))
                 .andExpect(jsonPath("$.myOrders[0].refundRequestable").value(true));
@@ -263,8 +262,8 @@ class CancelRefundPauseTest extends IntegrationTest {
                 .andExpect(status().isConflict());
         mvc.perform(withJson(post(g.pub() + "/refund-request"), refund("01088400001", "한멈춤", "1234567890")))
                 .andExpect(status().isConflict());
-        // "입금했어요"·내 주문 찾기는 됨
-        mvc.perform(post(g.pub() + "/orders/1/report-deposit").cookie(device)).andExpect(status().isOk());
+        // 내 주문 보기·찾기는 됨
+        mvc.perform(get(g.pub()).cookie(device)).andExpect(jsonPath("$.myOrders.length()").value(1));
         mvc.perform(withJson(post(g.pub() + "/identify"), Map.of("phone", "01088400001"))).andExpect(status().isOk());
 
         // 판매자 문구·링크

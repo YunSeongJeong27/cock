@@ -114,13 +114,8 @@ class M2OrderFormTest extends IntegrationTest {
                 .andExpect(jsonPath("$.orderNo").value(2))
                 .andExpect(jsonPath("$.changed").value(false));
 
-        // 입금 신고 (확정 아님)
-        mvc.perform(post("/api/public/g/" + token + "/orders/1/report-deposit").cookie(device))
-                .andExpect(status().isOk());
         mvc.perform(get("/api/public/g/" + token).cookie(device))
-                .andExpect(jsonPath("$.myOrders[1].statusLabel").value("주문 확정 전 (입금 알림 보냄)"));
-        // 쿠키 없이 입금 신고 불가
-        mvc.perform(post("/api/public/g/" + token + "/orders/2/report-deposit")).andExpect(status().isForbidden());
+                .andExpect(jsonPath("$.myOrders[1].statusLabel").value("주문 확정 전"));
 
         // 다른 기기: 휴대폰 전체 번호만으로 본인 확인 (뒷4자리만은 불가, 입금자명은 묻지 않음). 그 번호의 주문만 보인다
         mvc.perform(withJson(post("/api/public/g/" + token + "/identify"),
@@ -147,7 +142,6 @@ class M2OrderFormTest extends IntegrationTest {
                 .andExpect(jsonPath("$.totalQuantity").value(3))
                 .andExpect(jsonPath("$.totalAmount").value(5700))
                 .andExpect(jsonPath("$.unpaidCount").value(1))
-                .andExpect(jsonPath("$.depositReportedCount").value(1))
                 .andExpect(jsonPath("$.cancelledCount").value(1));
     }
 

@@ -128,7 +128,6 @@ CREATE TABLE customer_order (
     shipping_fee        INTEGER      NOT NULL,
     expected_amount     INTEGER      NOT NULL,
     status              VARCHAR(20)  NOT NULL,
-    deposit_reported_at TIMESTAMP,
     -- 입금 확정은 deposit_confirmation 테이블에 기록한다 (주문 테이블에는 두지 않음)
     onsite_paid         BOOLEAN      NOT NULL DEFAULT FALSE,
     picked_up           BOOLEAN      NOT NULL DEFAULT FALSE,

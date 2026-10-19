@@ -173,19 +173,6 @@ class ReviewFixesOrderTest extends IntegrationTest {
 
     }
 
-    @Test
-    void reportDepositOnPaidOrderIsRejected() throws Exception {
-        Opened g = open(groupBuyBody("신고", List.of(product("상품", 1000, null))));
-        String url = "/api/public/g/" + g.token();
-        MvcResult placed = mvc.perform(withJson(post(url + "/orders"), order(g.productId(), 1, "010-5400-0001", "가", true)))
-                .andReturn();
-        Cookie device = placed.getResponse().getCookie("dcg_" + g.token());
-        JsonNode orders = read(mvc.perform(get("/api/seller/group-buys/" + g.id() + "/orders").cookie(g.seller())).andReturn());
-        mvc.perform(withJson(post("/api/seller/group-buys/" + g.id() + "/orders/" + orders.get(0).get("id").asLong()
-                + "/manual-paid").cookie(g.seller()), Map.of("depositorName", "가", "amount", 1000))).andExpect(status().isOk());
-        mvc.perform(post(url + "/orders/1/report-deposit").cookie(device)).andExpect(status().isBadRequest());
-    }
-
     /** 판매자가 상품을 수정해도 판매 수량(sold)을 옛 값으로 덮어쓰지 않는다 */
     @Test
     void sellerProductEditDoesNotOverwriteSold() throws Exception {

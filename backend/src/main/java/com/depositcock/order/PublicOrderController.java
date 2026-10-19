@@ -62,11 +62,6 @@ public class PublicOrderController {
         return result.body();
     }
 
-    @PostMapping("/orders/{orderNo}/report-deposit")
-    public PublicGroupBuy reportDeposit(@PathVariable String token, @PathVariable int orderNo, HttpServletRequest request) {
-        return service.reportDeposit(token, readCookie(request, token), orderNo);
-    }
-
     @PostMapping("/cancel")
     public PublicGroupBuy cancel(@PathVariable String token, @Valid @RequestBody CancelRequest body,
                                  HttpServletRequest request) {
