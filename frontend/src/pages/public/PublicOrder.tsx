@@ -606,7 +606,7 @@ export default function PublicOrder() {
               <>
                 <label className="field"><span>환불받을 은행</span><input type="text" value={cancel.bankName} onChange={(e) => setCancel({ ...cancel, bankName: e.target.value })} required maxLength={30} placeholder="예: 국민은행" /></label>
                 <label className="field"><span>계좌번호</span><input type="text" inputMode="numeric" value={cancel.accountNumber} onChange={(e) => setCancel({ ...cancel, accountNumber: e.target.value })} required maxLength={30} placeholder="숫자만 (- 있어도 됨)" /></label>
-                <label className="field"><span>예금주</span><input type="text" value={cancel.accountHolder} onChange={(e) => setCancel({ ...cancel, accountHolder: e.target.value })} required maxLength={30} /></label>
+                <label className="field"><span>예금주 (입금자명과 같은 이름이어야 합니다)</span><input type="text" value={cancel.accountHolder} onChange={(e) => setCancel({ ...cancel, accountHolder: e.target.value })} required maxLength={30} /></label>
               </>
             )}
             {cancel.orderNo && cancel.choices.length === 0 && <div className="small muted mb">{cancel.orderNo}번 주문</div>}

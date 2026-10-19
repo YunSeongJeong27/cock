@@ -113,7 +113,8 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
 
   /**
    * 환불받을 계좌 (복사 버튼). 키가 바뀌어 못 읽으면 안내.
-   * 휴대폰 번호와 입금자명만 알면 남이 환불 신청을 할 수 있으므로, 예금주가 입금자명과 다르면 경고 (2026-10-19)
+   * 고객 환불 신청은 예금주가 입금자명과 같아야 받지만(2026-10-19), 적힌 예금주는 확인할 수 없는 값이라
+   * 송금할 때 은행 앱에 뜨는 받는 분 이름을 확인하라고 항상 안내한다. 다르면(전에 받은 신청 등) 빨간 경고도
    */
   const refundAccount = (o: SellerOrder) => (
     <>
@@ -122,8 +123,9 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
         {o.refundAccount && <CopyButton text={o.refundAccount} label="계좌 복사" />}
       </div>
       {squash(o.refundHolder) !== squash(o.depositorName) && (
-        <div style={{ color: 'var(--danger)' }}>⚠ 예금주가 입금자명({o.depositorName})과 다릅니다. 고객 본인 계좌인지 확인한 뒤 보내세요.</div>
+        <div style={{ color: 'var(--danger)' }}>⚠ 예금주가 입금자명({o.depositorName})과 다릅니다.</div>
       )}
+      <div style={{ color: 'var(--warn)' }}>보낼 때 은행 앱에 뜨는 받는 분 이름이 입금자명({o.depositorName})과 같은지 확인하세요.</div>
     </>
   )
 
