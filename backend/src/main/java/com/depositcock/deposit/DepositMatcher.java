@@ -71,7 +71,9 @@ public final class DepositMatcher {
         /** 이미 입금 확인된 주문의 입금자 → 중복 입금? */
         PAID,
         /** 취소된 주문의 입금자 → 환불 필요? */
-        CANCELLED
+        CANCELLED,
+        /** 이번 대조에서 같은 고객의 다른 입금이 이 주문에 추천됨 → 나눠 보냄·중복 입금? (2026-10-19) */
+        SUGGESTED
     }
 
     /** 대조 대상 주문 (선입금, 취소 안 됨, 입금 확정 안 됨, 금액 > 0) */
@@ -146,6 +148,8 @@ public final class DepositMatcher {
 
         // 2차: 근거 있는 입금 → 추천(후보 1명) / 후보 여러 명
         Set<Long> suggestedByEvidence = new HashSet<>();
+        Candidate[] single = new Candidate[deposits.size()];
+        Map<Long, Integer> bestForOrder = new HashMap<>();
         for (int i = 0; i < deposits.size(); i++) {
             if (results[i] != null) {
                 continue;
@@ -158,12 +162,28 @@ public final class DepositMatcher {
             long customers = withEvidence.stream().map(c -> byId.get(c.orderId()).customerId()).distinct().count();
             if (customers == 1) {
                 Candidate c = withEvidence.get(0); // 같은 고객의 주문 중 금액이 맞는(가까운) 것
+                single[i] = c;
                 suggestedByEvidence.add(c.orderId());
-                results[i] = new Result(d, Status.SUGGESTED, c.orderId(), c.evidence(), c.amountDiff(), List.of(c), null);
+                Integer best = bestForOrder.get(c.orderId());
+                if (best == null || Math.abs(c.amountDiff()) < Math.abs(single[best].amountDiff())) {
+                    bestForOrder.put(c.orderId(), i);
+                }
             } else {
                 withEvidence.forEach(c -> suggestedByEvidence.add(c.orderId()));
                 results[i] = new Result(d, Status.AMBIGUOUS, null, null, 0, withEvidence, null);
             }
+        }
+        // 한 주문에는 추천 1건만 (2026-10-19): 같은 고객의 입금이 여러 건이면 금액이 가장 가까운 입금에만 추천하고,
+        // 나머지는 "나눠 보냈거나 중복 입금" 확인 안내로 둔다 (같은 주문에 두 번 확정하려다 오류가 나지 않게)
+        for (int i = 0; i < deposits.size(); i++) {
+            Candidate c = single[i];
+            if (c == null) {
+                continue;
+            }
+            Deposit d = deposits.get(i);
+            results[i] = bestForOrder.get(c.orderId()) == i
+                    ? new Result(d, Status.SUGGESTED, c.orderId(), c.evidence(), c.amountDiff(), List.of(c), null)
+                    : new Result(d, Status.UNRELATED, null, null, 0, List.of(), new Related(c.orderId(), Relation.SUGGESTED));
         }
 
         // 3차: 근거 없는 입금 → 금액만 일치 추천 / 관련 없음

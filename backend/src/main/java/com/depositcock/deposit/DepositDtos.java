@@ -45,7 +45,9 @@ public final class DepositDtos {
             int amountDiff,
             List<CandidateView> candidates,
             /** 관련 없는 입금에 붙는 확인 안내 (예: 취소된 주문의 입금자 → 환불 확인). 없으면 null */
-            String note) {
+            String note,
+            /** 취소된 주문의 입금자이고 그 주문을 "입금 확정 + 환불 필요"로 표시할 수 있으면 그 주문 id (2026-10-19) */
+            Long refundCheckOrderId) {
     }
 
     public record UsedRow(Long rowId, String depositorName, int amount, String datetimeText, Long orderId, int orderNo) {

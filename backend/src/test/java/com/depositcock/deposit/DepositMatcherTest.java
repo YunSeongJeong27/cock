@@ -246,4 +246,17 @@ class DepositMatcherTest {
         assertThat(o.results().get(0).status()).isEqualTo(Status.MATCHED);
         assertThat(o.results().get(0).evidence()).isEqualTo(Evidence.DEPOSITOR_NAME);
     }
+
+    /** 같은 고객의 입금 2건이 주문 1건을 가리키면 금액이 가까운 입금에만 추천하고, 나머지는 확인 안내 (2026-10-19) */
+    @Test
+    void oneSuggestionPerOrder() {
+        Outcome o = DepositMatcher.match(
+                List.of(payee(1, "01077778888", "오나눔", null, 10000)),
+                List.of(new Deposit(10L, "오나눔", 5000), new Deposit(11L, "오나눔", 9000)), Map.of());
+        assertThat(o.results().get(1).status()).isEqualTo(Status.SUGGESTED);
+        assertThat(o.results().get(1).orderId()).isEqualTo(1L);
+        assertThat(o.results().get(0).status()).isEqualTo(Status.UNRELATED);
+        assertThat(o.results().get(0).related().relation()).isEqualTo(DepositMatcher.Relation.SUGGESTED);
+        assertThat(o.results().get(0).related().orderId()).isEqualTo(1L);
+    }
 }

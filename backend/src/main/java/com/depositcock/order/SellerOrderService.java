@@ -61,11 +61,24 @@ public class SellerOrderService {
                 .orElseThrow(() -> ApiException.notFound("주문을 찾을 수 없습니다."));
     }
 
+    /**
+     * 고객 환불 신청이 기다리는 주문은 판매자가 [취소하고 환불]·[취소 안 함]으로 먼저 처리해야 한다 (2026-10-19).
+     * 그 전에 수령 체크·주문 변경·일반 취소를 하면 환불 기록이 사라지거나, 물건을 받은 주문이 환불로 취소될 수 있다
+     */
+    private static void requireNoRefundPending(CustomerOrder order) {
+        if (order.isRefundPending()) {
+            throw ApiException.badRequest("고객이 환불 신청한 주문입니다. 먼저 [취소하고 환불] 또는 [취소 안 함]을 눌러 주세요.");
+        }
+    }
+
     @Transactional
     public SellerOrder setPickedUp(Long sellerId, Long groupBuyId, Long orderId, boolean pickedUp) {
         CustomerOrder order = getOwnedOrderForUpdate(sellerId, groupBuyId, orderId);
         if (!order.isActive()) {
             throw ApiException.badRequest("취소된 주문입니다.");
+        }
+        if (pickedUp) {
+            requireNoRefundPending(order);
         }
         order.markPickedUp(pickedUp, LocalDateTime.now(clock));
         return OrderMapper.toSellerOrder(order, false, cipher);
@@ -77,6 +90,7 @@ public class SellerOrderService {
         if (!order.isActive()) {
             throw ApiException.badRequest("이미 취소된 주문입니다.");
         }
+        requireNoRefundPending(order);
         OrderCancellation.cancel(order, productRepository, entityManager, stockAlerts, LocalDateTime.now(clock));
         return OrderMapper.toSellerOrder(order, false, cipher);
     }
@@ -106,6 +120,9 @@ public class SellerOrderService {
         if (!order.isRefundRequired()) {
             throw ApiException.badRequest("환불이 필요한 주문이 아닙니다.");
         }
+        if (order.getRefundedAt() != null) {
+            throw ApiException.badRequest("이미 환불 완료된 주문입니다.");
+        }
         order.markRefunded(LocalDateTime.now(clock));
         return OrderMapper.toSellerOrder(order, false, cipher);
     }
@@ -127,14 +144,17 @@ public class SellerOrderService {
         if (order.isPickedUp()) {
             throw ApiException.badRequest("수령 완료된 주문은 바꿀 수 없습니다.");
         }
+        requireNoRefundPending(order);
         if (order.isPaid()) {
             throw ApiException.badRequest("입금 확정된 주문입니다. 바꾸려면 먼저 입금 확정을 취소해 주세요.");
         }
         LocalDateTime now = LocalDateTime.now(clock);
 
-        // 1) 수령·결제
-        ReceiveMethod receive = OrderRules.receiveMethod(groupBuy, r.receiveMethod());
-        PaymentMethod payment = OrderRules.paymentMethod(groupBuy, receive, r.paymentMethod());
+        // 1) 수령·결제. 공구에서 그 방법을 꺼도(예: 픽업 끄고 배송만) 이미 받은 주문은 같은 방법 그대로 고칠 수 있다 (2026-10-19)
+        boolean sameReceive = r.receiveMethod() != null && r.receiveMethod() == order.getReceiveMethod();
+        ReceiveMethod receive = sameReceive ? order.getReceiveMethod() : OrderRules.receiveMethod(groupBuy, r.receiveMethod());
+        PaymentMethod payment = sameReceive && r.paymentMethod() != null && r.paymentMethod() == order.getPaymentMethod()
+                ? order.getPaymentMethod() : OrderRules.paymentMethod(groupBuy, receive, r.paymentMethod());
         PickupPoint point = receive == ReceiveMethod.PICKUP ? OrderRules.pickupPoint(groupBuy, r.pickupPointId()) : null;
         String recipientPhone = null;
         if (receive == ReceiveMethod.DELIVERY) {

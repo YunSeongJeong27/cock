@@ -204,6 +204,8 @@ public final class OrderDtos {
             DisplayStatus status,
             String statusLabel,
             boolean active,
+            /** 처리가 끝난 주문 (취소 + 환불 필요 없음 또는 환불 완료) → 판매자 주문 목록의 "취소·환불 완료"에만 보임 (2026-10-19) */
+            boolean finished,
             boolean paid,
             LocalDateTime paidAt,
             String paidDepositorName,

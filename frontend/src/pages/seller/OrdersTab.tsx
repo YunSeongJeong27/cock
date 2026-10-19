@@ -18,6 +18,9 @@ const SORT_VALUE: Record<SortKey, (o: SellerOrder) => string | number> = {
   updatedAt: (o) => o.updatedAt,
 }
 
+/** 이름 비교용: 띄어쓰기 무시 */
+const squash = (v: string | null) => (v ?? '').replace(/\s+/g, '')
+
 /** 판매자 확인을 기다리는 고객 환불 신청 */
 const refundPending = (o: SellerOrder) => o.active && o.refundRequestedAt !== null && o.refundRejectedAt === null
 
@@ -46,7 +49,8 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
       if (filter === 'unpaid' && !(o.active && o.paymentMethod === 'PREPAID' && !o.paid)) return false
       if (filter === 'refund' && !(o.refundRequired && !o.refundedAt)) return false
       if (filter === 'refundreq' && !refundPending(o)) return false
-      if (filter === 'cancelled' && o.active) return false
+      // 처리가 끝난 주문(취소·환불 완료)은 다른 목록에서 빼고 따로 모아 본다 (2026-10-19 사용자 결정)
+      if ((filter === 'finished') !== o.finished) return false
       if (filter === 'samenick' && o.sameNicknameOrderNos.length === 0) return false
       const q = query.trim()
       if (q && ![o.depositorName, o.nickname, o.phone, o.recipientName, String(o.orderNo)].some((v) => v?.includes(q))
@@ -99,17 +103,26 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
 
   const sameNick = orders.filter((o) => o.sameNicknameOrderNos.length > 0).length
   const refundRequests = orders.filter(refundPending).length
+  const finishedCount = orders.filter((o) => o.finished).length
   // 판매자 알림 설정 (2026-10-19). 꺼도 필터·주문 줄 표시는 그대로
   const { me } = useAuth()
   const showRefundBanner = me?.notifications.SCREEN_REFUND_REQUEST !== false
   const showNickBanner = me?.notifications.SCREEN_SAME_NICKNAME !== false
 
-  /** 환불받을 계좌 (복사 버튼). 키가 바뀌어 못 읽으면 안내 */
+  /**
+   * 환불받을 계좌 (복사 버튼). 키가 바뀌어 못 읽으면 안내.
+   * 휴대폰 번호와 입금자명만 알면 남이 환불 신청을 할 수 있으므로, 예금주가 입금자명과 다르면 경고 (2026-10-19)
+   */
   const refundAccount = (o: SellerOrder) => (
-    <div className="row">
-      <span>환불 계좌: <b>{o.refundBank} {o.refundAccount ?? '(읽을 수 없음)'}</b> ({o.refundHolder})</span>
-      {o.refundAccount && <CopyButton text={o.refundAccount} label="계좌 복사" />}
-    </div>
+    <>
+      <div className="row">
+        <span>환불 계좌: <b>{o.refundBank} {o.refundAccount ?? '(읽을 수 없음)'}</b> ({o.refundHolder})</span>
+        {o.refundAccount && <CopyButton text={o.refundAccount} label="계좌 복사" />}
+      </div>
+      {squash(o.refundHolder) !== squash(o.depositorName) && (
+        <div style={{ color: 'var(--danger)' }}>⚠ 예금주가 입금자명({o.depositorName})과 다릅니다. 고객 본인 계좌인지 확인한 뒤 보내세요.</div>
+      )}
+    </>
   )
 
   /** 상세: 시각·배송지·입금 이력·변경 이력 + 버튼 (그리드·카드 공통) */
@@ -160,11 +173,11 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             onSaved={(updated) => { setEditing(null); setReply({ orderId: o.id, text: changeReply(updated) }); reload() }} />
         ) : (
           <div className="row mt">
-            {o.active && !o.pickedUp && <button className="btn small" onClick={() => startEdit(o)}>주문 변경</button>}
+            {o.active && !o.pickedUp && !refundPending(o) && <button className="btn small" onClick={() => startEdit(o)}>주문 변경</button>}
             {o.active && o.paymentMethod === 'PREPAID' && !o.paid && <button className="btn small" onClick={() => manualPaid(o)}>수동 입금 확정</button>}
-            {o.paid && <button className="btn small" onClick={() => post(`${o.id}/unconfirm-paid`, undefined, '입금 확정을 취소할까요?')}>입금 확정 취소</button>}
+            {o.paid && !o.refundedAt && <button className="btn small" onClick={() => post(`${o.id}/unconfirm-paid`, undefined, '입금 확정을 취소할까요?')}>입금 확정 취소</button>}
             {o.refundRequired && !o.refundedAt && <button className="btn small ok" onClick={() => post(`${o.id}/refunded`)}>환불 완료</button>}
-            {o.active && <button className="btn small danger" onClick={() => post(`${o.id}/cancel`, undefined, `${o.orderNo}번 주문을 취소할까요?${o.paid ? ' (입금 확정된 주문이라 환불 필요로 표시됩니다)' : ''}`)}>주문 취소</button>}
+            {o.active && !refundPending(o) && <button className="btn small danger" onClick={() => post(`${o.id}/cancel`, undefined, `${o.orderNo}번 주문을 취소할까요?${o.paid ? ' (입금 확정된 주문이라 환불 필요로 표시됩니다)' : ''}`)}>주문 취소</button>}
           </div>
         )}
       </>
@@ -315,12 +328,12 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
       )}
       <div className="row mb">
         <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: 170 }}>
-          <option value="all">전체 ({orders.length})</option>
+          <option value="all">전체 ({orders.length - finishedCount})</option>
           <option value="active">주문 중 (취소 제외)</option>
           <option value="unpaid">미입금 (선입금)</option>
           <option value="refundreq">환불 신청 ({refundRequests})</option>
           <option value="refund">환불 필요</option>
-          <option value="cancelled">취소됨</option>
+          <option value="finished">취소·환불 완료 ({finishedCount})</option>
           {(sameNick > 0 || filter === 'samenick') && <option value="samenick">링크·댓글 닉네임 같음 ({sameNick})</option>}
         </select>
         {mobile && (

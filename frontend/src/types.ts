@@ -144,6 +144,8 @@ export interface SellerOrder {
   status: DisplayStatus
   statusLabel: string
   active: boolean
+  /** 처리가 끝난 주문 (취소 + 환불 필요 없음 또는 환불 완료) → "취소·환불 완료"에만 보임 */
+  finished: boolean
   paid: boolean
   paidAt: string | null
   paidDepositorName: string | null
@@ -226,6 +228,8 @@ export interface MatchRow {
   candidates: { order: OrderBrief; evidence: string; amountDiff: number }[]
   /** 관련 없는 입금의 확인 안내 (중복 입금·환불 가능성) */
   note: string | null
+  /** 취소된 주문의 입금자일 때 [환불 필요로 표시]를 걸 주문 id */
+  refundCheckOrderId: number | null
 }
 
 export interface MatchResponse {

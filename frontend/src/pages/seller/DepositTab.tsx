@@ -241,7 +241,8 @@ export default function DepositTab({ groupBuy, reload }: Props) {
           {match.rows.map((r) => (
             <MatchItem key={r.rowId} row={r} openOrders={match.openOrders} value={choice[r.rowId] ?? ''} busy={busy}
               onChange={(v) => setChoice({ ...choice, [r.rowId]: v })}
-              onConfirm={() => choice[r.rowId] && confirmItems([{ rowId: r.rowId, orderId: Number(choice[r.rowId]) }])} />
+              onConfirm={() => choice[r.rowId] && confirmItems([{ rowId: r.rowId, orderId: Number(choice[r.rowId]) }])}
+              onRefundCheck={(orderId) => confirmItems([{ rowId: r.rowId, orderId }])} />
           ))}
         </div>
       )}
@@ -268,8 +269,10 @@ export default function DepositTab({ groupBuy, reload }: Props) {
   )
 }
 
-function MatchItem({ row, openOrders, value, busy, onChange, onConfirm }: {
+function MatchItem({ row, openOrders, value, busy, onChange, onConfirm, onRefundCheck }: {
   row: MatchRow; openOrders: OrderBrief[]; value: string; busy: boolean; onChange: (v: string) => void; onConfirm: () => void
+  /** 취소된 주문의 입금자: 그 주문을 입금 확정 + 환불 필요로 표시 (2026-10-19) */
+  onRefundCheck: (orderId: number) => void
 }) {
   // 후보가 있으면 후보를 먼저, 그 외 모든 미입금 주문(다른 입금에 추천된 주문 포함)도 고를 수 있게 한다
   const candidateIds = new Set(row.candidates.map((c) => c.order.orderId))
@@ -284,6 +287,12 @@ function MatchItem({ row, openOrders, value, busy, onChange, onConfirm }: {
       </div>
       {row.evidence && <div className="small muted">근거: {row.evidence}</div>}
       {row.note && <div className="small" style={{ color: 'var(--warn)' }}>⚠ {row.note}</div>}
+      {row.refundCheckOrderId != null && (
+        <div className="row mt">
+          <button className="btn small" disabled={busy} onClick={() => onRefundCheck(row.refundCheckOrderId!)}>환불 필요로 표시</button>
+          <span className="small muted">입금하고 취소한 고객이면 누르세요. 주문 목록에 "환불 필요"로 뜹니다.</span>
+        </div>
+      )}
       <div className="row mt">
         <select value={value} onChange={(e) => onChange(e.target.value)} style={{ flex: 1, minWidth: 220 }}>
           <option value="">{row.status === 'AMBIGUOUS' ? '후보 중에서 고르세요' : '주문 선택 (확정하지 않으려면 비워두기)'}</option>

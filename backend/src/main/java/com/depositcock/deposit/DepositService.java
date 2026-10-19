@@ -222,7 +222,7 @@ public class DepositService {
             matchRows.add(new MatchRow(row.getId(), row.getRowNo(), row.getDepositorName(), row.getAmount(),
                     row.getDatetimeText(), r.status(), statusLabel(r), r.orderId() == null ? null : brief(orderById.get(r.orderId())),
                     r.evidence() == null ? null : r.evidence().getLabel(), r.amountDiff(), candidates,
-                    note(r.related(), orderById)));
+                    note(r.related(), orderById), refundCheckOrderId(r.related(), orderById)));
         }
         List<UsedRow> used = rows.stream().filter(r -> orderByRow.containsKey(r.getId()))
                 .map(r -> {
@@ -248,7 +248,20 @@ public class DepositService {
             case LINKED -> no + "주문에 같은 입금자의 입금이 이미 연결됐습니다. 중복 입금인지 확인하세요.";
             case PAID -> no + "주문(입금 확인됨)의 입금자와 같습니다. 중복 입금인지 확인하세요.";
             case CANCELLED -> "취소된 " + no + "주문의 입금자와 같습니다. 환불이 필요한지 확인하세요.";
+            case SUGGESTED -> no + "주문에 같은 입금자의 다른 입금이 추천됐습니다. 나눠 보냈거나 중복 입금인지 확인하세요.";
         };
+    }
+
+    /**
+     * 취소된 주문의 입금자일 때 [환불 필요로 표시]를 걸 주문 (2026-10-19): 입금하고 바로 취소한 고객.
+     * 아직 입금 확정·환불 완료가 안 된 선입금 주문만
+     */
+    private static Long refundCheckOrderId(DepositMatcher.Related related, Map<Long, CustomerOrder> orderById) {
+        if (related == null || related.relation() != DepositMatcher.Relation.CANCELLED) {
+            return null;
+        }
+        CustomerOrder o = orderById.get(related.orderId());
+        return o != null && !o.isActive() && o.isPrepaid() && !o.isPaid() && o.getRefundedAt() == null ? o.getId() : null;
     }
 
     private static String statusLabel(Result r) {
@@ -279,11 +292,16 @@ public class DepositService {
                 errors.add("'" + row.getDepositorName() + " " + row.getAmount() + "원' 입금은 이미 다른 주문에 확정되었습니다.");
                 continue;
             }
-            if (!order.isActive() || !order.isPrepaid() || order.isPaid() || !usedOrders.add(order.getId())) {
+            // 취소된 주문도 환불 완료 전이면 받는다: 고객이 입금하고 바로 취소한 경우 → 입금 확정 + 환불 필요 (2026-10-19)
+            boolean cancelled = !order.isActive();
+            if ((cancelled && order.getRefundedAt() != null) || !order.isPrepaid() || order.isPaid()
+                    || !usedOrders.add(order.getId())) {
                 errors.add(order.getOrderNo() + "번 주문은 입금 확정할 수 없는 상태입니다.");
                 continue;
             }
-            DepositConfirmation confirmation = order.confirmPaid(row.getDepositorName(), row.getAmount(), row.getId(), now);
+            DepositConfirmation confirmation = cancelled
+                    ? order.confirmPaidAfterCancel(row.getDepositorName(), row.getAmount(), row.getId(), now)
+                    : order.confirmPaid(row.getDepositorName(), row.getAmount(), row.getId(), now);
             aliasBook.record(sellerId, order, confirmation, now);
             orderRepository.flush(); // 같은 요청 안의 다음 줄이 이 확정을 보도록 (입금 1건은 주문 1건에만)
             confirmed++;
@@ -299,6 +317,9 @@ public class DepositService {
                 .orElseThrow(() -> ApiException.notFound("주문을 찾을 수 없습니다."));
         if (!order.isPaid()) {
             throw ApiException.badRequest("입금 확정된 주문이 아닙니다.");
+        }
+        if (order.getRefundedAt() != null) {
+            throw ApiException.badRequest("환불 완료된 주문은 입금 확정을 취소할 수 없습니다.");
         }
         aliasBook.undo(sellerId, order, Set.of(order.getId()));
         // 확정 기록은 지우지 않고 취소 시각만 남긴다. 취소된 주문이면 "입금 확정"이 잘못이었다는 뜻이므로 "환불 필요"도 함께 거둔다

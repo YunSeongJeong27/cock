@@ -22,7 +22,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *   <li>공개 주문 API·로그인/가입의 쓰기 요청: 1분에 app.public-rate-limit-per-minute 회</li>
  *   <li>본인 확인(/identify)·주문 취소(/cancel)·환불 신청(/refund-request): (IP + 공구)마다 10분에
  *   app.sensitive-rate-limit-per-10-minutes 회
- *       — "입금자명 + 휴대폰 뒷4자리"를 하나씩 넣어보는 시도를 막는다.
+ *       — 휴대폰 번호를 하나씩 넣어보는 시도를 막는다 (내 주문 찾기는 휴대폰 전체 번호, 취소·환불 신청은 번호 + 입금자명).
  *       공구별로 따로 세는 이유: 휴대폰 망은 여러 사람이 IP 하나를 같이 쓰는 경우가 많아서, 다른 공구 고객끼리 한도를 나눠 쓰지 않게.</li>
  * </ul>
  * 프록시 뒤에서는 server.forward-headers-strategy 설정으로 실제 IP 가 getRemoteAddr 에 들어온다.

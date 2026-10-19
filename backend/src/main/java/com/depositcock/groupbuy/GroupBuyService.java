@@ -217,7 +217,11 @@ public class GroupBuyService {
                 r.orderChannel(), r.unitAddressFieldEnabled(), blankToNull(r.kakaoInquiryUrl()),
                 blankToNull(r.adminNames())), now);
         syncProducts(groupBuy, r.products());
-        syncPickupPoints(groupBuy, r.pickupEnabled() ? r.pickupPoints() : List.of());
+        // 픽업을 꺼도 지점은 지우지 않는다: 이미 들어온 픽업 주문은 그 지점 그대로 두고, 새 주문만 픽업을 못 고른다 (2026-10-19).
+        // 전에는 지점을 지우려다 "주문이 있는 픽업 지점은 삭제할 수 없습니다"로 막혀 배송만으로 바꿀 수 없었음
+        if (r.pickupEnabled()) {
+            syncPickupPoints(groupBuy, r.pickupPoints());
+        }
     }
 
     /** 요청의 id 로 기존 상품을 찾아 수정하고, 없는 것은 추가, 빠진 것은 삭제(주문이 있으면 삭제 불가). */

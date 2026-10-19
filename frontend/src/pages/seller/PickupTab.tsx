@@ -5,6 +5,8 @@ import type { GroupBuy, SellerOrder } from '../../types'
 
 interface Props { groupBuy: GroupBuy; orders: SellerOrder[]; reload: () => void }
 
+const refundPending = (o: SellerOrder) => o.active && o.refundRequestedAt !== null && o.refundRejectedAt === null
+
 /** 수령 체크 (정리본 9장): 선입금인데 미입금이면 경고, 현장결제는 수령할 때 결제 완료 처리 */
 export default function PickupTab({ groupBuy, orders, reload }: Props) {
   const [query, setQuery] = useState('')
@@ -58,9 +60,14 @@ export default function PickupTab({ groupBuy, orders, reload }: Props) {
               {o.pickupPointName && <span className="muted"> · {o.pickupPointName}</span>}
             </div>
           </div>
-          <button className={`btn ${o.pickedUp ? 'ok' : ''}`} onClick={() => toggle(o)} style={{ minWidth: 96 }}>
-            {o.pickedUp ? '수령 ✓' : '수령 체크'}
-          </button>
+          {refundPending(o) ? (
+            // 환불 신청이 기다리는 주문은 주문 목록에서 [취소하고 환불]·[취소 안 함]을 먼저 (2026-10-19)
+            <span className="small" style={{ color: 'var(--warn)', minWidth: 96, textAlign: 'right' }}>환불 신청 중<br />주문 목록에서 먼저 처리</span>
+          ) : (
+            <button className={`btn ${o.pickedUp ? 'ok' : ''}`} onClick={() => toggle(o)} style={{ minWidth: 96 }}>
+              {o.pickedUp ? '수령 ✓' : '수령 체크'}
+            </button>
+          )}
         </div>
       ))}
       {shown.length === 0 && <p className="muted">표시할 주문이 없습니다.</p>}

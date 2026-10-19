@@ -47,12 +47,15 @@ public class OrderSheetExcelWriter {
             moneyStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0"));
 
             List<Product> products = groupBuy.sortedProducts();
-            writeSheet(workbook.createSheet(WorkbookUtil.createSafeSheetName(safeTitle(groupBuy.getTitle()))),
+            String mainName = WorkbookUtil.createSafeSheetName(safeTitle(groupBuy.getTitle()));
+            writeSheet(workbook.createSheet(mainName),
                     products, orders.stream().filter(CustomerOrder::isActive).toList(), includeContact,
                     headerStyle, moneyStyle);
             List<CustomerOrder> cancelled = orders.stream().filter(o -> !o.isActive()).toList();
             if (!cancelled.isEmpty()) {
-                writeSheet(workbook.createSheet(WorkbookUtil.createSafeSheetName("취소된 주문")), products, cancelled,
+                // 시트 이름은 대소문자 무시하고 겹치면 안 된다 (공구 제목이 "취소된 주문"이면 500 이 나던 문제, 2026-10-19)
+                String cancelledName = mainName.equalsIgnoreCase("취소된 주문") ? "취소된 주문 (2)" : "취소된 주문";
+                writeSheet(workbook.createSheet(cancelledName), products, cancelled,
                         includeContact, headerStyle, moneyStyle);
             }
             workbook.write(out);

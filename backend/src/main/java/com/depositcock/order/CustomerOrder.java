@@ -254,11 +254,14 @@ public class CustomerOrder {
         return confirmation;
     }
 
-    /** 입금 확정 취소. 기록은 남기고 취소 시각만 채운다. 취소된 주문이면 "환불 필요"도 거둔다 (확정이 잘못이었으므로). */
+    /**
+     * 입금 확정 취소. 기록은 남기고 취소 시각만 채운다. 취소된 주문이면 "환불 필요"도 거둔다 (확정이 잘못이었으므로).
+     * 단, 고객 환불 신청을 받아 취소한 주문은 환불이 고객 신청에서 온 것이므로 "환불 필요"와 환불 계좌를 그대로 둔다 (2026-10-19).
+     * 환불 완료된 주문은 부르는 쪽에서 막는다 (처리가 끝난 주문)
+     */
     public void cancelPaid(LocalDateTime now) {
-        if (status == OrderStatus.CANCELLED) {
+        if (status == OrderStatus.CANCELLED && !isCancelledByRefundRequest()) {
             this.refundRequired = false;
-            this.refundedAt = null;
             clearRefundAccount();
         }
         activeConfirmation().ifPresent(c -> c.cancel(now));
@@ -323,6 +326,29 @@ public class CustomerOrder {
         this.refundRejectedAt = now;
         clearRefundAccount();
         this.updatedAt = now;
+    }
+
+    /** 고객 환불 신청을 판매자가 받아들여 취소된 주문인지 */
+    public boolean isCancelledByRefundRequest() {
+        return status == OrderStatus.CANCELLED && refundRequestedAt != null && refundRejectedAt == null;
+    }
+
+    /**
+     * 처리가 끝난 주문 (2026-10-19 사용자 결정: 판매자 주문 목록에서 "취소·환불 완료"로 따로 모음, 더 바꿀 수 없음).
+     * 취소됐고 환불이 필요 없거나 환불 완료됨. 취소 + 환불 필요(아직 송금 전)는 할 일이 남아 있으므로 아님
+     */
+    public boolean isFinished() {
+        return status == OrderStatus.CANCELLED && (!refundRequired || refundedAt != null);
+    }
+
+    /**
+     * 바로 취소된 주문에 들어온 입금을 판매자가 입금 대조에서 확인함 → 입금 확정 + 환불 필요 (2026-10-19).
+     * 고객이 입금하고 [바로 취소]한 경우. 환불 계좌는 없으므로 판매자가 고객에게 연락해 돌려보낸다
+     */
+    public DepositConfirmation confirmPaidAfterCancel(String depositorName, int amount, Long depositRowId, LocalDateTime now) {
+        DepositConfirmation confirmation = confirmPaid(depositorName, amount, depositRowId, now);
+        this.refundRequired = true;
+        return confirmation;
     }
 
     /** 판매자 확인을 기다리는 환불 신청이 있는지 */

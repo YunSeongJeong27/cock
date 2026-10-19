@@ -83,7 +83,7 @@ final class OrderMapper {
                 o.getItems().stream().map(i -> new SellerOrderItem(i.getProduct().getId(), i.getProductNameSnapshot(),
                         i.getQuantity(), i.getUnitPriceSnapshot())).toList(),
                 o.totalQuantity(), o.getItemsAmount(), o.getShippingFee(), o.getExpectedAmount(), status,
-                status.getLabel(), o.isActive(), o.isPaid(), o.getPaidAt(),
+                status.getLabel(), o.isActive(), o.isFinished(), o.isPaid(), o.getPaidAt(),
                 o.getPaidDepositorName(), o.getPaidAmount(), o.isOnsitePaid(), o.isPickedUp(), o.getPickedUpAt(),
                 o.isRefundRequired(), o.getRefundedAt(), o.getRefundRequestedAt(), o.getRefundRejectedAt(),
                 o.getRefundBank(), cipher.decrypt(o.getRefundAccount()), o.getRefundHolder(), duplicateContact, o.getOrderedAt(), o.getUpdatedAt(), o.getCancelledAt(),
