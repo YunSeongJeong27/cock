@@ -209,6 +209,14 @@ class CancelRefundPauseTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.refundAccount").isEmpty())
                 .andExpect(jsonPath("$.refundBank").isEmpty());
+        // 고객 화면(주문한 기기·내 주문 찾기 모두): 취소됨 + 환불 완료 시각
+        mvc.perform(get(g.pub()).cookie(device))
+                .andExpect(jsonPath("$.myOrders[0].refundRequired").value(false))
+                .andExpect(jsonPath("$.myOrders[0].refundedAt").isNotEmpty());
+        mvc.perform(withJson(post(g.pub() + "/identify"), Map.of("phone", "01088200001")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.myOrders[0].status").value("CANCELLED"))
+                .andExpect(jsonPath("$.myOrders[0].refundedAt").isNotEmpty());
     }
 
     @Test

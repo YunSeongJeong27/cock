@@ -97,7 +97,10 @@ public final class OrderDtos {
             boolean refundRequestable,
             /** 환불 신청 상태: REQUESTED(판매자 확인 중) / REJECTED(반려) / null */
             String refundState,
+            /** 취소됐고 판매자가 환불할 예정 (환불 완료 전) */
             boolean refundRequired,
+            /** 판매자가 "환불 완료"를 누른 시각 (환불 안 했으면 null) */
+            LocalDateTime refundedAt,
             LocalDateTime orderedAt,
             /** 판매자가 주문을 마지막으로 바꾼 시각 (안 바꿨으면 null) */
             LocalDateTime changedAt,

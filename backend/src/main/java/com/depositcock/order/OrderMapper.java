@@ -35,6 +35,7 @@ final class OrderMapper {
                 o.canRequestRefund(),
                 o.isRefundPending() ? "REQUESTED" : o.isActive() && o.getRefundRejectedAt() != null ? "REJECTED" : null,
                 o.isRefundRequired() && o.getRefundedAt() == null,
+                o.isRefundRequired() ? o.getRefundedAt() : null,
                 o.getOrderedAt(),
                 lastChange(o, ChangeActor.SELLER), lastChange(o, ChangeActor.CUSTOMER),
                 acceptingOrders && o.isReplaceableByCustomer(), editValues);

@@ -30,6 +30,8 @@ interface MyOrder {
   /** REQUESTED: 판매자 확인 중 / REJECTED: 반려 */
   refundState: 'REQUESTED' | 'REJECTED' | null
   refundRequired: boolean
+  /** 판매자가 환불 완료를 누른 시각 */
+  refundedAt: string | null
   orderedAt: string
   /** 판매자가 주문을 마지막으로 바꾼 시각 */
   changedAt: string | null
@@ -401,6 +403,7 @@ export default function PublicOrder() {
               {o.changedAt && <div className="small" style={{ color: 'var(--warn)' }}>판매자가 주문을 변경했어요 ({dateTime(o.changedAt)}). 위 내용·금액을 확인해 주세요.</div>}
               {o.customerChangedAt && <div className="small muted">주문 수정됨 ({dateTime(o.customerChangedAt)})</div>}
               {o.refundRequired && <div className="small" style={{ color: 'var(--danger)' }}>취소됨 · 판매자가 환불할 예정입니다.</div>}
+              {o.refundedAt && <div className="small muted">취소됨 · 환불 완료 ({dateTime(o.refundedAt)})</div>}
               {o.refundState === 'REQUESTED' && <div className="small" style={{ color: 'var(--warn)' }}>환불 신청됨 · 판매자가 확인 중입니다.</div>}
               {o.refundState === 'REJECTED' && <div className="small" style={{ color: 'var(--danger)' }}>환불 신청이 반려됐어요. 판매자에게 문의해 주세요.</div>}
               {o.canReportDeposit && view.account && (
