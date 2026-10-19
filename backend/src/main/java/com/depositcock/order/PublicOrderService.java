@@ -340,17 +340,20 @@ public class PublicOrderService {
         }
         List<CustomerOrder> matches = matchByPhoneAndName(groupBuy, r.phone(), r.depositorName());
         if (r.orderNo() == null && matches.stream().noneMatch(PublicOrderService::cancellableBeforeConfirm)
-                && matches.stream().anyMatch(o -> o.isActive() && !o.isPickedUp())) {
+                && matches.stream().anyMatch(o -> o.isActive() && !o.isPickedUp() && o.isConfirmed() && !o.isRefundPending())) {
             throw refundInstead();
         }
         CustomerOrder order = pick(matches, r.orderNo(), PublicOrderService::cancellableBeforeConfirm,
                 "주문이 여러 건 있습니다. 취소할 주문을 골라주세요.",
-                "취소할 수 있는 주문이 없습니다. (이미 취소했거나 수령한 주문)");
+                "취소할 수 있는 주문이 없습니다. (이미 취소·수령했거나 환불 신청한 주문)");
         if (!order.isActive()) {
             throw ApiException.badRequest("이미 취소된 주문입니다.");
         }
         if (order.isPickedUp()) {
             throw ApiException.badRequest("이미 수령한 주문은 취소할 수 없습니다.");
+        }
+        if (order.isRefundPending()) {
+            throw ApiException.badRequest("환불 신청한 주문입니다. 판매자가 확인 중입니다.");
         }
         if (order.isConfirmed()) {
             throw refundInstead();
@@ -396,8 +399,9 @@ public class PublicOrderService {
         return toPublic(groupBuy, device(groupBuy, cookieToken).orElse(null), now);
     }
 
+    /** 바로 취소 대상: 주문 확정 전, 수령 전, 환불 신청 중이 아님 (환불 신청한 주문은 판매자가 처리) */
     private static boolean cancellableBeforeConfirm(CustomerOrder o) {
-        return o.isActive() && !o.isPickedUp() && !o.isConfirmed();
+        return o.isActive() && !o.isPickedUp() && !o.isConfirmed() && !o.isRefundPending();
     }
 
     /** 확정된 주문은 바로 취소 대신 환불 신청 (화면이 환불 신청 칸으로 바뀜) */
@@ -543,8 +547,9 @@ public class PublicOrderService {
                     : "이 번호로 주문한 내역이 있습니다. 계속하면 지금 내용으로 수정됩니다.");
         }
         if (!previous.isEmpty()) {
-            boolean confirmed = previous.stream().anyMatch(CustomerOrder::isConfirmed);
-            return List.of("이 번호로 " + (confirmed ? "확정된" : "수령한") + " 주문이 있어, 이번 주문은 새 주문으로 추가됩니다.");
+            String which = previous.stream().anyMatch(CustomerOrder::isRefundPending) ? "환불 신청한"
+                    : previous.stream().anyMatch(CustomerOrder::isConfirmed) ? "확정된" : "수령한";
+            return List.of("이 번호로 " + which + " 주문이 있어, 이번 주문은 새 주문으로 추가됩니다.");
         }
         return List.of();
     }

@@ -213,7 +213,8 @@ public class CustomerOrder {
      * 고객의 "입금했어요"는 실제 입금 여부를 알 수 없으므로 판단에 쓰지 않음)
      */
     public boolean isReplaceableByCustomer() {
-        return isActive() && source == OrderSource.FORM && !isConfirmed() && !pickedUp;
+        // 환불 신청 중인 주문은 판매자가 처리할 때까지 그대로 둔다 (같은 번호로 다시 주문하면 새 주문, 2026-10-19)
+        return isActive() && source == OrderSource.FORM && !isConfirmed() && !pickedUp && !isRefundPending();
     }
 
     /** 주문 확정 = 판매자가 입금 대조로(또는 수동으로) 입금 확정한 상태. 고객 수정·바로 취소는 확정 전에만 */

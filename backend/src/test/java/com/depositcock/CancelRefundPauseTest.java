@@ -141,6 +141,53 @@ class CancelRefundPauseTest extends IntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    /**
+     * 환불 신청 중인 주문은 판매자가 처리할 때까지 그대로: 같은 번호로 다시 주문하면 새 주문으로 쌓이고, 수정·바로 취소는 안 됨.
+     * 판매자가 [취소하고 환불]하면 그 주문은 취소(환불 필요)로 남고 새 주문은 그대로 (2026-10-19)
+     */
+    @Test
+    void reorderWhileRefundPendingAddsNewOrder() throws Exception {
+        Opened g = open(false);
+        Cookie device = place(g, "010-8850-0001", "다시주문");
+        mvc.perform(withJson(post(g.pub() + "/refund-request").cookie(device), refund("01088500001", "다시주문", "1234567890")))
+                .andExpect(status().isOk());
+        mvc.perform(get(g.pub()).cookie(device))
+                .andExpect(jsonPath("$.myOrders[0].refundState").value("REQUESTED"))
+                .andExpect(jsonPath("$.myOrders[0].replaceable").value(false))
+                .andExpect(jsonPath("$.myOrders[0].cancellable").value(false))
+                .andExpect(jsonPath("$.myOrders[0].refundRequestable").value(false));
+        mvc.perform(withJson(post(g.pub() + "/cancel"), Map.of("phone", "01088500001", "depositorName", "다시주문")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(withJson(post(g.pub() + "/cancel"), Map.of("orderNo", 1, "phone", "01088500001", "depositorName", "다시주문")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("환불 신청한 주문입니다. 판매자가 확인 중입니다."));
+
+        // 같은 번호·이름으로 다시 주문: 수정이 아니라 새 주문 (안내 경고)
+        Map<String, Object> again = order(g, "010-8850-0001", "다시주문");
+        again.put("acknowledgeWarnings", false);
+        mvc.perform(withJson(post(g.pub() + "/orders").cookie(device), again))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.replaceOrderNo").isEmpty())
+                .andExpect(jsonPath("$.warnings[0]").value("이 번호로 환불 신청한 주문이 있어, 이번 주문은 새 주문으로 추가됩니다."));
+        again.put("acknowledgeWarnings", true);
+        mvc.perform(withJson(post(g.pub() + "/orders").cookie(device), again))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderNo").value(2))
+                .andExpect(jsonPath("$.changed").value(false));
+
+        // 판매자가 1번을 취소하고 환불 → 1번은 취소(환불 필요), 2번은 그대로
+        long first = sellerOrder(g, 0).get("id").asLong();
+        mvc.perform(post(g.sellerBase() + "/orders/" + first + "/refund-request/approve").cookie(g.seller()))
+                .andExpect(status().isOk());
+        mvc.perform(get(g.pub()).cookie(device))
+                .andExpect(jsonPath("$.myOrders.length()").value(2))
+                .andExpect(jsonPath("$.myOrders[0].orderNo").value(2))
+                .andExpect(jsonPath("$.myOrders[0].status").value("AWAITING_DEPOSIT"))
+                .andExpect(jsonPath("$.myOrders[1].orderNo").value(1))
+                .andExpect(jsonPath("$.myOrders[1].status").value("CANCELLED"))
+                .andExpect(jsonPath("$.myOrders[1].refundRequired").value(true));
+    }
+
     @Test
     void approvedRefundCancelsWithRefundAndAccountIsDeletedWhenRefunded() throws Exception {
         Opened g = open(false);
