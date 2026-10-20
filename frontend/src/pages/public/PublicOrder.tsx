@@ -491,7 +491,7 @@ export default function PublicOrder() {
               <div className="segmented">
                 {(['PREPAID', 'ONSITE'] as const).map((m) => (
                   <label key={m} className={form.paymentMethod === m ? 'on' : ''}>
-                    <input type="radio" name="payment" checked={form.paymentMethod === m} onChange={() => set('paymentMethod', m)} /> {m === 'PREPAID' ? '계좌이체 (선입금)' : '현장결제'}
+                    <input type="radio" name="payment" checked={form.paymentMethod === m} onChange={() => set('paymentMethod', m)} /> {m === 'PREPAID' ? '계좌이체' : '현장결제'}
                   </label>
                 ))}
               </div>
