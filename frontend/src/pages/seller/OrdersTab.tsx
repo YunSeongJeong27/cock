@@ -18,6 +18,9 @@ const SORT_VALUE: Record<SortKey, (o: SellerOrder) => string | number> = {
   updatedAt: (o) => o.updatedAt,
 }
 
+/** 이름 비교용: 띄어쓰기 무시 */
+const squash = (v: string | null) => (v ?? '').replace(/\s+/g, '')
+
 /** 판매자 확인을 기다리는 고객 환불 신청 */
 const refundPending = (o: SellerOrder) => o.active && o.refundRequestedAt !== null && o.refundRejectedAt === null
 
@@ -111,16 +114,21 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
   /**
    * 환불받을 계좌 (복사 버튼). 키가 바뀌어 못 읽으면 안내.
    * 예금주는 받지 않는다 (2026-10-20): 휴대폰 번호 + 입금자명만 알면 남이 자기 계좌로 신청할 수 있으므로,
-   * 송금할 때 은행 앱에 뜨는 받는 분 이름이 실제 입금된 이름(대조 전에는 주문서 입금자명)과 같은지 확인하게 안내한다
+   * 송금할 때 은행 앱에 뜨는 받는 분 이름이 실제 입금된 이름(대조 전에는 주문서 입금자명)과 같은지 확인하게 안내한다.
+   * 대조 후 실제 입금된 이름이 주문서 입금자명과 다르면 빨간 표시 (2026-10-20 사용자 요청: 잘못 적었더라도 표시)
    */
   const refundAccount = (o: SellerOrder) => {
-    const name = o.paid && o.paidDepositorName ? `실제 입금된 이름(${o.paidDepositorName})` : `입금자명(${o.depositorName})`
+    const paidName = o.paid ? o.paidDepositorName : null
+    const name = paidName ? `실제 입금된 이름(${paidName})` : `입금자명(${o.depositorName})`
     return (
       <>
         <div className="row">
           <span>환불 계좌: <b>{o.refundBank} {o.refundAccount ?? '(읽을 수 없음)'}</b></span>
           {o.refundAccount && <CopyButton text={o.refundAccount} label="계좌 복사" />}
         </div>
+        {paidName && squash(paidName) !== squash(o.depositorName) && (
+          <div style={{ color: 'var(--danger)' }}>⚠ 실제 입금된 이름({paidName})이 주문서 입금자명({o.depositorName})과 다릅니다.</div>
+        )}
         <div style={{ color: 'var(--warn)' }}>보낼 때 은행 앱에 뜨는 받는 분 이름이 {name}과 같은지 확인하세요. 다르면 보내지 말고 고객에게 확인하세요.</div>
       </>
     )
