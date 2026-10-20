@@ -61,7 +61,6 @@ public class CommentService {
     }
 
     @Builder
-
     public record CommentView(Long id, int seq, String authorName, String content, boolean duplicateSuspected,
                               Integer manualQuantity, ParseType type, Integer quantity, String memo,
                               String reviewReason, boolean excludedAsAdmin) {
@@ -78,6 +77,7 @@ public class CommentService {
      * linkOrderNos: 닉네임이 같은 링크(주문서) 주문 번호. 같은 사람이면 반영 시 주문이 두 번 잡힌다 (경고만)
      * orderNo·orderQuantity: 이미 반영된 댓글 주문 (없으면 null)
      */
+    @Builder
     public record CustomerView(String customerKey, String authorName, int quantity, long amount, String memo,
                                boolean needsReview, List<Integer> linkOrderNos, ApplyState applyState, Integer orderNo,
                                Integer orderQuantity) {
@@ -150,9 +150,18 @@ public class CommentService {
         List<CustomerView> customers = totals.stream()
                 .map(t -> {
                     Applied a = applied(appliedOrders.get(t.authorName().trim()), t.quantity());
-                    return new CustomerView(t.customerKey(), t.authorName(), t.quantity(), (long) t.quantity() * unitPrice,
-                            t.memo(), t.needsReview(), linkOrders.getOrDefault(Nicknames.key(t.authorName()), List.of()),
-                            a.state(), a.orderNo(), a.orderQuantity());
+                    return CustomerView.builder()
+                            .customerKey(t.customerKey())
+                            .authorName(t.authorName())
+                            .quantity(t.quantity())
+                            .amount((long) t.quantity() * unitPrice)
+                            .memo(t.memo())
+                            .needsReview(t.needsReview())
+                            .linkOrderNos(linkOrders.getOrDefault(Nicknames.key(t.authorName()), List.of()))
+                            .applyState(a.state())
+                            .orderNo(a.orderNo())
+                            .orderQuantity(a.orderQuantity())
+                            .build();
                 })
                 .toList();
         int total = customers.stream().mapToInt(CustomerView::quantity).sum();

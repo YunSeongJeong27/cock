@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.depositcock.common.ExternalApiException;
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -26,15 +27,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AnthropicVisionExtractorTest {
 
     /** Anthropic 응답을 흉내: thinking Generation(signature 속성) 다음에 텍스트(JSON) Generation */
+    @RequiredArgsConstructor
     static class FakeChatModel implements ChatModel {
         final AtomicReference<Prompt> lastPrompt = new AtomicReference<>();
         final String json;
         final String stopReason;
-
-        FakeChatModel(String json, String stopReason) {
-            this.json = json;
-            this.stopReason = stopReason;
-        }
 
         @Override
         public ChatResponse call(Prompt prompt) {

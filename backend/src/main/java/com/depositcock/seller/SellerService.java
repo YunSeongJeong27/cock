@@ -111,8 +111,13 @@ public class SellerService {
         if (seller.getRole() == Role.ADMIN && request.suspended()) {
             throw new ApiException(ErrorCode.ADMIN_CANNOT_SUSPEND);
         }
-        seller.updateByAdmin(request.plan(), request.paidUntil(), request.trialEndsAt(), request.suspended(),
-                blankToNull(request.adminMemo()));
+        seller.setPlan(request.plan());
+        seller.setPaidUntil(request.paidUntil());
+        if (request.trialEndsAt() != null) {
+            seller.setTrialEndsAt(request.trialEndsAt());
+        }
+        seller.setSuspended(request.suspended());
+        seller.setAdminMemo(blankToNull(request.adminMemo()));
         seller.setDailyCaptureLimit(request.dailyCaptureLimit());
         if (request.commentFeatureEnabled() != null) {
             seller.setCommentFeatureEnabled(request.commentFeatureEnabled());

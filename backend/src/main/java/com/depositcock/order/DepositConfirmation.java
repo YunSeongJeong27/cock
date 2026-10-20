@@ -16,6 +16,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * 입금 확정 1건. 확정을 취소해도 지우지 않고 cancelledAt 을 채워 이력으로 남긴다 (누가 언제 무엇으로 확정했다가 취소했는지).
@@ -50,10 +51,12 @@ public class DepositConfirmation {
     private int amount;
 
     /** 이 확정이 입금자 별칭을 새로 만들었는지·바꿨는지 (null 이면 건드리지 않음) */
+    @Setter
     @Enumerated(EnumType.STRING)
     private PaidAliasChange aliasChange;
 
     /** aliasChange 가 CHANGED 일 때 바꾸기 전 고객 id (그 고객이 지워졌으면 null) */
+    @Setter
     private Long aliasPreviousCustomerId;
 
     @Column(nullable = false)
@@ -76,12 +79,6 @@ public class DepositConfirmation {
         this.confirmedAt = now;
         this.activeOrderId = order.getId();
         this.activeDepositRowId = depositRowId;
-    }
-
-    /** 확정 때 별칭을 만들었거나 바꿨으면 기록한다 */
-    public void recordAliasChange(PaidAliasChange change, Long previousCustomerId) {
-        this.aliasChange = change;
-        this.aliasPreviousCustomerId = previousCustomerId;
     }
 
     void cancel(LocalDateTime now) {

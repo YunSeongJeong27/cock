@@ -11,6 +11,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -74,6 +75,7 @@ public class Product {
     @Getter(AccessLevel.NONE)
     private long version;
 
+    @Builder
     public Product(GroupBuy groupBuy, String name, int unitPrice, Integer stockLimit, Integer perOrderLimit, int sortOrder,
                    Integer stockAlertThreshold, boolean blockWhenSoldOut) {
         this.groupBuy = groupBuy;

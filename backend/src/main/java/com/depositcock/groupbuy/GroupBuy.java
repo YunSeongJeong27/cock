@@ -12,6 +12,7 @@ import jakarta.persistence.CascadeType;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.DynamicUpdate;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -41,9 +42,11 @@ public class GroupBuy {
     @JoinColumn(name = "seller_id")
     private Seller seller;
 
+    @Setter
     @Column(nullable = false)
     private String title;
 
+    @Setter
     private String description;
 
     @Column(nullable = false, unique = true)
@@ -53,56 +56,73 @@ public class GroupBuy {
     @Column(nullable = false)
     private GroupBuyStatus status;
 
+    @Setter
     private LocalDateTime closeAt;
 
+    @Setter
     private String bankName;
+    @Setter
     private String accountNumber;
+    @Setter
     private String accountHolder;
 
     /** 픽업을 고객에게 보일지 */
+    @Setter
     @Column(nullable = false)
     private boolean pickupEnabled;
 
     /** 픽업 + 선입금 허용 */
+    @Setter
     @Column(nullable = false)
     private boolean pickupPrepayEnabled;
 
     /** 픽업 + 현장결제(픽업 예약) 허용. 픽업의 기본값 (개발 전 인터뷰 결과 1번) */
+    @Setter
     @Column(nullable = false)
     private boolean pickupOnsiteEnabled;
 
     /** 배송을 고객에게 보일지. 배송은 선입금만 (개발 전 인터뷰 결과 1번) */
+    @Setter
     @Column(nullable = false)
     private boolean deliveryEnabled;
 
+    @Setter
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ShippingFeeType shippingFeeType;
 
+    @Setter
     @Column(nullable = false)
     private int shippingFee;
 
     /** 주문 받는 방법 (링크만이면 닉네임 선택, 링크 + 댓글이면 닉네임 필수) */
+    @Setter
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private OrderChannel orderChannel;
 
+    @Setter
     @Column(nullable = false)
     private boolean unitAddressFieldEnabled;
 
+    @Setter
     private String kakaoInquiryUrl;
 
     /** 2단계 댓글 집계에서 제외할 관리자 닉네임 (쉼표 구분) */
+    @Setter
     private String adminNames;
 
     /** 주문 잠시 멈춤: 고객의 새 주문·수정·취소·환불 신청을 막는다 (내 주문 보기는 됨, 2026-10-18) */
+    @Setter
     @Column(nullable = false)
     private boolean paused;
 
     /** 멈춤 중 고객 화면 문구 (비우면 기본 문구) */
+    @Setter
     private String pauseMessage;
 
     /** 멈춤 중 고객 화면에 보여줄 링크 (밴드 글 등, 선택) */
+    @Setter
     private String pauseLinkUrl;
 
     /** 마지막으로 준 주문번호. 판매자가 주문을 지워도 번호를 다시 쓰지 않게 (2026-10-19) */
@@ -113,6 +133,7 @@ public class GroupBuy {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    @Setter
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
@@ -133,36 +154,8 @@ public class GroupBuy {
         this.updatedAt = now;
     }
 
-    public void updateSettings(GroupBuySettings s, LocalDateTime now) {
-        this.title = s.title();
-        this.description = s.description();
-        this.closeAt = s.closeAt();
-        this.bankName = s.bankName();
-        this.accountNumber = s.accountNumber();
-        this.accountHolder = s.accountHolder();
-        this.pickupEnabled = s.pickupEnabled();
-        this.pickupPrepayEnabled = s.pickupPrepayEnabled();
-        this.pickupOnsiteEnabled = s.pickupOnsiteEnabled();
-        this.deliveryEnabled = s.deliveryEnabled();
-        this.shippingFeeType = s.shippingFeeType();
-        this.shippingFee = s.shippingFeeType() == ShippingFeeType.FIXED ? s.shippingFee() : 0;
-        this.orderChannel = s.orderChannel();
-        this.unitAddressFieldEnabled = s.unitAddressFieldEnabled();
-        this.kakaoInquiryUrl = s.kakaoInquiryUrl();
-        this.adminNames = s.adminNames();
-        this.updatedAt = now;
-    }
-
     public void changeStatus(GroupBuyStatus status, LocalDateTime now) {
         this.status = status;
-        this.updatedAt = now;
-    }
-
-    /** 멈추거나 푼다. 문구·링크는 풀어도 남겨서 다음에 다시 쓴다 */
-    public void changePause(boolean paused, String message, String linkUrl, LocalDateTime now) {
-        this.paused = paused;
-        this.pauseMessage = message;
-        this.pauseLinkUrl = linkUrl;
         this.updatedAt = now;
     }
 

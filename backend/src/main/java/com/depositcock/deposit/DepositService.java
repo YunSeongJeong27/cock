@@ -445,8 +445,7 @@ public class DepositService {
         if (p.deposits().size() <= 300) {
             return p;
         }
-        return new ParsedStatement(p.mapping(), p.autoDetected(), p.headerRowNo(), p.headers(), p.columnOptions(),
-                p.preview(), p.deposits().subList(0, 300), p.skippedRows(), p.message());
+        return p.toBuilder().deposits(p.deposits().subList(0, 300)).build();
     }
 
     private static byte[] bytes(MultipartFile file) {

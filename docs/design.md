@@ -329,7 +329,7 @@
 - 확인: 테스트 200개 통과 (H2·PostgreSQL 16), 실행 jar 에 lombok 없음, jar 로 브라우저 시나리오(주문·재주문 경고·수동 입금 확정·환불·픽업 끈 뒤 주문 변경·입금 대조·댓글 반영) 통과 [사실]
 - 검토 (원래 작업 에이전트, 점검기록 7장): 지운 것은 단순 getter·생성자뿐, Lombok 전후 공개 메서드 목록이 완전히 같음(javap 비교), enum 생성자 순서 문제없음. PR 브랜치에 merge 후 테스트 202개(H2·PostgreSQL 16)·브라우저 확인 [사실]
 - 추가 적용 (원래 작업 에이전트, 사용자 "판단해서 더 좋아지는 곳에 써") [판단, 2026-10-20]
-  - `@Builder`: 코드에서 직접 만드는 record 중 값이 8개 이상이고 같은 타입이 4개 이상인 16개 (SellerOrder 46·GroupBuyResponse 29·PublicGroupBuy 23·MyOrder 22·AdminSellerRow 17·GroupBuySettings 16·MeResponse 14·Prefill 13·MatchRow 13·OrderUpdate.Values 12·Dashboard 11·ProductResponse 11·CommentView 11·FinalOrder 8·AnnouncementLine 8·MatchResponse 8). 만드는 곳 18군데를 `X.builder().이름(값)...build()` 로. 이유: 같은 타입 값끼리 순서가 바뀌어도 컴파일러가 못 잡는데(예: Dashboard 의 int 10개), 이름을 붙이면 그런 실수가 안 생기고 읽기 쉬움
+  - `@Builder`: 코드에서 직접 만드는 record 중 값이 8개 이상이고 같은 타입이 4개 이상인 16개 (SellerOrder 46·GroupBuyResponse 29·PublicGroupBuy 23·MyOrder 22·AdminSellerRow 17·GroupBuySettings 16·MeResponse 14·Prefill 13·MatchRow 13·OrderUpdate.Values 12·Dashboard 11·ProductResponse 11·CommentView 11·FinalOrder 8·AnnouncementLine 8·MatchResponse 8, GroupBuySettings 는 뒤에 setter 로 바꾸며 삭제). 만드는 곳 18군데를 `X.builder().이름(값)...build()` 로. 이유: 같은 타입 값끼리 순서가 바뀌어도 컴파일러가 못 잡는데(예: Dashboard 의 int 10개), 이름을 붙이면 그런 실수가 안 생기고 읽기 쉬움
   - 요청 record(JSON 에서 만들어짐)·설정 record·값이 적은 record 는 그대로
   - `@Slf4j`: 로거 필드 5곳 (AdminBootstrap, SellerMail, AutoCloseScheduler, ApiExceptionHandler, VisionConfig)
   - 예외 3개(ApiException, ExternalApiException, ImageSlicer.UnusableImageException)의 `getCode()` → 필드 `@Getter`
@@ -344,9 +344,27 @@
   - 바꾼 기준 [판단]: 값만 넣고 다른 일은 안 하는 엔티티 메서드 → 그 필드에 `@Setter` (클래스 전체가 아니라 필드마다). 같은 타입 값을 순서대로 넘기던 메서드(`Product.update` 7개, `Seller.updateDefaults` String 4개, `fillDelivery` String 5개)는 순서가 바뀌어도 컴파일러가 못 잡았는데, `setName(...)` 처럼 이름으로 넣게 됨
   - 바꾼 것 [사실]: ImportedComment.update → authorName·content·manualQuantity, PickupPoint.update → name·info·sortOrder, Product.update → name·unitPrice·stockLimit·perOrderLimit·sortOrder·stockAlertThreshold·blockWhenSoldOut, Product.markStockAlertSent → stockAlertSent(같은 패키지만), Seller.updateDefaults·changeDailyCaptureLimit·changeCommentFeature → displayName·기본 계좌 3칸·dailyCaptureLimit·commentFeatureEnabled, CustomerOrder.fillCustomer·fillReceive·fillDelivery·placedFrom → 주문서 칸 11개·deviceToken, OrderItem.changeQuantity → quantity(같은 패키지만), DepositorAlias.changeCustomer → customerId
   - 새 주문·주문 변경 두 곳이 주문서 칸 11개를 똑같이 넣어서 `OrderUpdate.fill(order, values)` 하나로 모음. 배송이 아니면 values 의 배송 칸이 이미 null 이라 전의 `fillDelivery(null, ...)` 분기는 없앰 (결과 같음)
-  - 그대로 둔 것 [판단]: 값을 넣으면서 다른 일도 하는 메서드. 시각을 같이 남김(`confirmPaid`·`cancel`·`markPickedUp`·`requestRefund`·`changeStatus`·`changePause`·`updateSettings`·`recordChange` 등), 계산함(`fillAmounts` 는 합계 금액, `CaptureUsage.add` 는 더하기), 조건이 있음(`Seller.updateByAdmin` 은 체험 종료일이 비면 안 바꿈, `CustomerDevice.seen`), 묶음 값을 풀어 넣음(`BankColumnPreset.update(mapping)`), 맵 일부만 바꿈(`changeNotifications`). setter 로 쪼개면 부르는 곳마다 같이 해야 할 일을 빠뜨릴 수 있음
+  - 그대로 둔 것 [판단]: 상태를 바꾸는 동작(`confirmPaid`·`cancel`·`markPickedUp`·`requestRefund`·`markRefunded`·`changeStatus` 등, 규칙 검사·시각·확정 기록이 같이 바뀜), 엔티티 안에서 계산해야 맞는 값(`fillAmounts` 는 합계 금액, `CaptureUsage.add` 는 더하기, `nextOrderNo`), 조건으로 바꾸는 것(`CustomerDevice.seen`), 묶음 값을 풀어 넣음(`BankColumnPreset.update(mapping)`), 맵 일부만 바꿈(`changeNotifications`), 자식 기록을 같이 남김(`recordChange`). setter 로 쪼개면 부르는 곳마다 같이 해야 할 일을 빠뜨릴 수 있음
   - 판매 수량 `sold`·`@Version` 같은 필드에는 setter 를 안 붙임 (원자 UPDATE 로만 바꾸는 값)
   - 확인 [사실]: 테스트 202개 (H2·PostgreSQL 16), 바꾸기 전 jar 와 API 응답 34개 비교 → 같음. 비교에 없던 상품·픽업 지점 수정, 댓글 수정, 관리자 수정, 프로필 수정은 jar 를 띄워 API 로 따로 확인
+- "처음부터 Lombok 을 쓸 수 있었다면" 기준으로 다시 맞춘 것 (사용자 "그렇게 봤을 때 더 좋은 방향은 다 Lombok 으로, setter 를 못 써서 빌더로 쓴 곳은 빌더가 낫다면 그대로", 2026-10-20) [판단]
+  - setter 가 없어서 생긴 우회 코드 → `@Setter`
+    - `GroupBuySettings` record(값 16개) + `GroupBuy.updateSettings(...)` 삭제: 공구 설정을 엔티티에 넣으려고만 만든 값 묶음이라 같은 16칸을 record 선언·builder 호출·updateSettings 대입 세 번 적었음. 이제 GroupBuyService 에서 `setTitle(...)` 등으로 한 번만. 배송비 규칙(`FIXED` 일 때만 금액, 아니면 0)은 옆의 다른 설정 규칙(선입금·현장결제는 픽업이 켜졌을 때만, 배송을 끄면 배송비 없음)이 이미 있던 서비스로 옮김. 설정이 하나 늘 때 고칠 곳이 5곳(엔티티 칸·요청 칸·record·builder·updateSettings) → 3곳(엔티티 칸·요청 칸·setter 호출)
+    - `GroupBuy.changePause(boolean, String, String, now)` → `setPaused`·`setPauseMessage`·`setPauseLinkUrl` (문구·링크가 둘 다 String 이라 순서가 바뀌어도 컴파일러가 못 잡았음). `updatedAt` 은 `setUpdatedAt(now)`
+    - `Seller.updateByAdmin(값 5개)` → setter: 같은 관리자 수정에서 캡처 제한·댓글 기능은 이미 setter 로, 나머지 5칸만 메서드로 넣던 것을 맞춤. "체험 종료일이 비면 안 바꿈"은 바로 옆 "댓글 기능 값이 없으면 안 바꿈"과 같은 모양으로 서비스에 둠
+    - `DepositConfirmation.recordAliasChange` → `setAliasChange`·`setAliasPreviousCustomerId` (값만 넣는 메서드인데 지난번에 빠뜨림)
+  - 빌더 중 그대로 둔 것: 응답 record 14개(값을 다 정해서 한 번에 만드는 불변 값이라 setter 대상 아님), `OrderUpdate.Values`(바꾸기 전 주문과 비교해 변경 기록을 만든 뒤 넣어야 해서 값 묶음이 필요)
+  - `@Builder` 기준을 "값 8개 이상"으로 (전에는 "같은 타입 4개 이상"도 조건). 타입이 달라도 8개 넘게 순서로 넘기면 읽기 어려움. 예: `new ParsedStatement(..., false, 0, List.of(), options, preview, List.of(), 0, message)`
+    - 추가: GroupBuySummary·CustomerView(10), ParsedStatement(9), PlaceOrderResponse(8, `target != null` 이 무슨 값인지 안 보였음 → `.changed(...)`), AppProperties(10, 테스트에서만 직접 만듦 — 필요 없는 null 값을 안 적어도 됨), 테스트 IsolationCoverageTest.Shop(10, long 7개)
+    - 엔티티 생성자: `Product`(8) 생성자에 `@Builder`. 다른 엔티티 생성자는 7개 이하라 그대로
+    - 같은 record 를 한 칸만 바꿔 복사하던 곳(`ParsedStatement` 의 입금 300줄 자르기) → `@Builder(toBuilder = true)` 로 `p.toBuilder().deposits(...).build()`
+  - 테스트 도우미: `MutableClock` 생성자 → `@AllArgsConstructor`, `FakeChatModel` → `@RequiredArgsConstructor`
+  - 지난번 `@Builder` 변환이 `@Builder` 와 record 사이에 빈 줄을 남긴 11곳 정리 (동작은 같음)
+  - 이번에 안 쓴 것과 이유 [판단] (규칙이 아니라 지금 코드 기준 판단, 필요해지면 씀)
+    - `@UtilityClass`: `lombok.experimental` 패키지 기능이고, 메서드 선언에서 `static` 이 사라져 읽을 때 헷갈림. 지금의 `@NoArgsConstructor(access = PRIVATE)` 와 하는 일(빈 private 생성자)은 같음
+    - `@Data`·`@ToString`·`@EqualsAndHashCode`: 엔티티를 문자열·equals 로 비교하는 곳이 없어 만들 일이 없음. DTO 는 record 가 이미 만들어 줌
+    - `@SneakyThrows`·`@Cleanup`: 체크 예외를 감추거나 try-with-resources 를 대신하는 것이라, 지금 코드(예외를 바꿔 던지고 try-with-resources 사용)보다 나아지는 곳이 없음
+  - 확인 [사실]: 테스트 202개 (H2·PostgreSQL 16), 바꾸기 전 jar 와 API 응답 34개 비교 → 같음, 공구 수정·주문 정지·고객 주문·주문 목록·관리자 수정을 브라우저로 확인 (화면 오류 없음)
 - 내 맥북 IntelliJ: Lombok 플러그인은 기본 포함. 처음 열 때 "Enable annotation processing" 안내가 뜨면 켠다 [사실: IntelliJ 2020.3 이후 기본 포함. 사용자 판(Community/Ultimate)은 미확인]
 
 ### 2026-10-20 전체 점검 2차 (사용자 요청: 이상한 판매자·고객 가정, 디버깅, 고치고 테스트) — 자세한 기록 `docs/점검기록-2026-10-20.md`
@@ -684,7 +702,7 @@
 ### 설정
 - `application.yml`(공통), `application-local.yml`(맥북, H2), `application-prod.yml`(운영, PostgreSQL) 프로필 분리 [제안]
 - 앱 고유 설정 값은 `@ConfigurationProperties` record로 묶어서 주입 [제안]
-- 반복 코드는 Lombok: 엔티티 `@Getter`·`@NoArgsConstructor(PROTECTED)`, 서비스 `@RequiredArgsConstructor`, 로거 `@Slf4j`, 값 8개 이상·같은 타입 4개 이상인 record 는 `@Builder` 로 만든다. 도우미 클래스는 `@NoArgsConstructor(access = PRIVATE)`, enum 값은 `@Getter`(`getLabel()` 등). 엔티티에서 값만 넣는 필드는 필드 `@Setter` (값을 넣으면서 시각 기록·계산·조건 검사를 같이 하면 이름 있는 메서드). DTO 는 record (2026-10-20 사용자 결정, 위 "Lombok 사용") [결정]
+- 반복 코드는 Lombok: 엔티티 `@Getter`·`@NoArgsConstructor(PROTECTED)`, 서비스 `@RequiredArgsConstructor`, 로거 `@Slf4j`, 값 8개 이상인 record·엔티티 생성자는 `@Builder` (한 칸만 바꿔 복사할 때는 `toBuilder`). 도우미 클래스는 `@NoArgsConstructor(access = PRIVATE)`, enum 값은 `@Getter`(`getLabel()` 등). 엔티티 값 넣기는 필드 `@Setter` (상태를 바꾸는 동작이나 엔티티 안에서 계산해야 맞는 값은 이름 있는 메서드). DTO 는 record (2026-10-20 사용자 결정, 위 "Lombok 사용") [결정]
 - API 키·비밀번호 등 비밀값은 환경변수로만. 깃허브에 올리지 않는다 [결정]
 
 ### 사용자 환경 (내 맥북)

@@ -91,7 +91,6 @@ public final class GroupBuyDtos {
     }
 
     @Builder
-
     public record GroupBuyResponse(
             Long id,
             String title,
@@ -184,6 +183,7 @@ public final class GroupBuyDtos {
             int cancelledCount) {
     }
 
+    @Builder
     public record GroupBuySummary(
             Long id,
             String title,

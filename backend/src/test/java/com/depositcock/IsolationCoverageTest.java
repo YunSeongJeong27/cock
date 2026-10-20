@@ -8,6 +8,7 @@ import java.util.Map;
 import com.depositcock.support.IntegrationTest;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.servlet.http.Cookie;
+import lombok.Builder;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MvcResult;
@@ -26,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class IsolationCoverageTest extends IntegrationTest {
 
+    @Builder
     record Shop(Cookie seller, long gb, String token, long productId, long orderId, int orderNo, long uploadId,
                 long rowId, long commentId, long pickupPointId) {
     }
@@ -60,7 +62,18 @@ class IsolationCoverageTest extends IntegrationTest {
                 Map.of("source", "TEXT", "comments", List.of(Map.of("author", "꼭지맘", "content", "1"))))).andExpect(status().isOk());
         long commentId = read(mvc.perform(get("/api/seller/group-buys/" + gb + "/comments").cookie(seller)).andReturn())
                 .get("comments").get(0).get("id").asLong();
-        return new Shop(seller, gb, token, productId, orderId, orderNo, uploadId, rowId, commentId, pickupPointId);
+        return Shop.builder()
+                .seller(seller)
+                .gb(gb)
+                .token(token)
+                .productId(productId)
+                .orderId(orderId)
+                .orderNo(orderNo)
+                .uploadId(uploadId)
+                .rowId(rowId)
+                .commentId(commentId)
+                .pickupPointId(pickupPointId)
+                .build();
     }
 
     @Test

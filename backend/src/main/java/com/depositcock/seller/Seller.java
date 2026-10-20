@@ -49,19 +49,24 @@ public class Seller {
     @Column(nullable = false)
     private Role role;
 
+    @Setter
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Plan plan;
 
+    @Setter
     @Column(nullable = false)
     private LocalDateTime trialEndsAt;
 
+    @Setter
     private LocalDate paidUntil;
 
     /** 관리자가 켜는 사용 제한. 켜지면 판매자 화면에서 쓰기 작업이 막힌다. */
+    @Setter
     @Column(nullable = false)
     private boolean suspended;
 
+    @Setter
     private String adminMemo;
 
     /** 하루 캡처(비전 AI) 제한 장수. null 이면 설정 기본값 */
@@ -136,15 +141,5 @@ public class Seller {
                 notifications.put(type, on);
             }
         });
-    }
-
-    public void updateByAdmin(Plan plan, LocalDate paidUntil, LocalDateTime trialEndsAt, boolean suspended, String adminMemo) {
-        this.plan = plan;
-        this.paidUntil = paidUntil;
-        if (trialEndsAt != null) {
-            this.trialEndsAt = trialEndsAt;
-        }
-        this.suspended = suspended;
-        this.adminMemo = adminMemo;
     }
 }

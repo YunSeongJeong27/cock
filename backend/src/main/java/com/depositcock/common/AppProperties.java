@@ -1,11 +1,13 @@
 package com.depositcock.common;
 
+import lombok.Builder;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * application.yml 의 app.* 설정.
  */
 @ConfigurationProperties(prefix = "app")
+@Builder
 public record AppProperties(
         String zone,
         String jwtSecret,

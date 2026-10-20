@@ -234,8 +234,16 @@ public class PublicOrderService {
                 .address(order.getAddress())
                 .addressDetail(order.getAddressDetail())
                 .build();
-        return new WithCookie<>(new PlaceOrderResponse(order.getOrderNo(), order.getExpectedAmount(),
-                order.getPaymentMethod(), order.getDepositorName(), account, myOrders, target != null, finalOrder),
+        return new WithCookie<>(PlaceOrderResponse.builder()
+                .orderNo(order.getOrderNo())
+                .expectedAmount(order.getExpectedAmount())
+                .paymentMethod(order.getPaymentMethod())
+                .depositorName(order.getDepositorName())
+                .account(account)
+                .myOrders(myOrders)
+                .changed(target != null)
+                .finalOrder(finalOrder)
+                .build(),
                 newCookie);
     }
 

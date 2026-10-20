@@ -2,6 +2,8 @@ package com.depositcock.deposit;
 
 import java.util.List;
 
+import lombok.Builder;
+
 /**
  * 거래내역 파일을 읽은 결과.
  *
@@ -15,6 +17,7 @@ import java.util.List;
  * @param skippedRows    건너뛴 줄 수 (출금, 0원 이하, 이름 없음, 이자)
  * @param message        안내 문구 (열을 못 찾았을 때 등)
  */
+@Builder(toBuilder = true)
 public record ParsedStatement(
         ColumnMapping mapping,
         boolean autoDetected,

@@ -79,9 +79,18 @@ public class GroupBuyService {
     public List<GroupBuySummary> list(Long sellerId) {
         LocalDateTime now = LocalDateTime.now(clock);
         return groupBuyRepository.findBySellerIdOrderByIdDesc(sellerId).stream()
-                .map(g -> new GroupBuySummary(g.getId(), g.getTitle(), g.getStatus(), g.statusLabel(now), g.isAcceptingOrders(now),
-                        g.getCloseAt(), g.getPublicToken(), g.getCreatedAt(),
-                        dashboard(orderRepository.findByGroupBuyIdOrderByOrderNoAsc(g.getId())), g.isPaused()))
+                .map(g -> GroupBuySummary.builder()
+                        .id(g.getId())
+                        .title(g.getTitle())
+                        .status(g.getStatus())
+                        .statusLabel(g.statusLabel(now))
+                        .acceptingOrders(g.isAcceptingOrders(now))
+                        .closeAt(g.getCloseAt())
+                        .publicToken(g.getPublicToken())
+                        .createdAt(g.getCreatedAt())
+                        .dashboard(dashboard(orderRepository.findByGroupBuyIdOrderByOrderNoAsc(g.getId())))
+                        .paused(g.isPaused())
+                        .build())
                 .toList();
     }
 
@@ -149,8 +158,11 @@ public class GroupBuyService {
             throw new ApiException(ErrorCode.PAUSE_LINK_INVALID);
         }
         String message = blankToNull(r.message());
-        groupBuy.changePause(r.paused(), message == null || message.equals(Notice.PAUSE_DEFAULT.text()) ? null : message,
-                link, now);
+        // 문구·링크는 풀어도 남겨서 다음에 다시 쓴다
+        groupBuy.setPaused(r.paused());
+        groupBuy.setPauseMessage(message == null || message.equals(Notice.PAUSE_DEFAULT.text()) ? null : message);
+        groupBuy.setPauseLinkUrl(link);
+        groupBuy.setUpdatedAt(now);
         return GroupBuyResponse.of(groupBuy, now);
     }
 
@@ -198,24 +210,24 @@ public class GroupBuyService {
             // 링크만 쓰는 공구에서는 댓글 집계를 숨기므로, 이미 있는 댓글 주문을 관리할 수 없게 된다
             throw new ApiException(ErrorCode.COMMENT_ORDERS_EXIST);
         }
-        groupBuy.updateSettings(GroupBuySettings.builder()
-                .title(r.title().trim())
-                .description(blankToNull(r.description()))
-                .closeAt(r.closeAt())
-                .bankName(blankToNull(r.bankName()))
-                .accountNumber(blankToNull(r.accountNumber()))
-                .accountHolder(blankToNull(r.accountHolder()))
-                .pickupEnabled(r.pickupEnabled())
-                .pickupPrepayEnabled(r.pickupEnabled() && r.pickupPrepayEnabled())
-                .pickupOnsiteEnabled(r.pickupEnabled() && r.pickupOnsiteEnabled())
-                .deliveryEnabled(r.deliveryEnabled())
-                .shippingFeeType(r.deliveryEnabled() ? r.shippingFeeType() : ShippingFeeType.NONE)
-                .shippingFee(r.shippingFee())
-                .orderChannel(r.orderChannel())
-                .unitAddressFieldEnabled(r.unitAddressFieldEnabled())
-                .kakaoInquiryUrl(blankToNull(r.kakaoInquiryUrl()))
-                .adminNames(blankToNull(r.adminNames()))
-                .build(), now);
+        ShippingFeeType feeType = r.deliveryEnabled() ? r.shippingFeeType() : ShippingFeeType.NONE;
+        groupBuy.setTitle(r.title().trim());
+        groupBuy.setDescription(blankToNull(r.description()));
+        groupBuy.setCloseAt(r.closeAt());
+        groupBuy.setBankName(blankToNull(r.bankName()));
+        groupBuy.setAccountNumber(blankToNull(r.accountNumber()));
+        groupBuy.setAccountHolder(blankToNull(r.accountHolder()));
+        groupBuy.setPickupEnabled(r.pickupEnabled());
+        groupBuy.setPickupPrepayEnabled(r.pickupEnabled() && r.pickupPrepayEnabled());
+        groupBuy.setPickupOnsiteEnabled(r.pickupEnabled() && r.pickupOnsiteEnabled());
+        groupBuy.setDeliveryEnabled(r.deliveryEnabled());
+        groupBuy.setShippingFeeType(feeType);
+        groupBuy.setShippingFee(feeType == ShippingFeeType.FIXED ? r.shippingFee() : 0);
+        groupBuy.setOrderChannel(r.orderChannel());
+        groupBuy.setUnitAddressFieldEnabled(r.unitAddressFieldEnabled());
+        groupBuy.setKakaoInquiryUrl(blankToNull(r.kakaoInquiryUrl()));
+        groupBuy.setAdminNames(blankToNull(r.adminNames()));
+        groupBuy.setUpdatedAt(now);
         syncProducts(groupBuy, r.products());
         // 픽업을 꺼도 지점은 지우지 않는다: 이미 들어온 픽업 주문은 그 지점 그대로 두고, 새 주문만 픽업을 못 고른다 (2026-10-19).
         // 전에는 지점을 지우려다 "주문이 있는 픽업 지점은 삭제할 수 없습니다"로 막혀 배송만으로 바꿀 수 없었음
@@ -247,8 +259,16 @@ public class GroupBuyService {
             } else if (r.id() != null) {
                 throw new ApiException(ErrorCode.PRODUCT_ID_NOT_FOUND, r.id());
             } else {
-                groupBuy.getProducts().add(new Product(groupBuy, r.name().trim(), r.unitPrice(), r.stockLimit(),
-                        r.perOrderLimit(), order, r.stockAlertThreshold(), r.blockWhenSoldOut()));
+                groupBuy.getProducts().add(Product.builder()
+                        .groupBuy(groupBuy)
+                        .name(r.name().trim())
+                        .unitPrice(r.unitPrice())
+                        .stockLimit(r.stockLimit())
+                        .perOrderLimit(r.perOrderLimit())
+                        .sortOrder(order)
+                        .stockAlertThreshold(r.stockAlertThreshold())
+                        .blockWhenSoldOut(r.blockWhenSoldOut())
+                        .build());
             }
         }
         for (Product product : List.copyOf(groupBuy.getProducts())) {

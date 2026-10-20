@@ -36,7 +36,6 @@ public final class SellerDtos {
     }
 
     @Builder
-
     public record MeResponse(
             Long id,
             String email,
@@ -80,7 +79,6 @@ public final class SellerDtos {
     }
 
     @Builder
-
     public record AdminSellerRow(
             Long id,
             String email,

@@ -35,9 +35,10 @@ public class AliasBook {
         DepositorAlias alias = aliasRepository.findBySellerIdAndDepositorName(sellerId, name).orElse(null);
         if (alias == null) {
             aliasRepository.save(new DepositorAlias(sellerId, name, customerId, now));
-            confirmation.recordAliasChange(PaidAliasChange.CREATED, null);
+            confirmation.setAliasChange(PaidAliasChange.CREATED);
         } else if (!alias.getCustomerId().equals(customerId)) {
-            confirmation.recordAliasChange(PaidAliasChange.CHANGED, alias.getCustomerId());
+            confirmation.setAliasChange(PaidAliasChange.CHANGED);
+            confirmation.setAliasPreviousCustomerId(alias.getCustomerId());
             alias.setCustomerId(customerId);
         }
     }

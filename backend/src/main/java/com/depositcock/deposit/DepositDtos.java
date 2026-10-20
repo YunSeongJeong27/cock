@@ -34,7 +34,6 @@ public final class DepositDtos {
     }
 
     @Builder
-
     public record MatchRow(
             Long rowId,
             int rowNo,
@@ -112,7 +111,6 @@ public final class DepositDtos {
     }
 
     @Builder
-
     public record AnnouncementLine(Long orderId, int orderNo, String displayName, String nickname, String depositorName,
                                    String itemsText, LocalDateTime paidAt, boolean pickedUp) {
     }

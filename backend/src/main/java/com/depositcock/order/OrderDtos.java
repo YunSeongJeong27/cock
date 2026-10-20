@@ -83,7 +83,6 @@ public final class OrderDtos {
     }
 
     @Builder
-
     public record MyOrder(
             int orderNo,
             List<PublicItem> items,
@@ -133,7 +132,6 @@ public final class OrderDtos {
     }
 
     @Builder
-
     public record PublicGroupBuy(
             String title,
             String description,
@@ -162,6 +160,7 @@ public final class OrderDtos {
             String pauseLinkUrl) {
     }
 
+    @Builder
     public record PlaceOrderResponse(
             int orderNo,
             int expectedAmount,
@@ -189,7 +188,6 @@ public final class OrderDtos {
     }
 
     @Builder
-
     public record SellerOrder(
             Long id,
             int orderNo,

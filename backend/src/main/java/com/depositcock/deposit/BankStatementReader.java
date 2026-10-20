@@ -244,14 +244,32 @@ public class BankStatementReader {
                 String dateText = dateIdx >= 0 ? cut(get(row, dateIdx).trim(), DepositRow.MAX_DATETIME_TEXT) : null;
                 deposits.add(new DepositLine(i + 1, name, amount, blankToNull(dateText), parseDateTime(dateText)));
             }
-            return new ParsedStatement(used, !manual, r + 1, rows.get(r), options, preview, deposits, skipped, null);
+            return ParsedStatement.builder()
+                    .mapping(used)
+                    .autoDetected(!manual)
+                    .headerRowNo(r + 1)
+                    .headers(rows.get(r))
+                    .columnOptions(options)
+                    .preview(preview)
+                    .deposits(deposits)
+                    .skippedRows(skipped)
+                    .build();
         }
         String message = manual
                 ? ErrorCode.STATEMENT_GIVEN_COLUMNS_NOT_FOUND.message(requested.nameColumn(), requested.amountColumn(),
                         HEADER_SEARCH_ROWS)
                 : ErrorCode.STATEMENT_COLUMNS_NOT_FOUND.message();
-        return new ParsedStatement(manual ? requested : new ColumnMapping(null, null, null, null), false, 0,
-                List.of(), options, preview, List.of(), 0, message);
+        return ParsedStatement.builder()
+                .mapping(manual ? requested : new ColumnMapping(null, null, null, null))
+                .autoDetected(false)
+                .headerRowNo(0)
+                .headers(List.of())
+                .columnOptions(options)
+                .preview(preview)
+                .deposits(List.of())
+                .skippedRows(0)
+                .message(message)
+                .build();
     }
 
     /**

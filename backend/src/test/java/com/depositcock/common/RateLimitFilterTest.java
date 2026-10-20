@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 
+import lombok.AllArgsConstructor;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -18,7 +19,15 @@ class RateLimitFilterTest {
     }
 
     private static AppProperties props(int limit, int sensitiveLimit) {
-        return new AppProperties("Asia/Seoul", "x", 1, false, 30, null, null, limit, sensitiveLimit, null);
+        return AppProperties.builder()
+                .zone("Asia/Seoul")
+                .jwtSecret("x")
+                .jwtTtlHours(1)
+                .cookieSecure(false)
+                .trialDays(30)
+                .publicRateLimitPerMinute(limit)
+                .sensitiveRateLimitPer10Minutes(sensitiveLimit)
+                .build();
     }
 
     private static int call(RateLimitFilter filter, String method, String uri, String ip) throws Exception {
@@ -70,12 +79,9 @@ class RateLimitFilterTest {
         assertThat(filter.trackedKeys()).isLessThan(10);
     }
 
+    @AllArgsConstructor
     static class MutableClock extends Clock {
         private Instant now;
-
-        MutableClock(Instant now) {
-            this.now = now;
-        }
 
         void advance(java.time.Duration d) {
             now = now.plus(d);
