@@ -22,8 +22,6 @@ export default function GroupBuyDetail() {
   const [orders, setOrders] = useState<SellerOrder[]>([])
   const [tab, setTab] = useState<Tab>(() => (localStorageGet('dc_tab') as Tab) || 'orders')
   const [error, setError] = useState<string | null>(null)
-  // 주문서 링크 아래 TIP: ✕ 를 누르면 이 브라우저에서는 계속 안 보임 (로그아웃해도 그대로, 다른 기기·브라우저에서는 다시 보임)
-  const [showTip, setShowTip] = useState(() => localStorageGet('dc_hide_promo_tip') !== '1')
 
   const reload = useCallback(async () => {
     try {
@@ -98,13 +96,6 @@ export default function GroupBuyDetail() {
               <CopyButton text={link} label="링크 복사" />
               <a className="btn small" href={link} target="_blank" rel="noreferrer">열어보기</a>
             </div>
-            {showTip && (
-              <div className="row small muted mt" style={{ gap: 6, flexWrap: 'nowrap' }}>
-                <span className="grow">{T.promoTip}</span>
-                <button type="button" className="link" aria-label="TIP 닫기" title="닫기"
-                  onClick={() => { localStorageSet('dc_hide_promo_tip', '1'); setShowTip(false) }}>✕</button>
-              </div>
-            )}
           </>
         )}
         <div className="row mt">
