@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth'
+import { commonText } from '../texts/common'
 
 export default function SellerLayout() {
   const { me, logout } = useAuth()
@@ -29,12 +30,10 @@ export default function SellerLayout() {
         </nav>
       </header>
       {me?.suspended && (
-        <div className="banner danger">관리자가 사용을 제한한 계정입니다. 조회만 할 수 있습니다. 문의: 관리자</div>
+        <div className="banner danger">{commonText.suspendedBanner}</div>
       )}
       {me && !me.suspended && me.expired && (
-        <div className="banner warn">
-          이용 기간이 끝났습니다{me.plan === 'TRIAL' ? ' (무료 체험 종료)' : ''}. 계속 쓰시려면 관리자에게 이용료를 입금해 주세요.
-        </div>
+        <div className="banner warn">{commonText.expiredBanner(me.plan === 'TRIAL')}</div>
       )}
       <main className={`container wide${wider ? ' wider' : ''}`}>
         <Outlet />

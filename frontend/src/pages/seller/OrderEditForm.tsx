@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { api, errorMessage, won } from '../../api'
 import { ErrorBox } from '../../components/Ui'
+import { sellerOrderText as T } from '../../texts/sellerOrders'
 import type { GroupBuy, PaymentMethod, ReceiveMethod, SellerOrder } from '../../types'
 
 interface Props {
@@ -158,7 +159,7 @@ export default function OrderEditForm({ groupBuy, order, onSaved, onClose }: Pro
         )}
       </div>
       {forced.length > 0 && (
-        <p className="small" style={{ color: 'var(--warn)' }}>공구 설정이 바뀌어서, 저장하면 {forced.join(', ')}(으)로 바뀝니다.</p>
+        <p className="small" style={{ color: 'var(--warn)' }}>{T.forcedBySettings(forced)}</p>
       )}
 
       <div className="mt">
@@ -167,8 +168,8 @@ export default function OrderEditForm({ groupBuy, order, onSaved, onClose }: Pro
         {total !== order.expectedAmount && <span className="small muted"> · 지금 {won(order.expectedAmount)}</span>}
       </div>
       <p className="small muted">
-        휴대폰 번호는 바꿀 수 없습니다(바꾸려면 주문 취소 후 다시 주문). 고객 화면에는 "판매자가 주문을 변경했어요"가 표시됩니다.
-        {order.source === 'COMMENT' && ' 댓글 집계를 다시 반영해도 바꾼 내용은 그대로 남습니다.'}
+        {T.editNote}
+        {order.source === 'COMMENT' && T.editNoteComment}
       </p>
       <ErrorBox message={error} />
       <div className="row">

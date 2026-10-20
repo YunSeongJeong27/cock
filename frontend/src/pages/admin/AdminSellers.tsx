@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../../api'
 import { ErrorBox } from '../../components/Ui'
+import { accountText as T } from '../../texts/account'
 import type { Plan, Role } from '../../types'
 
 interface Row {
@@ -40,9 +41,7 @@ export default function AdminSellers() {
   }, [])
 
   async function toggleCommentOpen(open: boolean) {
-    const text = open
-      ? '댓글 주문 기능을 모든 판매자에게 엽니다. 계속할까요?'
-      : '댓글 주문 기능 전체 공개를 끕니다. 아래에서 따로 허용한 판매자만 쓸 수 있습니다. 계속할까요?'
+    const text = open ? T.confirmCommentOpen : T.confirmCommentClose
     if (!confirm(text)) return
     setError(null)
     try {
@@ -74,7 +73,7 @@ export default function AdminSellers() {
   }
 
   async function remove(r: Row) {
-    if (!confirm(`${r.email} 판매자를 탈퇴 처리합니다. 이 판매자의 공구·주문·입금 정보가 모두 삭제됩니다. 계속할까요?`)) return
+    if (!confirm(T.confirmRemoveSeller(r.email))) return
     try {
       await api.del(`/api/admin/sellers/${r.id}`)
       load()
@@ -88,16 +87,16 @@ export default function AdminSellers() {
   return (
     <div>
       <h1>판매자 관리</h1>
-      <p className="muted small">캡처(비전 AI) 하루 제한: 판매자별로 바꿀 수 있습니다. 비우면 기본값을 씁니다. 날짜는 한국 시간 기준입니다.</p>
-      <p className="muted small">판매자가 이용료를 입금하면 플랜을 "유료"로 바꾸고 유료 만료일을 넣으세요. 기간이 끝나도 자동으로 막지 않습니다. 막아야 하면 "사용 제한"을 켜세요 (조회만 가능, 고객 주문은 계속 받음).</p>
+      <p className="muted small">{T.captureLimitHelp}</p>
+      <p className="muted small">{T.planHelp}</p>
       <div className="card">
         <div className="row between">
           <div>
             <b>댓글 주문 기능</b> <span className="small muted">(댓글 캡처·집계·주문 반영, 공구의 "주문 링크 + 댓글")</span>
             <div className="small muted">
               {commentOpen === null ? '불러오는 중…' : commentOpen
-                ? '모든 판매자에게 열려 있습니다.'
-                : '닫혀 있습니다. 아래 표에서 "댓글 기능"을 체크한 판매자만 씁니다. 주문 링크·입금 대조는 상관없이 씁니다.'}
+                ? T.commentOpenAll
+                : T.commentClosed}
             </div>
           </div>
           {commentOpen !== null && (
@@ -143,7 +142,7 @@ export default function AdminSellers() {
                   <td data-label="상태">
                     {row.expired && <div className="badge badge-CLOSED">만료</div>}
                     <label className="check small" style={{ whiteSpace: 'nowrap' }}><input type="checkbox" checked={r.suspended} onChange={(e) => update({ suspended: e.target.checked })} disabled={row.role === 'ADMIN'} /> 사용 제한</label>
-                    <label className="check small" style={{ whiteSpace: 'nowrap' }} title="전체 공개가 꺼져 있을 때 이 판매자만 댓글 주문 기능을 쓰게 함">
+                    <label className="check small" style={{ whiteSpace: 'nowrap' }} title={T.commentFeatureTitle}>
                       <input type="checkbox" checked={r.commentFeatureEnabled} onChange={(e) => update({ commentFeatureEnabled: e.target.checked })} disabled={row.role === 'ADMIN'} /> 댓글 기능
                     </label>
                   </td>

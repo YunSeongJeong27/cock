@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { api, errorMessage, won } from '../../api'
 import { ErrorBox } from '../../components/Ui'
+import { sellerOrderText as T } from '../../texts/sellerOrders'
 import type { GroupBuy, SellerOrder } from '../../types'
 
 interface Props { groupBuy: GroupBuy; orders: SellerOrder[]; reload: () => void }
@@ -24,7 +25,7 @@ export default function PickupTab({ groupBuy, orders, reload }: Props) {
 
   async function toggle(o: SellerOrder) {
     if (!o.pickedUp && o.paymentMethod === 'PREPAID' && !o.paid
-      && !confirm(`${o.nickname || o.depositorName}님은 아직 입금 확인이 안 됐습니다. 그래도 수령 처리할까요?`)) return
+      && !confirm(T.confirmPickupUnpaid(o.nickname || o.depositorName))) return
     setError(null)
     try {
       await api.post(`/api/seller/group-buys/${groupBuy.id}/orders/${o.id}/picked-up`, { pickedUp: !o.pickedUp })

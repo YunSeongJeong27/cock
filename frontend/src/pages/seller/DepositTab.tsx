@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, dateTime, errorMessage, won } from '../../api'
 import { ErrorBox, StatusBadge } from '../../components/Ui'
+import { depositText as T } from '../../texts/deposit'
 import type { ColumnMapping, GroupBuy, MatchResponse, MatchRow, OrderBrief, ParsedStatement, Preset, UploadSummary } from '../../types'
 import ScreenshotDeposits from './ScreenshotDeposits'
 
@@ -85,7 +86,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
     setError(null)
     try {
       const res = await api.post<{ savedCount: number; duplicateCount: number }>(`${base}/uploads`, formData())
-      setNotice(`입금 ${res.savedCount}건을 올렸습니다.${res.duplicateCount ? ` (이미 올린 입금 ${res.duplicateCount}건은 건너뜀)` : ''}`)
+      setNotice(T.uploaded(res.savedCount, res.duplicateCount))
       setParsed(null)
       setFile(null)
       setInputKey((k) => k + 1)
@@ -98,12 +99,12 @@ export default function DepositTab({ groupBuy, reload }: Props) {
   }
 
   async function savePreset() {
-    const name = prompt('이 열 설정의 이름 (예: 신협, 국민은행)')
+    const name = prompt(T.presetNamePrompt)
     if (!name) return
     try {
       const p = await api.post<Preset>('/api/seller/bank-columns/presets', { name, ...mapping })
       setPresets((list) => [...list.filter((x) => x.id !== p.id), p])
-      setNotice(`"${name}" 열 설정을 저장했습니다. 다음부터 목록에서 고르면 됩니다.`)
+      setNotice(T.presetSaved(name))
     } catch (e) {
       setError(errorMessage(e))
     }
@@ -115,7 +116,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
     setError(null)
     try {
       const res = await api.post<{ confirmedCount: number; errors: string[] }>(`${base}/confirm`, { items })
-      setNotice(`${res.confirmedCount}건 입금 확정했습니다.`)
+      setNotice(T.confirmed(res.confirmedCount))
       if (res.errors.length) setError(res.errors.join('\n'))
       await loadMatch()
       reload()
@@ -127,7 +128,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
   }
 
   async function deleteUpload(id: number) {
-    if (!confirm('이 업로드의 입금 줄을 지울까요?')) return
+    if (!confirm(T.confirmDeleteUpload)) return
     try {
       await api.del(`${base}/uploads/${id}`)
       loadMatch()
@@ -143,7 +144,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
     <div>
       <div className="card">
         <h3>① 거래내역 올리기 (엑셀·CSV)</h3>
-        <p className="muted small">은행 앱·인터넷뱅킹의 거래내역조회에서 엑셀로 받아 올려주세요. 토스뱅크는 발급할 때 '입금만 + 엑셀'로 받으면 편합니다. 원본 파일은 저장하지 않습니다.</p>
+        <p className="muted small">{T.uploadHelp}</p>
         <input key={inputKey} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setParsed(null) }} />
         <div className="row mt">
           <select value={presetId} onChange={(e) => { setPresetId(e.target.value); setManual(false) }} style={{ width: 220 }}>
@@ -154,7 +155,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
         </div>
         {manual && (
           <div className="mt">
-            <p className="small muted">은행마다 열 이름이 다릅니다. 파일의 열 이름을 그대로 적거나 목록에서 고르세요. (띄어쓰기는 무시)</p>
+            <p className="small muted">{T.manualColumnsHelp}</p>
             <datalist id="column-options">{parsed?.columnOptions.map((c) => <option key={c} value={c} />)}</datalist>
             <div className="mapping-grid">
               <label className="field"><span>입금자명 열 *</span><input type="text" list="column-options" value={mapping.nameColumn ?? ''} onChange={(e) => setMapping({ ...mapping, nameColumn: e.target.value })} placeholder="예: 기재내용" /></label>
@@ -174,15 +175,15 @@ export default function DepositTab({ groupBuy, reload }: Props) {
             {parsed.headerRowNo > 0 ? (
               <>
                 <div className="success-box">
-                  {parsed.autoDetected ? '열을 자동으로 찾았습니다.' : '지정한 열 이름으로 읽었습니다.'} (헤더 {parsed.headerRowNo}행)
+                  {T.columnsFound(parsed.autoDetected, parsed.headerRowNo)}
                   <div className="mt">
                     <span className="chip">입금자명: {parsed.mapping.nameColumn}</span>
                     <span className="chip">금액: {parsed.mapping.amountColumn}</span>
                     <span className="chip">날짜: {parsed.mapping.dateColumn || '없음'}</span>
                     <span className="chip">유형: {parsed.mapping.typeColumn || '없음'}</span>
                   </div>
-                  <div className="small mt">입금 {parsed.deposits.length}건 · 건너뛴 줄 {parsed.skippedRows}개 (출금·0원·이자 등){duplicates ? ` · 이미 올린 입금 ${duplicates}건` : ''}</div>
-                  <div className="small">열이 틀렸으면 "열 이름 직접 지정"으로 바꿔서 다시 미리보기 하세요.</div>
+                  <div className="small mt">{T.previewCounts(parsed.deposits.length, parsed.skippedRows, duplicates)}</div>
+                  <div className="small">{T.wrongColumnsHint}</div>
                 </div>
                 {manual && <button className="btn small" onClick={savePreset}>이 열 설정 저장 (은행별)</button>}
                 <div className="table-wrap mt">
@@ -230,14 +231,14 @@ export default function DepositTab({ groupBuy, reload }: Props) {
               </button>
             )}
           </div>
-          <p className="muted small">결과는 "확정"을 눌러야 저장됩니다. 확정하면 입금자명이 그 고객의 별칭으로 저장되어 다음 공구부터 자동 매칭에 쓰입니다.</p>
+          <p className="muted small">{T.confirmHelp}</p>
           <div className="row small mb">
             <StatusBadge status="MATCHED" label={`자동 매칭 ${match.matchedCount}`} />
             <StatusBadge status="SUGGESTED" label={`추천 ${match.suggestedCount}`} />
             <StatusBadge status="AMBIGUOUS" label={`후보 여러 명 ${match.ambiguousCount}`} />
             <StatusBadge status="UNRELATED" label={`관련 없는 입금 ${match.unrelatedCount}`} />
           </div>
-          {match.rows.length === 0 && <p className="muted">대조할 입금이 없습니다. 거래내역을 올려주세요.</p>}
+          {match.rows.length === 0 && <p className="muted">{T.noDeposits}</p>}
           {match.rows.map((r) => (
             <MatchItem key={r.rowId} row={r} openOrders={match.openOrders} value={choice[r.rowId] ?? ''} busy={busy}
               onChange={(v) => setChoice({ ...choice, [r.rowId]: v })}
@@ -290,7 +291,7 @@ function MatchItem({ row, openOrders, value, busy, onChange, onConfirm, onRefund
       {row.refundCheckOrderId != null && (
         <div className="row mt">
           <button className="btn small" disabled={busy} onClick={() => onRefundCheck(row.refundCheckOrderId!)}>환불 필요로 표시</button>
-          <span className="small muted">입금하고 취소한 고객이면 누르세요. 주문 목록에 "환불 필요"로 뜹니다.</span>
+          <span className="small muted">{T.refundCheckHint}</span>
         </div>
       )}
       <div className="row mt">

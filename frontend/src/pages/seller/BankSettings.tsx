@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, dateTime, errorMessage } from '../../api'
 import { ErrorBox } from '../../components/Ui'
+import { depositText as T } from '../../texts/deposit'
 import type { Preset } from '../../types'
 
 interface Defaults { date: string[]; name: string[]; amount: string[]; type: string[] }
@@ -34,7 +35,7 @@ export default function BankSettings() {
   }
 
   async function remove(url: string) {
-    if (!confirm('삭제할까요?')) return
+    if (!confirm(T.confirmRemove)) return
     try {
       await api.del(url)
       load()
@@ -48,13 +49,13 @@ export default function BankSettings() {
       <h1>은행 거래내역 열 설정</h1>
       <div className="card">
         <h3>기본값 (자동 인식)</h3>
-        <p className="muted small">거래내역 파일 위쪽 30줄에서 아래 이름의 열을 찾습니다 (띄어쓰기 무시, 정확히 같아야 함). 은행 파일의 열 이름이 다르면 자동 인식이 안 되므로, 아래에서 은행별로 열 이름을 저장해 두거나 올릴 때 직접 지정하세요.</p>
+        <p className="muted small">{T.defaultsHelp}</p>
         {defaults && (
           <div className="small">
             <div><b>입금자명</b>: {defaults.name.join(', ')}</div>
-            <div><b>금액</b>: {defaults.amount.join(', ')} <span className="muted">(앞에서부터 먼저 찾음. "거래금액"은 부호 있는 금액, 양수만 입금)</span></div>
+            <div><b>금액</b>: {defaults.amount.join(', ')} <span className="muted">{T.amountOrderNote}</span></div>
             <div><b>날짜</b>: {defaults.date.join(', ')}</div>
-            <div><b>거래 유형</b>: {defaults.type.join(', ')} <span className="muted">(값에 "이자"가 있으면 제외)</span></div>
+            <div><b>거래 유형</b>: {defaults.type.join(', ')} <span className="muted">{T.typeExcludeNote}</span></div>
           </div>
         )}
       </div>
@@ -85,7 +86,7 @@ export default function BankSettings() {
       </form>
       <div className="card">
         <h3>저장된 입금자 별칭 ({aliases.length})</h3>
-        <p className="muted small">입금을 확정하면 "입금자명 → 고객"이 저장되고, 다음 공구부터 같은 입금자명이면 자동으로 그 고객과 매칭합니다. 잘못 저장된 것은 지우세요.</p>
+        <p className="muted small">{T.aliasHelp}</p>
         <div className="table-wrap">
           <table>
             <thead><tr><th>입금자명</th><th>고객</th><th>저장</th><th></th></tr></thead>

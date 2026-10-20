@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, errorMessage } from '../../api'
 import { useAuth } from '../../auth'
 import { ErrorBox } from '../../components/Ui'
+import { accountText as T } from '../../texts/account'
 import type { Me, NotificationType } from '../../types'
 
 /** 알림 설정 (2026-10-19). 처음에는 꼭 필요한 것만 켜져 있다 (서버 NotificationType 기본값) */
@@ -46,7 +47,7 @@ export default function Profile() {
   }
 
   async function withdraw() {
-    const password = prompt('탈퇴하면 모든 공구·주문·입금 정보가 삭제되고 되돌릴 수 없습니다. 필요한 주문 정리표는 먼저 내려받으세요.\n계속하려면 비밀번호를 입력하세요.')
+    const password = prompt(T.withdrawPrompt)
     if (!password) return
     try {
       await api.post('/api/seller/withdraw', { password })
@@ -102,7 +103,7 @@ export default function Profile() {
       </form>
       <div className="card">
         <h3>알림 설정</h3>
-        <div className="muted small">처음에는 꼭 필요한 알림만 켜져 있습니다. 체크하면 바로 저장됩니다.</div>
+        <div className="muted small">{T.notifyHelp}</div>
         <h4 className="mt">메일 ({me.email})</h4>
         {MAIL_ITEMS.map((item) => (
           <label key={item.type} className="check">
@@ -119,13 +120,13 @@ export default function Profile() {
             <span>{item.label} <span className="muted small">— {item.note}</span></span>
           </label>
         ))}
-        <div className="muted small mt">화면 안내를 꺼도 주문 목록의 표시와 숫자는 그대로 보입니다.</div>
+        <div className="muted small mt">{T.screenNotifyNote}</div>
         <ErrorBox message={notifyError} />
       </div>
       {me.role !== 'ADMIN' && (
         <div className="card">
           <h3>탈퇴</h3>
-          <p className="muted small">탈퇴하면 판매자 정보와 받은 주문자·입금 정보가 모두 파기됩니다.</p>
+          <p className="muted small">{T.withdrawNote}</p>
           <button className="btn danger" onClick={withdraw}>탈퇴하기</button>
         </div>
       )}

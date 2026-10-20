@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, dateTime, errorMessage, won } from '../../api'
-import { ErrorBox, StatusBadge } from '../../components/Ui'
+import { ErrorBox, Rich, StatusBadge } from '../../components/Ui'
+import { groupBuyText as T } from '../../texts/groupBuy'
 import type { GroupBuySummary } from '../../types'
 
 export default function GroupBuyList() {
@@ -21,8 +22,8 @@ export default function GroupBuyList() {
       <ErrorBox message={error} />
       {list && list.length === 0 && (
         <div className="card">
-          <p>아직 만든 공구가 없습니다.</p>
-          <p className="muted">공구를 만들면 고객에게 보낼 <b>주문서 링크</b>가 생깁니다. 밴드·카톡 글에 붙여 주세요.</p>
+          <p>{T.emptyList}</p>
+          <p className="muted"><Rich text={T.emptyListHint} /></p>
           <Link className="btn primary" to="/seller/group-buys/new">첫 주문서 링크 만들기</Link>
         </div>
       )}

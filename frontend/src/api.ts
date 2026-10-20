@@ -1,12 +1,16 @@
 // 백엔드 API 호출. 로그인 토큰은 httpOnly 쿠키라 JS 에서 다루지 않는다 (credentials: 'include').
+import { commonText } from './texts/common'
 
+/** 서버 오류 응답: message = detail (화면에 보여줄 문구), code = 서버 ErrorCode 이름 */
 export class ApiError extends Error {
   status: number
   body: any
+  code: string | null
   constructor(status: number, message: string, body: any) {
     super(message)
     this.status = status
     this.body = body
+    this.code = body && typeof body === 'object' && typeof body.code === 'string' ? body.code : null
   }
 }
 
@@ -40,7 +44,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   if (!res.ok) {
     const message =
       (data && typeof data === 'object' && (data.detail || data.message)) ||
-      (res.status === 401 ? '로그인이 필요합니다.' : `요청에 실패했습니다. (${res.status})`)
+      (res.status === 401 ? commonText.loginRequired : commonText.requestFailed(res.status))
     throw new ApiError(res.status, message, data)
   }
   return data as T

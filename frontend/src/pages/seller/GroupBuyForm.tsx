@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, errorMessage } from '../../api'
 import { useAuth } from '../../auth'
 import { ErrorBox } from '../../components/Ui'
+import { groupBuyText as T } from '../../texts/groupBuy'
 import type { GroupBuy, OrderChannel, ShippingFeeType } from '../../types'
 
 interface ProductInput { id?: number; name: string; unitPrice: string; stockLimit: string; perOrderLimit: string; stockAlertThreshold: string; blockWhenSoldOut: boolean; sold?: number }
@@ -79,7 +80,7 @@ export default function GroupBuyForm() {
   async function submit(e: FormEvent, openAfter: boolean) {
     e.preventDefault()
     if (showChannel && !form.orderChannel) {
-      setError('맨 위에서 주문 받는 방법(주문 링크만 / 주문 링크 + 댓글)을 골라 주세요.')
+      setError(T.chooseChannelFirst)
       window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
@@ -112,7 +113,7 @@ export default function GroupBuyForm() {
         await api.post(`/api/seller/group-buys/${saved.id}/open`)
       } catch (err) {
         // 저장은 됐는데 열기만 실패: 폼에 남으면 다시 저장할 때 공구가 하나 더 생기므로 상세 화면으로 보낸다
-        alert(`저장은 했지만 주문 받기를 시작하지 못했습니다.\n${errorMessage(err)}\n공구 화면에서 내용을 고친 뒤 "주문 받기 시작"을 눌러주세요.`)
+        alert(T.savedButOpenFailed(errorMessage(err)))
       }
     }
     setBusy(false)
@@ -122,7 +123,7 @@ export default function GroupBuyForm() {
   return (
     <form onSubmit={(e) => submit(e, false)}>
       {params.get('welcome') && (
-        <div className="banner info mb" style={{ borderRadius: 8 }}>가입을 환영합니다! 먼저 주문서 링크를 만들어 보세요. 만든 링크를 밴드·카톡 글에 붙이면 고객이 주문합니다.</div>
+        <div className="banner info mb" style={{ borderRadius: 8 }}>{T.welcome}</div>
       )}
       <h1>{editing ? '공구 수정' : '주문서 링크 만들기'}</h1>
 
@@ -137,9 +138,9 @@ export default function GroupBuyForm() {
             ))}
           </div>
           <p className="muted small">
-            {form.orderChannel === 'LINK_ONLY' && '고객이 주문서 링크로만 주문합니다. 닉네임은 선택 입력입니다 (칸은 보임).'}
-            {form.orderChannel === 'LINK_AND_COMMENT' && '주문서 링크 주문과 밴드·카톡 댓글 주문(댓글 집계)을 함께 받습니다. 같은 사람이 양쪽으로 주문했는지 닉네임으로 확인하므로, 주문서에서 닉네임이 필수입니다.'}
-            {!form.orderChannel && '고르면 설명이 나옵니다. 댓글로만 주문을 받는다면 "주문 링크 + 댓글"을 고르고 링크는 공유하지 않으면 됩니다.'}
+            {form.orderChannel === 'LINK_ONLY' && T.channelLinkOnly}
+            {form.orderChannel === 'LINK_AND_COMMENT' && T.channelLinkAndComment}
+            {!form.orderChannel && T.channelNotChosen}
           </p>
         </div>
       )}
@@ -160,7 +161,7 @@ export default function GroupBuyForm() {
       <div className="card">
         <h3>상품</h3>
         {form.orderChannel === 'LINK_AND_COMMENT' && form.products.filter((p) => p.name.trim()).length > 1 && (
-          <p className="small warn-box">상품이 여러 개인 공구는 아직 댓글 주문을 받을 수 없습니다 (댓글을 상품별로 나눠 세는 기능 준비 중). 주문 링크로만 받게 됩니다.</p>
+          <p className="small warn-box">{T.multiProductNoComment}</p>
         )}
         {form.products.map((p, i) => (
           <div key={i} className="row mb" style={{ alignItems: 'flex-end' }}>
@@ -173,14 +174,14 @@ export default function GroupBuyForm() {
             <label className="field" style={{ width: 100, marginBottom: 0 }}><span>준비 수량</span>
               <input type="number" min={1} value={p.stockLimit} placeholder="무제한" onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, stockLimit: e.target.value } : x)))} />
             </label>
-            <label className="field" style={{ width: 110, marginBottom: 0 }} title="남은 수량이 이 값 이하가 되면 화면과 메일로 알려 드립니다"><span>알림 (남은 수량)</span>
+            <label className="field" style={{ width: 110, marginBottom: 0 }} title={T.stockAlertTitle}><span>알림 (남은 수량)</span>
               <input type="number" min={0} value={p.stockAlertThreshold} placeholder={p.stockLimit ? '알림 없음' : '준비 수량 먼저'} disabled={!p.stockLimit}
                 onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, stockAlertThreshold: e.target.value } : x)))} />
             </label>
             <label className="field" style={{ width: 100, marginBottom: 0 }}><span>1인 최대</span>
               <input type="number" min={1} value={p.perOrderLimit} placeholder="제한없음" onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, perOrderLimit: e.target.value } : x)))} />
             </label>
-            <label className="check small" style={{ whiteSpace: 'nowrap', margin: 0 }} title="켜면 준비 수량에 도달했을 때 손님 화면에 품절이 뜨고 주문이 막힙니다">
+            <label className="check small" style={{ whiteSpace: 'nowrap', margin: 0 }} title={T.blockWhenSoldOutTitle}>
               <input type="checkbox" checked={p.blockWhenSoldOut && Boolean(p.stockLimit)} disabled={!p.stockLimit}
                 onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, blockWhenSoldOut: e.target.checked } : x)))} /> 다 팔리면 품절
             </label>
@@ -189,11 +190,7 @@ export default function GroupBuyForm() {
           </div>
         ))}
         <button type="button" className="btn small" onClick={() => set('products', [...form.products, { name: '', unitPrice: '', stockLimit: '', perOrderLimit: '', stockAlertThreshold: '', blockWhenSoldOut: false }])}>+ 상품 추가</button>
-        <p className="muted small">
-          기본은 준비 수량을 넘어도 주문을 막지 않습니다 (가짜 주문으로 진짜 손님이 막히지 않게). 손님 화면에는 남은 수량이 1개 이상일 때만 보이고, 판매자 화면에는 초과 수량까지 보입니다.
-          "다 팔리면 품절"을 켜면 준비 수량에 도달했을 때 품절이 뜨고 주문이 막힙니다 (가짜 주문으로 품절될 수 있음).
-          "알림"에 숫자를 넣으면 남은 수량이 그 이하가 될 때 화면과 메일로 알려 드립니다. 준비 수량은 언제든 바꿀 수 있습니다.
-        </p>
+        <p className="muted small">{T.stockHelp}</p>
       </div>
 
       <div className="card">
@@ -236,7 +233,7 @@ export default function GroupBuyForm() {
           <input type="text" placeholder="계좌번호" value={form.accountNumber} onChange={(e) => set('accountNumber', e.target.value)} style={{ flex: 2, minWidth: 160 }} />
           <input type="text" placeholder="예금주" value={form.accountHolder} onChange={(e) => set('accountHolder', e.target.value)} style={{ flex: 1, minWidth: 100 }} />
         </div>
-        <p className="muted small">내 정보에서 기본 계좌를 저장해 두면 새 공구에 자동으로 채워집니다.</p>
+        <p className="muted small">{T.defaultAccountHint}</p>
       </div>
 
       <div className="card">

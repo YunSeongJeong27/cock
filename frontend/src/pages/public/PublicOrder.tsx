@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
 import { ApiError, api, dateTime, errorMessage, won } from '../../api'
-import { CopyButton, ErrorBox, StatusBadge } from '../../components/Ui'
+import { CopyButton, ErrorBox, Rich, StatusBadge } from '../../components/Ui'
+import { orderText as T } from '../../texts/order'
 import type { PaymentMethod, ReceiveMethod, ShippingFeeType } from '../../types'
 
 /**
@@ -93,7 +94,7 @@ function loadPostcode(): Promise<void> {
     const s = document.createElement('script')
     s.src = 'https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js'
     s.onload = () => resolve()
-    s.onerror = () => reject(new Error('주소 검색을 불러오지 못했습니다. 주소를 직접 입력해 주세요.'))
+    s.onerror = () => reject(new Error(T.postcodeLoadFailed))
     document.head.appendChild(s)
   })
 }
@@ -243,7 +244,7 @@ export default function PublicOrder() {
       applyView(v)
       setCancel(emptyCancel)
       setPlaced(null)
-      alert(refund ? '환불 신청을 했습니다. 판매자가 확인한 뒤 주문을 취소하고 환불합니다.' : '주문을 취소했습니다.')
+      alert(refund ? T.refundRequestedAlert : T.cancelledAlert)
     } catch (err) {
       if (err instanceof ApiError && err.status === 409 && Array.isArray(err.body?.orders)) {
         setCancel({ ...cancel, error: '', choices: err.body.orders })
@@ -285,9 +286,7 @@ export default function PublicOrder() {
 
   /** 주문 변경 안내: 주문 확정 전에는 [주문 수정], 확정 후에는 환불 신청 후 다시 주문 (2026-10-19 사용자 결정) */
   const changeNote = (
-    <p className="small mt" style={{ marginBottom: 0 }}>
-      주문 변경: 주문 확정 전에는 <b style={{ fontWeight: 800 }}>주문 수정</b>, 확정 후에는 <b style={{ fontWeight: 800 }}>환불 신청</b> 후 다시 주문해 주세요.
-    </p>
+    <p className="small mt" style={{ marginBottom: 0 }}><Rich text={T.changeNote} strongStyle={{ fontWeight: 800 }} /></p>
   )
 
   /**
@@ -354,7 +353,7 @@ export default function PublicOrder() {
               {view.kakaoInquiryUrl && <a className="btn small" href={view.kakaoInquiryUrl} target="_blank" rel="noreferrer">💬 카톡 문의</a>}
             </div>
           )}
-          <div className="small muted mt">지금은 주문·주문 수정·취소·환불 신청을 잠시 받지 않습니다. 내 주문 보기는 됩니다.</div>
+          <div className="small muted mt">{T.pausedNote}</div>
         </div>
       )}
 
@@ -367,13 +366,13 @@ export default function PublicOrder() {
             : <div>주문번호 <b>{placed.orderNo}</b> · 총 <b>{won(placed.expectedAmount)}</b></div>}
           {placed.account ? (
             <div className="mt">
-              <div>아래 계좌로 <b>{won(placed.expectedAmount)}</b>을 보내주세요.</div>
+              <div><Rich text={T.sendTo(won(placed.expectedAmount))} /></div>
               <div className="row mt"><b>{placed.account.bankName} {placed.account.accountNumber}</b> ({placed.account.accountHolder}) <CopyButton text={placed.account.accountNumber} label="계좌 복사" /></div>
-              <div className="warn-box">받는 분 통장 표시(입금자명)를 꼭 <b>{placed.depositorName}</b>(으)로 해주세요. 입금 확인이 빨라집니다.</div>
-              <div className="small muted mt">판매자가 입금을 확인하면 "주문 확정"으로 바뀝니다.</div>
+              <div className="warn-box"><Rich text={T.depositorReminder(placed.depositorName)} /></div>
+              <div className="small muted mt">{T.confirmAfterDeposit}</div>
             </div>
-          ) : <div className="mt">현장에서 결제해 주세요.</div>}
-          <p className="small muted">이 화면 위쪽 "내 주문"에서 언제든 상태를 확인할 수 있습니다. 이 링크를 다시 열면 됩니다.</p>
+          ) : <div className="mt">{T.payOnsite}</div>}
+          <p className="small muted">{T.checkLater}</p>
         </div>
       )}
 
@@ -388,12 +387,12 @@ export default function PublicOrder() {
               </div>
               <div className="small">{o.items.map((i) => `${i.productName} ${i.quantity}개`).join(', ')}</div>
               <div className="small muted">{o.receiveMethod === 'DELIVERY' ? '배송' : `픽업${o.pickupPointName ? ' · ' + o.pickupPointName : ''}`} · {o.paymentMethod === 'PREPAID' ? `선입금 (입금자명 ${o.depositorName})` : '현장결제'} · {dateTime(o.orderedAt)}</div>
-              {o.changedAt && <div className="small" style={{ color: 'var(--warn)' }}>판매자가 주문을 변경했어요 ({dateTime(o.changedAt)}). 위 내용·금액을 확인해 주세요.</div>}
+              {o.changedAt && <div className="small" style={{ color: 'var(--warn)' }}>{T.changedBySeller(dateTime(o.changedAt))}</div>}
               {o.customerChangedAt && <div className="small muted">주문 수정됨 ({dateTime(o.customerChangedAt)})</div>}
-              {o.refundRequired && <div className="small" style={{ color: 'var(--danger)' }}>취소됨 · 판매자가 환불할 예정입니다.</div>}
+              {o.refundRequired && <div className="small" style={{ color: 'var(--danger)' }}>{T.refundPlanned}</div>}
               {o.refundedAt && <div className="small muted">취소됨 · 환불 완료 ({dateTime(o.refundedAt)})</div>}
-              {o.refundState === 'REQUESTED' && <div className="small" style={{ color: 'var(--warn)' }}>환불 신청됨 · 판매자가 확인 중입니다.</div>}
-              {o.refundState === 'REJECTED' && <div className="small" style={{ color: 'var(--danger)' }}>환불 신청이 반려됐어요. 판매자에게 문의해 주세요.</div>}
+              {o.refundState === 'REQUESTED' && <div className="small" style={{ color: 'var(--warn)' }}>{T.refundRequested}</div>}
+              {o.refundState === 'REJECTED' && <div className="small" style={{ color: 'var(--danger)' }}>{T.refundRejected}</div>}
               {o.awaitingConfirm && view.account && (
                 <div className="small mt">입금 계좌: {view.account.bankName} {view.account.accountNumber} ({view.account.accountHolder}) <CopyButton text={view.account.accountNumber} label="복사" /></div>
               )}
@@ -402,8 +401,8 @@ export default function PublicOrder() {
                 {!view.paused && o.cancellable && <button className="btn small danger" onClick={() => openCancel(o.orderNo)}>주문 취소</button>}
                 {!view.paused && confirmedOrder(o) && <button className="btn small danger" onClick={() => openCancel(o.orderNo, 'refund')}>환불 신청</button>}
               </div>
-              {o.replaceable && o.paymentMethod === 'PREPAID' && <div className="small muted mt">주문 확정 전까지 수정할 수 있어요.</div>}
-              {confirmedOrder(o) && <div className="small muted mt">확정된 주문은 수정할 수 없어요. 변경은 환불 신청 후 다시 주문해 주세요.</div>}
+              {o.replaceable && o.paymentMethod === 'PREPAID' && <div className="small muted mt">{T.editableUntilConfirm}</div>}
+              {confirmedOrder(o) && <div className="small muted mt">{T.confirmedCannotEdit}</div>}
             </div>
           ))}
         </div>
@@ -420,11 +419,11 @@ export default function PublicOrder() {
                 <input type="tel" placeholder="휴대폰 번호 (010-0000-0000)" value={identify.phone} onChange={(e) => setIdentify({ ...identify, phone: e.target.value })} required style={{ flex: 1, minWidth: 160 }} />
                 <button className="btn primary">찾기</button>
               </div>
-              <p className="small muted">주문할 때 적은 휴대폰 번호 전체를 입력해 주세요.</p>
+              <p className="small muted">{T.identifyHint}</p>
               <ErrorBox message={identify.error} />
               {identify.error && (
                 <p className="small muted">
-                  주문서 링크로 주문하지 않은 분은 여기서 조회되지 않습니다. 판매자에게 문의해 주세요.
+                  {T.identifyNotFound}
                   {view.kakaoInquiryUrl && <> <a href={view.kakaoInquiryUrl} target="_blank" rel="noreferrer">💬 카톡 문의</a></>}
                 </p>
               )}
@@ -438,11 +437,11 @@ export default function PublicOrder() {
           <h3>{editing ? `${editing.orderNo}번 주문 수정` : replaceTarget ? '주문서' : view.myOrders.length > 0 ? '추가 주문하기' : '주문서'}</h3>
           {editing && editing.paymentMethod === 'PREPAID' && <div className="small mb"><b>주문 확정 전이에요.</b></div>}
           {/* 수정은 휴대폰 번호 + 입금자명이 기존 주문과 같아야 한다 (2026-10-19). 그래서 둘은 고칠 수 없다 */}
-          {editing && <div className="small muted mb">휴대폰 번호·입금자명은 수정할 수 없어요. (바꾸려면 판매자에게 문의)</div>}
+          {editing && <div className="small muted mb">{T.editLockedFields}</div>}
           {!editing && replaceTarget && (
-            <div className="small mb">주문을 고치려면 위 <b>주문 수정</b>을 눌러 주세요.{replaceTarget.paymentMethod === 'PREPAID' && ' (주문 확정 전까지)'}</div>
+            <div className="small mb"><Rich text={T.useEditButton(replaceTarget.paymentMethod === 'PREPAID')} /></div>
           )}
-          {(editing ? editing.editValues?.limited : view.prefill?.limited) && <div className="small muted mb">개인정보 보호를 위해 다른 기기에서 입력한 휴대폰 번호·주소는 채우지 않습니다. 다시 입력해 주세요.</div>}
+          {(editing ? editing.editValues?.limited : view.prefill?.limited) && <div className="small muted mb">{T.otherDevicePrefill}</div>}
           {view.products.map((p) => (
             <div key={p.id} className="product-row">
               <div>
@@ -517,7 +516,7 @@ export default function PublicOrder() {
               readOnly={!!(editing && editing.editValues?.phone)} /></label>
             <label className="field"><span>입금자명 *</span><input type="text" value={form.depositorName} onChange={(e) => set('depositorName', e.target.value)} required placeholder="통장에 찍힐 이름"
               readOnly={!!(editing && editing.editValues?.depositorName)} />
-              <span className="muted small" style={{ fontWeight: 400 }}>{payment === 'ONSITE' ? '주문 확인용 이름입니다.' : '계좌이체할 때 받는 분 통장 표시에 이 이름을 적어주세요.'}</span>
+              <span className="muted small" style={{ fontWeight: 400 }}>{payment === 'ONSITE' ? T.depositorHintOnsite : T.depositorHintTransfer}</span>
             </label>
             <label className="field"><span>{view.nicknameRequired ? '닉네임 (밴드·카톡) *' : '닉네임 (밴드·카톡, 선택)'}</span><input type="text" value={form.nickname} onChange={(e) => set('nickname', e.target.value)} required={view.nicknameRequired} /></label>
             {view.unitAddressFieldEnabled && <label className="field"><span>동·호수 *</span><input type="text" value={form.unitAddress} onChange={(e) => set('unitAddress', e.target.value)} required placeholder="예: 101동 1203호" /></label>}
@@ -532,7 +531,7 @@ export default function PublicOrder() {
           {warnings && (
             <div className="warn-box">
               {warnings.list.map((w) => <div key={w}>⚠ {w}</div>)}
-              {warnings.replaceOrder?.paymentMethod === 'PREPAID' && <div className="small mt">입금하신 경우에는 환불 후 재주문 하셔야 합니다.</div>}
+              {warnings.replaceOrder?.paymentMethod === 'PREPAID' && <div className="small mt">{T.refundThenReorder}</div>}
               {warnings.replaceOrder && showExisting && (
                 <OrderSummary o={warnings.replaceOrder}
                   title={<><b>기존 주문</b> <span className="muted">({warnings.replaceOrder.statusLabel})</span></>} />
@@ -558,18 +557,18 @@ export default function PublicOrder() {
           {/* 입금한 고객은 수정 대신 환불 후 재주문 (금액이 바뀌면 입금액과 어긋나므로, 2026-10-19 사용자 요청) */}
           {editing && editing.paymentMethod === 'PREPAID' && editing.refundRequestable && (
             <div className="row mt">
-              <span className="small muted grow">입금하신 경우에는 환불 후 재주문 하셔야 합니다.</span>
+              <span className="small muted grow">{T.refundThenReorder}</span>
               <button type="button" className="btn small danger" disabled={busy}
                 onClick={() => { openCancel(editing.orderNo, 'refund'); stopEdit() }}>환불 신청</button>
             </div>
           )}
-          <p className="muted small mt">주문하면 <a href="/privacy" target="_blank">개인정보처리방침</a>에 따라 주문 처리에 필요한 정보(연락처·입금자명·배송지)를 판매자에게 전달하는 데 동의하는 것으로 봅니다. 주문 후 이 링크에서 내 주문 상태를 볼 수 있도록 이 기기에 쿠키를 저장합니다.</p>
+          <p className="muted small mt"><Rich text={T.consent} /></p>
         </form>
       )}
 
       <div className="card" id="cancel-form">
         {view.paused ? (
-          <div className="small muted">판매자가 주문을 잠시 멈춰서 지금은 취소·환불 신청을 할 수 없습니다.</div>
+          <div className="small muted">{T.pausedNoCancel}</div>
         ) : !cancel.open ? (
           <>
             <div className="row between">
@@ -580,8 +579,8 @@ export default function PublicOrder() {
               </div>
             </div>
             <p className="small muted mt" style={{ marginBottom: 0 }}>
-              {view.acceptingOrders ? '주문 확정 전에는 바로 취소할 수 있습니다. ' : '주문이 마감되어 바로 취소는 할 수 없습니다. 판매자에게 문의해 주세요. '}
-              {view.account && '입금하셨다면 환불 신청을 해 주세요. 판매자가 확인한 뒤 취소·환불합니다.'}
+              {view.acceptingOrders ? T.cancelBeforeConfirm : T.cancelClosed}
+              {view.account && T.refundIfPaid}
             </p>
             {view.acceptingOrders && changeNote}
           </>
@@ -590,12 +589,12 @@ export default function PublicOrder() {
             {cancel.mode === 'cancel' ? (
               <>
                 <h3>주문 취소</h3>
-                <p className="small">입금하셨다면 <b>환불 신청</b>을 눌러 주세요. 판매자가 확인한 뒤 환불합니다.</p>
+                <p className="small"><Rich text={T.cancelFormNote} /></p>
               </>
             ) : (
               <>
                 <h3>환불 신청</h3>
-                <p className="small">판매자가 확인한 뒤 주문을 취소하고 아래 계좌로 환불합니다. 계좌는 환불에만 쓰고, 환불이 끝나면 지웁니다.</p>
+                <p className="small">{T.refundFormNote}</p>
               </>
             )}
             {cancel.notice && <div className="warn-box">{cancel.notice}</div>}
@@ -611,7 +610,7 @@ export default function PublicOrder() {
             <ErrorBox message={cancel.error} />
             {cancel.choices.length > 0 ? (
               <div>
-                <div className="small mb"><b>{cancel.mode === 'refund' ? '환불 신청할' : '취소할'} 주문을 골라주세요.</b></div>
+                <div className="small mb"><b>{T.chooseOrder(cancel.mode === 'refund')}</b></div>
                 {cancel.choices.map((o) => (
                   <div key={o.orderNo} className="row between" style={{ borderTop: '1px solid var(--line)', padding: '8px 0' }}>
                     <span className="small">{o.orderNo}번 · {o.items.map((i) => `${i.productName} ${i.quantity}개`).join(', ')} · {won(o.expectedAmount)} · {o.statusLabel}</span>

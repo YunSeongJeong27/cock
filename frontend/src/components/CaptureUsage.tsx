@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import { depositText } from '../texts/deposit'
 
 export interface CaptureStatus {
   visionAvailable: boolean
@@ -18,7 +19,7 @@ export function useCaptureStatus(refreshKey: unknown) {
 export function CaptureUsageLine({ status }: { status: CaptureStatus | null }) {
   if (!status) return null
   if (!status.visionAvailable) {
-    return <div className="small muted">스크린샷 글자 읽기(비전 AI)가 아직 꺼져 있습니다. 읽은 결과 표에 직접 입력할 수 있습니다.</div>
+    return <div className="small muted">{depositText.visionOff}</div>
   }
   const u = status.usage
   return (

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api, errorMessage } from '../api'
 import { useAuth } from '../auth'
 import { ErrorBox } from '../components/Ui'
+import { accountText as T } from '../texts/account'
 import type { Me } from '../types'
 
 export default function Signup() {
@@ -16,7 +17,7 @@ export default function Signup() {
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (!agree) {
-      setError('이용약관과 개인정보처리방침에 동의해 주세요.')
+      setError(T.agreeRequired)
       return
     }
     setBusy(true)

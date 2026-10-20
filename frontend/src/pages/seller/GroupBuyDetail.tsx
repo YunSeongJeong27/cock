@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, dateTime, errorMessage, won } from '../../api'
 import { useAuth } from '../../auth'
 import { CopyButton, ErrorBox, Stat, StatusBadge } from '../../components/Ui'
+import { groupBuyText as T } from '../../texts/groupBuy'
 import type { Dashboard, GroupBuy, Product, SellerOrder } from '../../types'
 import OrdersTab from './OrdersTab'
 import DepositTab from './DepositTab'
@@ -58,7 +59,7 @@ export default function GroupBuyDetail() {
   }
 
   async function remove() {
-    if (!confirm('공구를 삭제하면 주문·입금 정보도 모두 삭제됩니다. 필요하면 먼저 주문 정리표를 내려받으세요. 삭제할까요?')) return
+    if (!confirm(T.confirmDelete)) return
     try {
       await api.del(`/api/seller/group-buys/${id}`)
       navigate('/seller')
@@ -84,22 +85,23 @@ export default function GroupBuyDetail() {
       <div className="card">
         {groupBuy.status === 'DRAFT' ? (
           <div className="row between">
-            <span>아직 주문을 받지 않는 상태입니다. 주문을 받으려면 시작을 누르세요.</span>
+            <span>{T.draftNote}</span>
             <button className="btn primary" onClick={() => action('open')}>주문 받기 시작</button>
           </div>
         ) : (
           <>
-            <div className="muted small">고객에게 보낼 주문서 링크 (밴드·카톡 글에 붙이세요)</div>
+            <div className="muted small">{T.linkHint}</div>
             <div className="row">
               <code className="grow" style={{ wordBreak: 'break-all' }}>{link}</code>
               <CopyButton text={link} label="링크 복사" />
               <a className="btn small" href={link} target="_blank" rel="noreferrer">열어보기</a>
             </div>
+            <div className="small muted mt">{T.promoTip}</div>
           </>
         )}
         <div className="row mt">
           <Link className="btn small" to={`/seller/group-buys/${id}/edit`}>공구 수정</Link>
-          {groupBuy.status === 'OPEN' && <button className="btn small" onClick={() => action('close', '지금 마감할까요? 마감하면 고객이 주문·취소할 수 없습니다.')}>지금 마감</button>}
+          {groupBuy.status === 'OPEN' && <button className="btn small" onClick={() => action('close', T.confirmClose)}>지금 마감</button>}
           {groupBuy.status === 'CLOSED' && <button className="btn small" onClick={() => action('open')}>다시 열기</button>}
           <a className="btn small" href={`/api/seller/group-buys/${id}/export.xlsx`}>주문 정리표 엑셀</a>
           <a className="btn small" href={`/api/seller/group-buys/${id}/export.xlsx?includeContact=true`}>엑셀 (연락처·배송지 포함)</a>
@@ -175,7 +177,7 @@ function StockStatus({ products, warning, showAlert }: { products: Product[]; wa
         </div>
       )}
       <div className="card">
-        <div className="row between"><h3 style={{ margin: 0 }}>상품별 재고</h3><span className="small muted">"다 팔리면 품절"은 공구 수정에서 상품마다 켜고 끕니다</span></div>
+        <div className="row between"><h3 style={{ margin: 0 }}>상품별 재고</h3><span className="small muted">{T.soldOutToggleHint}</span></div>
         <div className="table-wrap mt">
           <table className="stack">
             <thead><tr><th>상품</th><th className="right">준비</th><th className="right">주문</th><th className="right">남은 수량</th><th className="right">알림 기준</th><th>다 팔리면</th></tr></thead>
@@ -244,7 +246,7 @@ function PauseCard({ groupBuy, onChange }: { groupBuy: GroupBuy; onChange: (g: G
           <b>⏸ 고객 주문을 잠시 멈춘 상태입니다</b>
           <button className="btn primary" disabled={busy} onClick={() => save(false)}>다시 받기</button>
         </div>
-        <div className="small mt">고객 화면에서 새 주문·주문 수정·취소·환불 신청이 막혀 있습니다. 내 주문 보기는 됩니다.</div>
+        <div className="small mt">{T.pausedNote}</div>
         {fields}
         <button className="btn small" disabled={busy} onClick={() => save(true)}>문구 저장</button>
         <ErrorBox message={error} />

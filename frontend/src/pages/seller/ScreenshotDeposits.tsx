@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api, errorMessage, won } from '../../api'
 import { ErrorBox } from '../../components/Ui'
+import { depositText as T } from '../../texts/deposit'
 import type { GroupBuy } from '../../types'
 import { CaptureUsageLine, useCaptureStatus } from '../../components/CaptureUsage'
 
@@ -37,7 +38,7 @@ export default function ScreenshotDeposits({ groupBuy, onSaved }: { groupBuy: Gr
       // 한도 초과·AI 꺼짐이어도 빈 표를 열어서 직접 입력할 수 있게 한다
       setRows(res.deposits.length ? res.deposits : [{ name: '', amount: 0, datetime: null, type: '입금', duplicateSuspected: false, imageIndex: 0 }])
       if (res.limitExceeded) setError(res.notice)
-      setInfo(res.limitExceeded ? null : [res.notice, res.skippedWithdrawals ? `출금 ${res.skippedWithdrawals}건은 뺐습니다.` : null].filter(Boolean).join(' '))
+      setInfo(res.limitExceeded ? null : [res.notice, res.skippedWithdrawals ? T.withdrawalsSkipped(res.skippedWithdrawals) : null].filter(Boolean).join(' '))
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -58,7 +59,7 @@ export default function ScreenshotDeposits({ groupBuy, onSaved }: { groupBuy: Gr
       setRows(null)
       setFiles(null)
       setInputKey((k) => k + 1)
-      setInfo('스크린샷 입금을 저장했습니다. 아래 대조 결과에 반영됩니다.')
+      setInfo(T.screenshotSaved)
       onSaved()
     } catch (e) {
       setError(errorMessage(e))
@@ -77,7 +78,7 @@ export default function ScreenshotDeposits({ groupBuy, onSaved }: { groupBuy: Gr
       </div>
       {open && (
         <>
-          <p className="muted small">폰에서 엑셀 받기가 번거로우면 은행앱 거래내역 화면을 캡처해서 여러 장 올리세요. AI가 입금자명·금액을 읽고, 직접 확인·수정한 뒤 저장합니다. 읽기 어려운 글자는 [?]로 표시됩니다. 캡처 이미지는 외부 AI 서비스로 전송되며 읽은 직후 삭제됩니다.</p>
+          <p className="muted small">{T.screenshotHelp}</p>
           <CaptureUsageLine status={capture} />
           <input key={inputKey} type="file" accept="image/*" multiple onChange={(e) => setFiles(e.target.files)} />
           <div className="row mt"><button className="btn" disabled={!files || busy} onClick={extract}>{busy ? '읽는 중…' : '글자 읽기'}</button></div>
@@ -106,7 +107,7 @@ export default function ScreenshotDeposits({ groupBuy, onSaved }: { groupBuy: Gr
                 <span className="grow muted small">합계 {won(rows.reduce((s, r) => s + (r.amount || 0), 0))} / {rows.length}건</span>
                 <button className="btn primary" disabled={busy || rows.some(hasUnread)} onClick={save}>검수 완료, 저장</button>
               </div>
-              {rows.some(hasUnread) && <div className="small" style={{ color: 'var(--danger)' }}>[?] 표시를 고친 뒤 저장할 수 있습니다.</div>}
+              {rows.some(hasUnread) && <div className="small" style={{ color: 'var(--danger)' }}>{T.fixUnreadFirst}</div>}
             </div>
           )}
         </>

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, errorMessage } from '../api'
 import { useAuth } from '../auth'
 import { ErrorBox } from '../components/Ui'
+import { accountText as T } from '../texts/account'
 import type { Me } from '../types'
 
 export default function Login() {
@@ -32,7 +33,7 @@ export default function Login() {
   return (
     <div className="container narrow">
       <h1 className="mt"><Link to="/" style={{ color: 'inherit' }}>📌 입금콕</Link> 로그인</h1>
-      {params.get('expired') && <div className="warn-box">로그인이 만료되었습니다. 다시 로그인해 주세요.</div>}
+      {params.get('expired') && <div className="warn-box">{T.loginExpired}</div>}
       <form className="card" onSubmit={submit}>
         <label className="field"><span>이메일</span>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />

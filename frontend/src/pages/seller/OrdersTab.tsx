@@ -1,7 +1,8 @@
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { api, dateTime, errorMessage, maskPhone, shortTime, won } from '../../api'
 import { useAuth } from '../../auth'
-import { CopyButton, ErrorBox, StatusBadge, useIsMobile } from '../../components/Ui'
+import { CopyButton, ErrorBox, Rich, StatusBadge, useIsMobile } from '../../components/Ui'
+import { sellerOrderText as T } from '../../texts/sellerOrders'
 import type { GroupBuy, SellerOrder } from '../../types'
 import OrderEditForm, { changeReply } from './OrderEditForm'
 
@@ -88,7 +89,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
   function startEdit(o: SellerOrder) {
     setReply(null)
     if (o.paid) {
-      setError('입금 확정된 주문입니다. 바꾸려면 먼저 입금 확정을 취소해 주세요.')
+      setError(T.paidCannotEdit)
       return
     }
     setError(null)
@@ -119,7 +120,6 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
    */
   const refundAccount = (o: SellerOrder) => {
     const paidName = o.paid ? o.paidDepositorName : null
-    const name = paidName ? `실제 입금된 이름(${paidName})` : `입금자명(${o.depositorName})`
     return (
       <>
         <div className="row">
@@ -127,9 +127,9 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
           {o.refundAccount && <CopyButton text={o.refundAccount} label="계좌 복사" />}
         </div>
         {paidName && squash(paidName) !== squash(o.depositorName) && (
-          <div style={{ color: 'var(--danger)' }}>⚠ 실제 입금된 이름({paidName})이 주문서 입금자명({o.depositorName})과 다릅니다.</div>
+          <div style={{ color: 'var(--danger)' }}>{T.paidNameDiffers(paidName, o.depositorName)}</div>
         )}
-        <div style={{ color: 'var(--warn)' }}>보낼 때 은행 앱에 뜨는 받는 분 이름이 {name}과 같은지 확인하세요. 다르면 보내지 말고 고객에게 확인하세요.</div>
+        <div style={{ color: 'var(--warn)' }}>{T.refundSendCheck(paidName, o.depositorName)}</div>
       </>
     )
   }
@@ -160,19 +160,19 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
           <div className="edit-box mt">
             <div><b>환불 신청</b> <span className="small muted">{dateTime(o.refundRequestedAt)}</span></div>
             <div className="small mt">{refundAccount(o)}</div>
-            {!o.paid && <div className="small mt" style={{ color: 'var(--warn)' }}>아직 주문 확정 전입니다. 통장에서 입금을 확인한 뒤 처리해 주세요.</div>}
+            {!o.paid && <div className="small mt" style={{ color: 'var(--warn)' }}>{T.refundBeforeConfirm}</div>}
             <div className="row mt">
               <button className="btn small danger" onClick={() => post(`${o.id}/refund-request/approve`, undefined,
-                `${o.orderNo}번 주문을 취소하고 "환불 필요"로 표시할까요? 위 계좌로 직접 돈을 보낸 뒤 [환불 완료]를 눌러 주세요.`)}>취소하고 환불</button>
+                T.confirmApproveRefund(o.orderNo))}>취소하고 환불</button>
               <button className="btn small" onClick={() => post(`${o.id}/refund-request/reject`, undefined,
-                '환불 신청을 받지 않을까요? 주문은 그대로 남고, 고객 화면에 "환불 신청이 반려됐어요"가 보입니다.')}>취소 안 함</button>
+                T.confirmRejectRefund)}>취소 안 함</button>
             </div>
           </div>
         )}
         {o.refundRequired && !o.refundedAt && o.refundBank && <div className="small mt">{refundAccount(o)}</div>}
         {reply?.orderId === o.id && (
           <div className="edit-box mt">
-            <div className="small"><b>변경했습니다.</b> 댓글 답글 예시 (고쳐서 복사해 쓰세요)</div>
+            <div className="small"><Rich text={T.changedReplyHead} /></div>
             <textarea className="mt reply-text" value={reply.text} onChange={(e) => setReply({ orderId: o.id, text: e.target.value })} />
             <div className="row mt"><CopyButton text={reply.text} label="답글 복사" /><button className="btn small" onClick={() => setReply(null)}>닫기</button></div>
           </div>
@@ -184,9 +184,9 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
           <div className="row mt">
             {o.active && !o.pickedUp && !refundPending(o) && <button className="btn small" onClick={() => startEdit(o)}>주문 변경</button>}
             {o.active && o.paymentMethod === 'PREPAID' && !o.paid && <button className="btn small" onClick={() => manualPaid(o)}>수동 입금 확정</button>}
-            {o.paid && !o.refundedAt && <button className="btn small" onClick={() => post(`${o.id}/unconfirm-paid`, undefined, '입금 확정을 취소할까요?')}>입금 확정 취소</button>}
+            {o.paid && !o.refundedAt && <button className="btn small" onClick={() => post(`${o.id}/unconfirm-paid`, undefined, T.confirmUnconfirmPaid)}>입금 확정 취소</button>}
             {o.refundRequired && !o.refundedAt && <button className="btn small ok" onClick={() => post(`${o.id}/refunded`)}>환불 완료</button>}
-            {o.active && !refundPending(o) && !o.pickedUp && <button className="btn small danger" onClick={() => post(`${o.id}/cancel`, undefined, `${o.orderNo}번 주문을 취소할까요?${o.paid ? ' (입금 확정된 주문이라 환불 필요로 표시됩니다)' : ''}`)}>주문 취소</button>}
+            {o.active && !refundPending(o) && !o.pickedUp && <button className="btn small danger" onClick={() => post(`${o.id}/cancel`, undefined, T.confirmCancel(o.orderNo, o.paid))}>주문 취소</button>}
           </div>
         )}
       </>
@@ -225,7 +225,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
       onChange={(e) => { const next = new Set(checked); if (e.target.checked) next.add(o.id); else next.delete(o.id); setChecked(next) }} />
   }
   async function deleteChecked() {
-    if (!confirm(`선택한 ${checkedShown.length}건을 삭제할까요? 되돌릴 수 없습니다.`)) return
+    if (!confirm(T.confirmDelete(checkedShown.length))) return
     setError(null)
     try {
       await api.post(`/api/seller/group-buys/${groupBuy.id}/orders/delete`, { orderIds: checkedShown.map((o) => o.id) })
@@ -346,13 +346,13 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
     <div>
       {showRefundBanner && refundRequests > 0 && filter !== 'refundreq' && (
         <div className="warn-box row between mb">
-          <span className="small">고객 환불 신청이 {refundRequests}건 있습니다. 상세에서 [취소하고 환불] 또는 [취소 안 함]을 눌러 주세요.</span>
+          <span className="small">{T.refundRequestsBanner(refundRequests)}</span>
           <button className="btn small" onClick={() => setFilter('refundreq')}>모아 보기</button>
         </div>
       )}
       {showNickBanner && sameNick > 0 && filter !== 'samenick' && (
         <div className="warn-box row between mb">
-          <span className="small">⚠ 링크 주문과 댓글 주문의 닉네임이 같은 주문이 {sameNick}건 있습니다. 같은 사람이 두 번 주문한 것이면 하나를 취소하거나 바꿔 주세요.</span>
+          <span className="small">{T.sameNicknameBanner(sameNick)}</span>
           <button className="btn small" onClick={() => setFilter('samenick')}>모아 보기</button>
         </div>
       )}
@@ -385,7 +385,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
               onChange={(e) => setChecked(new Set(e.target.checked ? shown.map((o) => o.id) : []))} /> 전체 선택
           </label>
           <button className="btn small danger" disabled={checkedShown.length === 0} onClick={deleteChecked}>선택 삭제 ({checkedShown.length})</button>
-          <span className="small muted">완료된 주문만 지울 수 있고, 지우면 되돌릴 수 없습니다.</span>
+          <span className="small muted">{T.deleteNote}</span>
         </div>
       )}
       <ErrorBox message={error} />

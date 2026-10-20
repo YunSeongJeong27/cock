@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, errorMessage, won } from '../../api'
-import { ErrorBox } from '../../components/Ui'
+import { ErrorBox, Rich } from '../../components/Ui'
+import { commentText as T } from '../../texts/comments'
 import type { GroupBuy } from '../../types'
 import { CaptureUsageLine, useCaptureStatus } from '../../components/CaptureUsage'
 
@@ -142,11 +143,9 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
 
   const apply = () => {
     const same = newCustomers.filter((c) => c.linkOrderNos.length > 0).length
-    const warn = same > 0 ? `\n\n⚠ 그중 링크 주문과 닉네임이 같은 손님이 ${same}명 있습니다. 같은 사람이면 주문이 두 번 잡히니, 반영 후 주문 목록에서 확인해 주세요.` : ''
-    if (!confirm(`새 손님 ${newCustomers.length}명을 주문으로 추가합니다. 이미 반영된 손님의 주문은 그대로 둡니다. 계속할까요?${warn}`)) return
+    if (!confirm(T.confirmApply(newCustomers.length, same))) return
     run(() => api.post<{ createdCount: number; reviewCount: number }>(`${base}/apply`, { productId: Number(productId) }), (r) => {
-      setNotice(`새 댓글 주문 ${r.createdCount}건을 만들었습니다.`
-        + (r.reviewCount > 0 ? ` 이미 반영된 주문과 댓글이 다른 ${r.reviewCount}건은 표의 ⚠ 표시를 보고 주문 목록에서 직접 바꾸거나 취소해 주세요.` : ''))
+      setNotice(T.applied(r.createdCount, r.reviewCount))
       load()
       reload()
     })
@@ -156,7 +155,7 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
     switch (c.applyState) {
       case 'NEW': return c.quantity > 0 ? <span className="chip">새로 추가</span> : <span className="small muted">수량을 정하면 추가</span>
       case 'SAME': return <span className="small muted">주문 {c.orderNo}번 ✓</span>
-      case 'DIFFERENT': return <span className="small" style={{ color: 'var(--warn)' }}>⚠ 주문 {c.orderNo}번은 {c.orderQuantity}개 (댓글 합계와 다름, 직접 확인)</span>
+      case 'DIFFERENT': return <span className="small" style={{ color: 'var(--warn)' }}>{T.appliedDifferent(c.orderNo, c.orderQuantity)}</span>
       case 'CANCELLED': return <span className="small muted">주문 {c.orderNo}번 취소됨 (다시 안 만듦)</span>
     }
   }
@@ -168,11 +167,8 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
     return (
       <div className="card">
         <h3>댓글 집계</h3>
-        <p className="warn-box">
-          상품이 여러 개인 공구는 아직 댓글 주문을 받을 수 없습니다. 댓글을 상품별로 나눠 세는 기능을 준비 중입니다.
-          <b> 이 공구는 주문 링크로 주문을 받아 주세요.</b>
-        </p>
-        {data && data.appliedOrderCount > 0 && <p className="small muted">이전에 반영한 댓글 주문 {data.appliedOrderCount}건은 주문 목록에 그대로 있습니다.</p>}
+        <p className="warn-box"><Rich text={T.multiProductBlocked} /></p>
+        {data && data.appliedOrderCount > 0 && <p className="small muted">{T.previousApplied(data.appliedOrderCount)}</p>}
       </div>
     )
   }
@@ -181,13 +177,13 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
     <div>
       <div className="card">
         <h3>댓글 올리기</h3>
-        <p className="muted small">밴드 댓글 화면 캡처(여러 장) 또는 댓글 텍스트를 붙여넣으세요. 공지·광고도 일단 읽고, 관리자 닉네임(공구 설정)과 주문 아닌 댓글은 집계에서 뺍니다. 캡처는 외부 AI로 전송되고 읽은 직후 삭제됩니다.</p>
+        <p className="muted small">{T.uploadHelp}</p>
         <CaptureUsageLine status={capture} />
         <div className="row">
           <input type="file" accept="image/*" multiple onChange={(e) => setFiles(e.target.files)} />
           <button className="btn" disabled={!files || busy} onClick={extract}>캡처 글자 읽기</button>
         </div>
-        <label className="field mt"><span>또는 텍스트 붙여넣기 (한 줄에 "닉네임 | 댓글" 또는 "닉네임: 댓글" 또는 탭으로 구분)</span>
+        <label className="field mt"><span>{T.pasteLabel}</span>
           <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={'꼭지맘 217-1505 | 1\n205-1205 | 1 7시이후 픽업\n망고맘 | 2박스요'} />
         </label>
         <button className="btn" disabled={!text.trim() || busy} onClick={parseText}>텍스트 읽기</button>
@@ -201,11 +197,11 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
           <h3>검수 ({drafts.length}개)</h3>
           {skipped.length > 0 && (
             <div className="warn-box row between">
-              <span className="small">이미 저장된 댓글과 똑같은 {skipped.length}개는 뺐습니다. (같은 손님이 같은 댓글을 또 단 거라면 다시 넣으세요)</span>
+              <span className="small">{T.alreadySavedSkipped(skipped.length)}</span>
               <button className="btn small" onClick={() => { setDrafts([...drafts, ...skipped]); setSkipped([]) }}>다시 넣기</button>
             </div>
           )}
-          <p className="muted small">작성자·내용을 고치거나 지울 수 있습니다. 노란 줄은 캡처가 겹쳐서 생긴 중복으로 의심되는 댓글입니다. 읽지 못한 글자([?])는 고친 뒤 저장할 수 있습니다.</p>
+          <p className="muted small">{T.reviewHelp}</p>
           <div className="table-wrap">
             <table className="stack">
               <thead><tr><th>작성자</th><th>내용</th><th></th></tr></thead>
@@ -245,7 +241,7 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
               {data.appliedOrderCount > 0 && ` · 반영된 댓글 주문 ${data.appliedOrderCount}건`}
               {toCheck > 0 && <b style={{ color: 'var(--warn)' }}> · 반영된 주문과 다른 손님 {toCheck}명</b>}
             </p>
-            <p className="muted small">캡처를 여러 번 올려도 됩니다. 반영하면 처음 보는 손님만 주문으로 추가하고, 이미 반영된 손님의 주문은 바꾸지 않습니다.</p>
+            <p className="muted small">{T.reapplyHelp}</p>
             <div className="table-wrap">
               <table className="stack">
                 <thead><tr><th>고객(닉네임)</th><th className="right">수량</th><th className="right">금액</th><th>메모</th><th>주문 반영</th></tr></thead>
@@ -253,7 +249,7 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
                   {data.customers.map((c) => (
                     <tr key={c.customerKey}>
                       <td className="stack-title"><b>{c.authorName}</b>{c.needsReview && <span className="chip">확인 필요 있음</span>}
-                        {c.linkOrderNos.length > 0 && <div className="small" style={{ color: 'var(--warn)' }}>⚠ 링크 주문 {c.linkOrderNos.join(', ')}번과 닉네임 같음 (같은 사람이면 중복)</div>}</td>
+                        {c.linkOrderNos.length > 0 && <div className="small" style={{ color: 'var(--warn)' }}>{T.sameAsLinkOrder(c.linkOrderNos)}</div>}</td>
                       <td className="right" data-label="수량">{c.quantity}</td>
                       <td className="right" data-label="금액">{won(c.amount)}</td>
                       <td className="small" data-label="메모">{c.memo}</td>
@@ -265,7 +261,7 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
             </div>
             {data.staleOrders.length > 0 && (
               <div className="warn-box">
-                <div className="small"><b>집계에 없는 댓글 주문</b> (댓글로 취소했거나 댓글을 지운 손님). 자동으로 취소하지 않으니 주문 목록에서 확인해 주세요.</div>
+                <div className="small"><Rich text={T.staleOrders} /></div>
                 {data.staleOrders.map((o) => <div key={o.orderNo} className="small">· 주문 {o.orderNo}번 {o.nickname} {o.quantity}개</div>)}
               </div>
             )}
@@ -273,7 +269,7 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
           <div className="card">
             <div className="row between">
               <h3>댓글 ({data.comments.length})</h3>
-              <button className="btn small danger" onClick={() => confirm('저장한 댓글을 모두 지울까요?') && run(() => api.del(base), load)}>모두 지우기</button>
+              <button className="btn small danger" onClick={() => confirm(T.confirmDeleteAll) && run(() => api.del(base), load)}>모두 지우기</button>
             </div>
             <div className="table-wrap">
               <table className="stack">

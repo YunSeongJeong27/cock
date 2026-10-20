@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, dateTime, errorMessage } from '../../api'
 import { CopyButton, ErrorBox } from '../../components/Ui'
+import { groupBuyText as T } from '../../texts/groupBuy'
 import type { GroupBuy } from '../../types'
 
 interface Line { orderId: number; orderNo: number; displayName: string; nickname: string | null; depositorName: string | null; itemsText: string; paidAt: string | null; pickedUp: boolean }
@@ -53,7 +54,7 @@ export default function AnnounceTab({ groupBuy }: { groupBuy: GroupBuy }) {
       </div>
       <div className="card">
         <h3>입금 확인된 사람 ({data?.lines.length ?? 0}명)</h3>
-        <p className="muted small">밴드에서 @이름으로 한 명씩 태그하면서 체크하세요. (체크 표시는 이 기기에만 저장됩니다)</p>
+        <p className="muted small">{T.tagHint}</p>
         {data?.lines.map((l) => (
           <label key={l.orderId} className="check" style={{ padding: '6px 0', borderBottom: '1px solid var(--line)' }}>
             <input type="checkbox" checked={Boolean(tagged[l.orderId])} onChange={() => toggle(l.orderId)} />
