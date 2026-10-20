@@ -2,16 +2,17 @@ package com.depositcock.order;
 
 import java.util.regex.Pattern;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 /**
  * 휴대폰 번호 정규화. 고객 구분 키로 쓴다 (정리본 4-2장).
  * "010-1234-5678", "010 1234 5678", "01012345678" → "01012345678"
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class PhoneNumbers {
 
     private static final Pattern MOBILE = Pattern.compile("^01[016789]\\d{7,8}$");
-
-    private PhoneNumbers() {
-    }
 
     /** 숫자만 남긴다. 휴대폰 번호 형식이 아니면 null. */
     public static String normalize(String raw) {

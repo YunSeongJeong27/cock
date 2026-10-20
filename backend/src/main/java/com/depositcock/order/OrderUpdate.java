@@ -18,7 +18,9 @@ import com.depositcock.groupbuy.ProductRepository;
 import com.depositcock.groupbuy.ShippingFeeType;
 import com.depositcock.groupbuy.StockAlerts;
 import jakarta.persistence.EntityManager;
+import lombok.AccessLevel;
 import lombok.Builder;
+import lombok.NoArgsConstructor;
 
 /**
  * 주문 내용 바꾸기 공통 처리: 판매자 "주문 변경"(2026-10-15)과 고객이 같은 휴대폰 번호로 다시 주문한 경우(2026-10-18).
@@ -27,10 +29,8 @@ import lombok.Builder;
  * - 원래 있던 상품은 주문 당시 단가 그대로, 새로 넣은 상품은 지금 단가
  * - 바뀐 내용을 사람이 읽는 문장으로 order_change 에 남긴다
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class OrderUpdate {
-
-    private OrderUpdate() {
-    }
 
     /** 바꿀 값. 입력 검사(필수값, 수령·결제 규칙, 배송 정보)는 부르는 쪽에서 끝낸 값 */
     @Builder
@@ -118,7 +118,7 @@ final class OrderUpdate {
                     + receiveLabel(v.receive(), v.point()));
         }
         if (v.payment() != order.getPaymentMethod()) {
-            changes.add("결제 " + order.getPaymentMethod().label() + "→" + v.payment().label());
+            changes.add("결제 " + order.getPaymentMethod().getLabel() + "→" + v.payment().getLabel());
         }
         addIfChanged(changes, "입금자명", order.getDepositorName(), v.depositorName());
         addIfChanged(changes, "닉네임", order.getNickname(), v.nickname());
@@ -198,9 +198,9 @@ final class OrderUpdate {
 
     private static String receiveLabel(ReceiveMethod method, PickupPoint point) {
         if (method == ReceiveMethod.DELIVERY || point == null) {
-            return method.label();
+            return method.getLabel();
         }
-        return method.label() + "(" + point.getName() + ")";
+        return method.getLabel() + "(" + point.getName() + ")";
     }
 
     private static String deliveryText(String name, String phone, String zipcode, String address, String detail) {

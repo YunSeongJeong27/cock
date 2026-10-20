@@ -104,10 +104,10 @@ public class OrderSheetExcelWriter {
             amount.setCellValue(o.getExpectedAmount());
             amount.setCellStyle(moneyStyle);
             amountTotal += o.getExpectedAmount();
-            row.createCell(c++).setCellValue(o.getPaymentMethod().label());
+            row.createCell(c++).setCellValue(o.getPaymentMethod().getLabel());
             row.createCell(c++).setCellValue(paidText(o));
             row.createCell(c++).setCellValue(nullToEmpty(o.getDepositorName()));
-            row.createCell(c++).setCellValue(o.getReceiveMethod().label());
+            row.createCell(c++).setCellValue(o.getReceiveMethod().getLabel());
             row.createCell(c++).setCellValue(o.getPickupPoint() == null ? "" : o.getPickupPoint().getName());
             row.createCell(c++).setCellValue(o.isPickedUp() ? "수령" : "");
             row.createCell(c++).setCellValue(String.join(", ", checks(o)));

@@ -6,6 +6,8 @@ import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.PickupPoint;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /**
  * 수령 방법·결제 방식·픽업 지점 규칙 (개발 전 인터뷰 결과 1번). 고객 주문서와 판매자의 주문 변경이 같이 쓴다.
@@ -13,10 +15,8 @@ import com.depositcock.groupbuy.PickupPoint;
  * - 배송은 선입금만. 픽업은 공구의 픽업 결제 설정(선입금·현장결제)을 따른다
  * - 픽업 지점이 2개 이상이면 골라야 한다
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class OrderRules {
-
-    private OrderRules() {
-    }
 
     static ReceiveMethod receiveMethod(GroupBuy groupBuy, ReceiveMethod requested) {
         if (groupBuy.isPickupEnabled() && groupBuy.isDeliveryEnabled()) {

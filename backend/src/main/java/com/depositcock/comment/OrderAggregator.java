@@ -5,6 +5,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 /**
  * 댓글 집계 (정리본 8장 "집계"):
  * - 관리자 닉네임 제외
@@ -12,15 +15,13 @@ import java.util.Map;
  * - REVIEW 는 판매자가 수량을 정하기 전까지 합계에서 제외. 수동 수량이 있으면 해석보다 우선
  * - 잡담만 한 사람은 제외
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class OrderAggregator {
 
     public record Input(String authorName, String content, Integer manualQuantity) {
     }
 
     public record CustomerTotal(String customerKey, String authorName, int quantity, String memo, boolean needsReview) {
-    }
-
-    private OrderAggregator() {
     }
 
     public static String customerKey(String authorName) {

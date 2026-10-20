@@ -12,11 +12,11 @@ import com.depositcock.order.OrderDtos.Prefill;
 import com.depositcock.order.OrderDtos.PublicItem;
 import com.depositcock.order.OrderDtos.SellerOrder;
 import com.depositcock.order.OrderDtos.SellerOrderItem;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class OrderMapper {
-
-    private OrderMapper() {
-    }
 
     static MyOrder toMyOrder(CustomerOrder o, boolean acceptingOrders) {
         return toMyOrder(o, acceptingOrders, null);

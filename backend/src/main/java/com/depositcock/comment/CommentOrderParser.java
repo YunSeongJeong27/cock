@@ -6,6 +6,9 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 /**
  * 댓글 해석 규칙 (docs/design.md 정리본 8장). 단일 상품 공구 기준.
  * <pre>
@@ -22,6 +25,7 @@ import java.util.regex.Pattern;
  * 알려진 한계: "10/8"(날짜)을 18로 오인할 수 있다.
  * </pre>
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class CommentOrderParser {
 
     private static final String UNIT = "(?:봉지|박스|세트|묶음|포기|마리|키로|kg|개|봉|팩|통|단|판|병)";
@@ -56,9 +60,6 @@ public final class CommentOrderParser {
     private static final Pattern MODIFY = Pattern.compile("수정|변경|바꿔|말고");
 
     private record Candidate(int start, int end, int quantity, boolean korean) {
-    }
-
-    private CommentOrderParser() {
     }
 
     public static ParseResult parse(String content) {

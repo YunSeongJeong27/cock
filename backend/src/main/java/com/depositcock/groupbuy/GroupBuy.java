@@ -183,7 +183,7 @@ public class GroupBuy {
 
     /** 화면에 보일 상태 이름 */
     public String statusLabel(LocalDateTime now) {
-        return status == GroupBuyStatus.OPEN && !isAcceptingOrders(now) ? GroupBuyStatus.CLOSE_AT_PASSED_LABEL : status.label();
+        return status == GroupBuyStatus.OPEN && !isAcceptingOrders(now) ? GroupBuyStatus.CLOSE_AT_PASSED_LABEL : status.getLabel();
     }
 
     /** 고객이 지금 주문·취소할 수 있는지 (OPEN 이고 마감 시각 전) */

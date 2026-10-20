@@ -11,6 +11,7 @@ import static org.springframework.http.HttpStatus.PAYLOAD_TOO_LARGE;
 import static org.springframework.http.HttpStatus.TOO_MANY_REQUESTS;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
@@ -263,12 +264,9 @@ public enum ErrorCode {
     VISION_TOO_MUCH_TEXT(BAD_GATEWAY, "캡처 한 장에 글자가 너무 많습니다. 더 작게 나눠서 올려주세요."),
     VISION_EMPTY_RESULT(BAD_GATEWAY, "비전 AI 응답에 읽은 결과가 없습니다. 직접 입력해 주세요.");
 
+    @Getter
     private final HttpStatus status;
     private final String format;
-
-    public HttpStatus status() {
-        return status;
-    }
 
     /** 입력값 검사 어노테이션의 message(이 enum 이름)로 찾는다. 이름이 없거나 틀리면 INVALID_INPUT */
     public static ErrorCode fromName(String name) {

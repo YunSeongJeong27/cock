@@ -1,6 +1,5 @@
 package com.depositcock.vision;
 
-import com.depositcock.common.ErrorCode;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -21,7 +20,11 @@ import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageOutputStream;
+
+import com.depositcock.common.ErrorCode;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /**
  * 비전 API 로 보내기 전에 이미지를 다듬는다.
@@ -34,6 +37,7 @@ import lombok.Getter;
  * 2) Claude API 이미지 제한(문서 확인 2026-10-13: 한 변 최대 8000px, 한 장 base64 10MB)을 넘는 원본·조각은 줄여서 다시 만든다.
  * 올리기 제한(10MB)이 API 제한(base64 10MB ≈ 원본 7.5MB)보다 커서, 줄이지 않으면 7.5MB 넘는 캡처는 API 가 거절한다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ImageSlicer {
 
     /** 세로/가로 비율이 이보다 크면 자른다 */
@@ -79,9 +83,6 @@ public final class ImageSlicer {
         long pixels() {
             return (long) width * height;
         }
-    }
-
-    private ImageSlicer() {
     }
 
     /**

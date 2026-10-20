@@ -91,7 +91,7 @@ class ErrorResponseTest extends IntegrationTest {
             }
             String message = (String) a.annotationType().getMethod("message").invoke(a);
             ErrorCode code = ErrorCode.fromName(message);
-            if (!code.name().equals(message) || code.status() != HttpStatus.BAD_REQUEST || code.message().contains("%")) {
+            if (!code.name().equals(message) || code.getStatus() != HttpStatus.BAD_REQUEST || code.message().contains("%")) {
                 missing.add(where + " @" + a.annotationType().getSimpleName() + " " + message);
             }
         }

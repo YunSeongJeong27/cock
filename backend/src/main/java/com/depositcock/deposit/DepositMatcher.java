@@ -13,6 +13,11 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
+
 /**
  * 입금 대조 규칙 (정리본 6-2장). 결과는 저장하지 않고, 판매자가 "확정"을 눌러야 저장한다.
  *
@@ -33,6 +38,7 @@ import java.util.regex.Pattern;
  * 1차(자동 매칭)는 입금마다 다른 입금과 상관없이 판단해서, 거래내역의 줄 순서에 따라 결과가 달라지지 않게 한다.
  * </pre>
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class DepositMatcher {
 
     public enum Status {
@@ -42,6 +48,8 @@ public final class DepositMatcher {
         UNRELATED
     }
 
+    @Getter
+    @RequiredArgsConstructor
     public enum Evidence {
         DEPOSITOR_NAME("입금자명 일치"),
         ALIAS("저장된 별칭"),
@@ -50,14 +58,6 @@ public final class DepositMatcher {
         AMOUNT_ONLY("금액만 일치");
 
         private final String label;
-
-        Evidence(String label) {
-            this.label = label;
-        }
-
-        public String getLabel() {
-            return label;
-        }
 
         boolean strong() {
             return this == DEPOSITOR_NAME || this == ALIAS;
@@ -103,9 +103,6 @@ public final class DepositMatcher {
     }
 
     private static final Pattern DIGITS = Pattern.compile("\\d+");
-
-    private DepositMatcher() {
-    }
 
     /** @param aliasToCustomerId 입금자명(별칭) → 고객 id */
     public static Outcome match(List<Payee> payees, List<Deposit> deposits, Map<String, Long> aliasToCustomerId) {

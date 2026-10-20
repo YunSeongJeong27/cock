@@ -32,7 +32,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     /** ErrorCode 로 응답 본문을 만든다. 409 처럼 추가 정보가 필요한 곳은 받은 값에 setProperty 로 더한다 */
     public static ProblemDetail problem(ErrorCode code, String message) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(code.status(), message);
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(code.getStatus(), message);
         problem.setProperty("code", code.name());
         return problem;
     }
@@ -99,7 +99,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex,
                                                                           HttpHeaders headers, HttpStatusCode status,
                                                                           WebRequest request) {
-        return ResponseEntity.status(ErrorCode.UPLOAD_TOO_LARGE.status()).body(problem(ErrorCode.UPLOAD_TOO_LARGE));
+        return ResponseEntity.status(ErrorCode.UPLOAD_TOO_LARGE.getStatus()).body(problem(ErrorCode.UPLOAD_TOO_LARGE));
     }
 
     @Override

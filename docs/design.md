@@ -334,6 +334,11 @@
   - `@Slf4j`: 로거 필드 5곳 (AdminBootstrap, SellerMail, AutoCloseScheduler, ApiExceptionHandler, VisionConfig)
   - 예외 3개(ApiException, ExternalApiException, ImageSlicer.UnusableImageException)의 `getCode()` → 필드 `@Getter`
   - 확인 [사실]: 생성자 인자 순서대로 이름을 붙이는 변환을 스크립트로 하고 개수가 다르면 멈추게 함. 테스트 202개 (H2·PostgreSQL 16). 바꾸기 전·후 jar 를 같은 시나리오(가입·공구·주문·재주문 경고·수정·배송 주문·내 주문 찾기·판매자 변경·거래내역 대조·확정·입금 확인 문구·환불 신청·댓글 반영·관리자 목록)로 돌려 API 응답 34개를 비교 → 시각·토큰 말고는 완전히 같음
+- 모양만 바뀌어도 일관성을 위해 맞춘 것 (사용자 "모양만 바뀌더라도 가독성·일관성이 좋아지면 바꿔") [판단, 2026-10-20]
+  - 도우미 클래스 18개의 `private X() {}` → `@NoArgsConstructor(access = AccessLevel.PRIVATE)` (엔티티의 `@NoArgsConstructor(access = PROTECTED)` 와 같은 모양)
+  - enum 값 꺼내는 메서드 이름 통일: `label()`(GroupBuyStatus·PaymentMethod·ReceiveMethod)·`status()`(ErrorCode) → Lombok `getLabel()`·`getStatus()` (DisplayStatus·NotificationType 과 같게). DepositMatcher.Evidence 의 손 생성자·getter 도 `@Getter`·`@RequiredArgsConstructor`. 문구를 조립하는 `message(...)`·`text(...)` 는 계산하는 메서드라 그대로
+  - import 묶음 순서 맞춤 (java → javax → 나머지)
+  - 확인 [사실]: 테스트 202개 (H2·PostgreSQL 16), 바꾸기 전 jar 와 API 응답 34개 다시 비교 → 같음
 - 내 맥북 IntelliJ: Lombok 플러그인은 기본 포함. 처음 열 때 "Enable annotation processing" 안내가 뜨면 켠다 [사실: IntelliJ 2020.3 이후 기본 포함. 사용자 판(Community/Ultimate)은 미확인]
 
 ### 2026-10-20 전체 점검 2차 (사용자 요청: 이상한 판매자·고객 가정, 디버깅, 고치고 테스트) — 자세한 기록 `docs/점검기록-2026-10-20.md`
@@ -671,7 +676,7 @@
 ### 설정
 - `application.yml`(공통), `application-local.yml`(맥북, H2), `application-prod.yml`(운영, PostgreSQL) 프로필 분리 [제안]
 - 앱 고유 설정 값은 `@ConfigurationProperties` record로 묶어서 주입 [제안]
-- 반복 코드는 Lombok: 엔티티 `@Getter`·`@NoArgsConstructor(PROTECTED)`, 서비스 `@RequiredArgsConstructor`, 로거 `@Slf4j`, 값 8개 이상·같은 타입 4개 이상인 record 는 `@Builder` 로 만든다. 엔티티에 `@Setter`·`@Data` 금지. DTO 는 record (2026-10-20 사용자 결정, 위 "Lombok 사용") [결정]
+- 반복 코드는 Lombok: 엔티티 `@Getter`·`@NoArgsConstructor(PROTECTED)`, 서비스 `@RequiredArgsConstructor`, 로거 `@Slf4j`, 값 8개 이상·같은 타입 4개 이상인 record 는 `@Builder` 로 만든다. 도우미 클래스는 `@NoArgsConstructor(access = PRIVATE)`, enum 값은 `@Getter`(`getLabel()` 등). 엔티티에 `@Setter`·`@Data` 금지. DTO 는 record (2026-10-20 사용자 결정, 위 "Lombok 사용") [결정]
 - API 키·비밀번호 등 비밀값은 환경변수로만. 깃허브에 올리지 않는다 [결정]
 
 ### 사용자 환경 (내 맥북)

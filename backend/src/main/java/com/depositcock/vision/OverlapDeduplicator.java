@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 /**
  * 스크롤 캡처 겹침 제거 (정리본 7장): 앞 이미지의 끝과 다음 이미지의 시작에서 연속으로 같은 구간을 찾아 한 번만 남긴다.
  * <ul>
@@ -16,6 +19,7 @@ import java.util.function.Function;
  * </ul>
  * 조각 단계에서 붙은 표시는 이미지 사이 단계에서도 그대로 남는다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class OverlapDeduplicator {
 
     /** 조각 경계에서 같은 구간을 못 찾았을 때 경계 앞뒤로 표시할 줄 수 */
@@ -26,9 +30,6 @@ public final class OverlapDeduplicator {
         Item<T> flagged() {
             return duplicateSuspected ? this : new Item<>(value, imageIndex, true);
         }
-    }
-
-    private OverlapDeduplicator() {
     }
 
     /** 사용자가 올린 이미지들 사이의 겹침을 합친다 */

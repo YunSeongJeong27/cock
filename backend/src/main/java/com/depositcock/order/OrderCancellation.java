@@ -5,14 +5,14 @@ import java.time.LocalDateTime;
 import com.depositcock.groupbuy.ProductRepository;
 import com.depositcock.groupbuy.StockAlerts;
 import jakarta.persistence.EntityManager;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /**
  * 주문 취소 공통 처리: 상태 변경 + 판매 수량(sold) 복구.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class OrderCancellation {
-
-    private OrderCancellation() {
-    }
 
     static void cancel(CustomerOrder order, ProductRepository productRepository, EntityManager em, StockAlerts stockAlerts,
                        LocalDateTime now) {
