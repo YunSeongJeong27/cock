@@ -256,8 +256,8 @@ function PauseCard({ groupBuy, onChange }: { groupBuy: GroupBuy; onChange: (g: G
   return (
     <div className="card">
       <div className="row between">
-        <span><b>주문 잠시 멈춤</b> <span className="small muted">입금 대조 중에 주문이 바뀌지 않게</span></span>
-        <button className="btn small" disabled={busy} onClick={() => save(true)}>잠시 멈추기</button>
+        <b>고객 주문 일시정지</b>
+        <button className="btn small" disabled={busy} onClick={() => save(true)}>주문 정지</button>
       </div>
       <details className="small mt">
         <summary>멈추면 고객 화면에 보일 문구·링크</summary>
