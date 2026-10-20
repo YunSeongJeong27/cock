@@ -14,6 +14,8 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ApiExceptionHandler;
+import com.depositcock.common.ErrorCode;
 import com.depositcock.common.DataCipher;
 import com.depositcock.common.Tokens;
 import com.depositcock.customer.Customer;
@@ -104,22 +106,22 @@ public class PublicOrderService {
         GroupBuy groupBuy = lock(findVisible(publicToken));
         LocalDateTime now = LocalDateTime.now(clock);
         if (!groupBuy.isAcceptingOrders(now)) {
-            throw ApiException.badRequest("주문이 마감되었습니다.");
+            throw new ApiException(ErrorCode.ORDER_CLOSED);
         }
         requireNotPaused(groupBuy);
 
         String phone = PhoneNumbers.normalize(r.phone());
         if (phone == null) {
-            throw ApiException.badRequest("휴대폰 번호를 확인해 주세요. (예: 010-1234-5678)");
+            throw new ApiException(ErrorCode.PHONE_INVALID);
         }
         String depositorName = r.depositorName().trim();
         String nickname = trimToNull(r.nickname());
         String unitAddress = trimToNull(r.unitAddress());
         if (groupBuy.isNicknameRequired() && nickname == null) {
-            throw ApiException.badRequest("닉네임을 입력해 주세요.");
+            throw new ApiException(ErrorCode.NICKNAME_REQUIRED);
         }
         if (groupBuy.isUnitAddressFieldEnabled() && unitAddress == null) {
-            throw ApiException.badRequest("동·호수를 입력해 주세요.");
+            throw new ApiException(ErrorCode.UNIT_ADDRESS_REQUIRED);
         }
 
         ReceiveMethod receiveMethod = OrderRules.receiveMethod(groupBuy, r.receiveMethod());
@@ -134,12 +136,12 @@ public class PublicOrderService {
                 continue;
             }
             if (!products.containsKey(item.productId())) {
-                throw ApiException.badRequest("상품을 찾을 수 없습니다.");
+                throw new ApiException(ErrorCode.PRODUCT_NOT_FOUND);
             }
             quantities.merge(item.productId(), item.quantity(), Integer::sum);
         }
         if (quantities.isEmpty()) {
-            throw ApiException.badRequest("상품 수량을 1개 이상 선택해 주세요.");
+            throw new ApiException(ErrorCode.QUANTITY_REQUIRED);
         }
         Long sellerId = groupBuy.getSeller().getId();
         // 처음 주문하는 번호면 아직 고객이 없다. 고객은 검사를 모두 통과한 뒤에 만든다 (실패한 주문의 번호를 남기지 않게)
@@ -160,8 +162,7 @@ public class PublicOrderService {
         // 수정은 휴대폰 번호 + 입금자명이 기존 주문과 같아야 한다 (2026-10-19 사용자 결정, 취소·환불 신청과 같은 기준).
         // 그래서 고객은 수정으로 입금자명을 바꿀 수 없다 (판매자 "주문 변경"으로). 기존 주문 내용도 이름이 맞을 때만 보여준다
         if (target != null && !name.equals(squash(target.getDepositorName()))) {
-            throw ApiException.badRequest("이 번호로 주문 확정 전인 주문이 있습니다. 수정하려면 그 주문의 입금자명을 똑같이 적어 주세요. "
-                    + "(입금자명을 바꾸려면 판매자에게 문의해 주세요)");
+            throw new ApiException(ErrorCode.REORDER_NAME_MISMATCH);
         }
         checkPerPersonLimit(products, quantities, previous, target);
 
@@ -170,7 +171,7 @@ public class PublicOrderService {
         if (receiveMethod == ReceiveMethod.DELIVERY) {
             recipientPhone = PhoneNumbers.normalize(r.recipientPhone());
             if (trimToNull(r.recipientName()) == null || recipientPhone == null || trimToNull(r.address()) == null) {
-                throw ApiException.badRequest("배송을 고르면 받는 분, 받는 분 연락처, 주소를 모두 입력해야 합니다.");
+                throw new ApiException(ErrorCode.DELIVERY_INFO_REQUIRED);
             }
         }
 
@@ -181,11 +182,11 @@ public class PublicOrderService {
         if (!confirmed) {
             List<String> messages = new ArrayList<>();
             if (mismatch) {
-                messages.add("이 주문은 수정할 수 없습니다. 주문이 확정됐거나 휴대폰 번호가 다릅니다.");
+                messages.add(ErrorCode.REORDER_CANNOT_REPLACE.message());
             }
-            messages.addAll(warnings(previous, target));
+            warnings(previous, target).forEach(w -> messages.add(w.message()));
             if (!messages.isEmpty()) {
-                ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, String.join("\n", messages));
+                ProblemDetail problem = ApiExceptionHandler.problem(ErrorCode.REORDER_WARNING, String.join("\n", messages));
                 problem.setProperty("warnings", messages);
                 problem.setProperty("replaceOrderNo", targetNo);
                 // "기존 주문 확인" 버튼으로 보여줄 바뀔 주문. "내 주문 찾기"(휴대폰 번호 전체)로 보이는 것과 같은 정보만
@@ -262,8 +263,8 @@ public class PublicOrderService {
                 if (productRepository.increaseSoldWithinStock(product.getId(), e.getValue()) == 0) {
                     entityManager.refresh(product);
                     Integer left = product.publicRemaining();
-                    throw ApiException.conflict("'" + product.getName() + "'이(가) "
-                            + (left == null ? "품절되었습니다." : "남은 수량보다 많습니다. (남은 수량 " + left + "개)"));
+                    throw left == null ? new ApiException(ErrorCode.SOLD_OUT, product.getName())
+                            : new ApiException(ErrorCode.OVER_REMAINING, product.getName(), left);
                 }
             } else {
                 productRepository.increaseSold(product.getId(), e.getValue());
@@ -275,7 +276,7 @@ public class PublicOrderService {
         }
         int shippingFee = shippingFee(groupBuy, v.receive());
         if (itemsAmount + shippingFee > MAX_ORDER_AMOUNT) {
-            throw ApiException.badRequest("주문 금액이 너무 큽니다. 수량을 확인해 주세요.");
+            throw new ApiException(ErrorCode.ORDER_AMOUNT_TOO_LARGE);
         }
         order.fillAmounts((int) itemsAmount, shippingFee);
         return orderRepository.save(order);
@@ -298,7 +299,7 @@ public class PublicOrderService {
         LocalDateTime now = LocalDateTime.now(clock);
         String phone = PhoneNumbers.normalize(r.phone());
         if (phone == null) {
-            throw ApiException.badRequest("휴대폰 번호 전체를 입력해 주세요. (예: 010-1234-5678)");
+            throw new ApiException(ErrorCode.PHONE_FULL_REQUIRED);
         }
         List<Long> customerIds = orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()).stream()
                 .filter(o -> o.getSource() == OrderSource.FORM)
@@ -307,7 +308,7 @@ public class PublicOrderService {
                 .distinct()
                 .toList();
         if (customerIds.isEmpty()) {
-            throw ApiException.notFound("일치하는 주문이 없습니다. 휴대폰 번호를 확인해 주세요.");
+            throw new ApiException(ErrorCode.ORDER_NOT_FOUND_BY_PHONE);
         }
         // 본인 확인을 거친 기기는 이 고객의 주문 상태를 볼 수 있다. 개인정보(휴대폰 전체·동호수·배송지) 자동 채움은
         // 그 기기에서 넣은 주문에서만 가져오므로, 다른 기기 주문의 개인정보는 여기서도 나가지 않는다.
@@ -331,8 +332,7 @@ public class PublicOrderService {
         LocalDateTime now = LocalDateTime.now(clock);
         requireNotPaused(groupBuy);
         if (!groupBuy.isAcceptingOrders(now)) {
-            throw ApiException.badRequest("마감된 공구는 여기서 취소할 수 없습니다. 판매자에게 문의해 주세요. "
-                    + "(입금한 주문은 환불 신청을 할 수 있습니다)");
+            throw new ApiException(ErrorCode.CANCEL_AFTER_CLOSE);
         }
         List<CustomerOrder> matches = matchByPhoneAndName(groupBuy, r.phone(), r.depositorName());
         if (r.orderNo() == null && matches.stream().noneMatch(PublicOrderService::cancellableBeforeConfirm)
@@ -340,16 +340,15 @@ public class PublicOrderService {
             throw refundInstead();
         }
         CustomerOrder order = pick(matches, r.orderNo(), PublicOrderService::cancellableBeforeConfirm,
-                "주문이 여러 건 있습니다. 취소할 주문을 골라주세요.",
-                "취소할 수 있는 주문이 없습니다. (이미 취소·수령했거나 환불 신청한 주문)");
+                ErrorCode.CHOOSE_ORDER_TO_CANCEL, ErrorCode.NOTHING_TO_CANCEL);
         if (!order.isActive()) {
-            throw ApiException.badRequest("이미 취소된 주문입니다.");
+            throw new ApiException(ErrorCode.ORDER_ALREADY_CANCELLED);
         }
         if (order.isPickedUp()) {
-            throw ApiException.badRequest("이미 수령한 주문은 취소할 수 없습니다.");
+            throw new ApiException(ErrorCode.PICKED_UP_CANNOT_CANCEL);
         }
         if (order.isRefundPending()) {
-            throw ApiException.badRequest("환불 신청한 주문입니다. 판매자가 확인 중입니다.");
+            throw new ApiException(ErrorCode.REFUND_PENDING);
         }
         if (order.isConfirmed()) {
             throw refundInstead();
@@ -373,25 +372,23 @@ public class PublicOrderService {
         requireNotPaused(groupBuy);
         String account = r.accountNumber().replaceAll("[\\s-]", "");
         if (!account.matches("\\d{8,20}")) {
-            throw ApiException.badRequest("계좌번호를 숫자로 입력해 주세요. (8~20자리)");
+            throw new ApiException(ErrorCode.ACCOUNT_NUMBER_INVALID);
         }
         List<CustomerOrder> matches = matchByPhoneAndName(groupBuy, r.phone(), r.depositorName());
         CustomerOrder order = pick(matches, r.orderNo(), CustomerOrder::canRequestRefund,
-                "주문이 여러 건 있습니다. 환불 신청할 주문을 골라주세요.",
-                "환불 신청할 수 있는 주문이 없습니다. (이미 신청했거나 취소·수령한 주문)");
+                ErrorCode.CHOOSE_ORDER_TO_REFUND, ErrorCode.NOTHING_TO_REFUND);
         if (!order.isActive()) {
-            throw ApiException.badRequest("이미 취소된 주문입니다.");
+            throw new ApiException(ErrorCode.ORDER_ALREADY_CANCELLED);
         }
         if (order.isPickedUp()) {
-            throw ApiException.badRequest("이미 수령한 주문은 환불 신청을 할 수 없습니다. 판매자에게 문의해 주세요.");
+            throw new ApiException(ErrorCode.PICKED_UP_CANNOT_REFUND);
         }
         if (!order.isPrepaid()) {
-            throw ApiException.badRequest("현장결제 주문은 입금이 없어 환불 신청이 필요 없습니다. 주문 취소를 눌러 주세요.");
+            throw new ApiException(ErrorCode.ONSITE_NO_REFUND);
         }
         if (order.getRefundRequestedAt() != null) {
-            throw ApiException.badRequest(order.getRefundRejectedAt() == null
-                    ? "이미 환불 신청한 주문입니다. 판매자가 확인 중입니다."
-                    : "환불 신청이 반려된 주문입니다. 판매자에게 문의해 주세요.");
+            throw new ApiException(order.getRefundRejectedAt() == null
+                    ? ErrorCode.REFUND_ALREADY_REQUESTED : ErrorCode.REFUND_REJECTED);
         }
         // 예금주는 받지 않는다 (2026-10-20 사용자 결정): 송금에는 은행·계좌번호면 되고, 고객이 적는 이름은 확인할 수 없어서.
         // 휴대폰 번호 + 입금자명만 알면 남이 자기 계좌로 신청할 수 있으므로, 판매자 화면에서 송금할 때 은행 앱에 뜨는
@@ -411,8 +408,7 @@ public class PublicOrderService {
 
     /** 확정된 주문은 바로 취소 대신 환불 신청 (화면이 환불 신청 칸으로 바뀜) */
     private static ErrorResponseException refundInstead() {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
-                "확정된 주문입니다. 바로 취소 대신 환불 신청을 해 주세요.");
+        ProblemDetail problem = ApiExceptionHandler.problem(ErrorCode.REFUND_INSTEAD);
         problem.setProperty("refundRequired", true);
         return new ErrorResponseException(HttpStatus.CONFLICT, problem, null);
     }
@@ -425,27 +421,27 @@ public class PublicOrderService {
                 .filter(o -> name.equals(squash(o.getDepositorName())))
                 .toList();
         if (matches.isEmpty()) {
-            throw ApiException.notFound("휴대폰 번호와 입금자명이 일치하는 주문이 없습니다.");
+            throw new ApiException(ErrorCode.ORDER_NOT_FOUND_BY_PHONE_NAME);
         }
         return matches;
     }
 
     /** 고른 주문번호의 주문, 아니면 조건에 맞는 주문이 하나일 때 그 주문. 여러 건이면 409 + 주문 목록(orders) */
     private static CustomerOrder pick(List<CustomerOrder> matches, Integer orderNo,
-                                      java.util.function.Predicate<CustomerOrder> eligible, String chooseMessage,
-                                      String noneMessage) {
+                                      java.util.function.Predicate<CustomerOrder> eligible, ErrorCode choose,
+                                      ErrorCode none) {
         if (orderNo != null) {
             return matches.stream().filter(o -> o.getOrderNo() == orderNo).findFirst()
-                    .orElseThrow(() -> ApiException.notFound("주문번호를 확인해 주세요."));
+                    .orElseThrow(() -> new ApiException(ErrorCode.ORDER_NO_INVALID));
         }
         List<CustomerOrder> candidates = matches.stream().filter(eligible).toList();
         if (candidates.size() == 1) {
             return candidates.get(0);
         }
         if (candidates.isEmpty()) {
-            throw ApiException.badRequest(noneMessage);
+            throw new ApiException(none);
         }
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, chooseMessage);
+        ProblemDetail problem = ApiExceptionHandler.problem(choose);
         problem.setProperty("orders", candidates.stream().map(o -> OrderMapper.toMyOrder(o, true)).toList());
         throw new ErrorResponseException(HttpStatus.CONFLICT, problem, null);
     }
@@ -454,9 +450,9 @@ public class PublicOrderService {
 
     private GroupBuy findVisible(String publicToken) {
         GroupBuy groupBuy = groupBuyRepository.findByPublicToken(publicToken)
-                .orElseThrow(() -> ApiException.notFound("공구를 찾을 수 없습니다."));
+                .orElseThrow(() -> new ApiException(ErrorCode.GROUP_BUY_NOT_FOUND));
         if (groupBuy.getStatus() == GroupBuyStatus.DRAFT) {
-            throw ApiException.notFound("아직 열리지 않은 공구입니다.");
+            throw new ApiException(ErrorCode.GROUP_BUY_NOT_OPEN);
         }
         return groupBuy;
     }
@@ -464,7 +460,7 @@ public class PublicOrderService {
     /** 판매자가 주문을 잠시 멈췄으면 고객 요청(주문·수정·취소·환불 신청)을 막는다. 잠근 뒤 확인해서 멈춘 직후 요청도 막힌다 */
     private static void requireNotPaused(GroupBuy groupBuy) {
         if (groupBuy.isPaused()) {
-            throw ApiException.conflict(groupBuy.effectivePauseMessage());
+            throw ApiException.withMessage(ErrorCode.ORDER_PAUSED, groupBuy.effectivePauseMessage());
         }
     }
 
@@ -530,10 +526,14 @@ public class PublicOrderService {
                     .filter(i -> i.getProduct().getId().equals(product.getId()))
                     .mapToInt(OrderItem::getQuantity).sum();
             if (already + e.getValue() > product.getPerOrderLimit()) {
-                String detail = already > 0 ? " (이미 주문한 " + already + "개 포함"
-                        + (target != null ? ", 바뀔 " + target.getOrderNo() + "번 주문 제외)" : ")") : "";
-                throw ApiException.badRequest("'" + product.getName() + "'은(는) 1인 최대 " + product.getPerOrderLimit()
-                        + "개까지 주문할 수 있습니다." + detail);
+                String name = product.getName();
+                int limit = product.getPerOrderLimit();
+                if (already == 0) {
+                    throw new ApiException(ErrorCode.PER_ORDER_LIMIT, name, limit);
+                }
+                throw target != null
+                        ? new ApiException(ErrorCode.PER_ORDER_LIMIT_REPLACING, name, limit, already, target.getOrderNo())
+                        : new ApiException(ErrorCode.PER_ORDER_LIMIT_WITH_PREVIOUS, name, limit, already);
             }
         }
     }
@@ -544,17 +544,15 @@ public class PublicOrderService {
      * @param previous 이 번호의 이 공구 주문 (취소 제외)
      * @param target   같은 번호로 다시 주문해서 수정될 주문 (없으면 null)
      */
-    private static List<String> warnings(List<CustomerOrder> previous, CustomerOrder target) {
+    private static List<ErrorCode> warnings(List<CustomerOrder> previous, CustomerOrder target) {
         // 수정은 주문 확정 전에만 (2026-10-19). 수정될 주문 내용은 화면의 "기존 주문 확인"으로 본다
         if (target != null) {
-            return List.of(target.isPrepaid()
-                    ? "이 번호로 주문 확정 전인 주문이 있습니다. 계속하면 지금 내용으로 수정됩니다."
-                    : "이 번호로 주문한 내역이 있습니다. 계속하면 지금 내용으로 수정됩니다.");
+            return List.of(target.isPrepaid() ? ErrorCode.REORDER_WILL_UPDATE : ErrorCode.REORDER_WILL_UPDATE_ONSITE);
         }
         if (!previous.isEmpty()) {
-            String which = previous.stream().anyMatch(CustomerOrder::isRefundPending) ? "환불 신청한"
-                    : previous.stream().anyMatch(CustomerOrder::isConfirmed) ? "확정된" : "수령한";
-            return List.of("이 번호로 " + which + " 주문이 있어, 이번 주문은 새 주문으로 추가됩니다.");
+            return List.of(previous.stream().anyMatch(CustomerOrder::isRefundPending) ? ErrorCode.REORDER_NEW_AFTER_REFUND_REQUEST
+                    : previous.stream().anyMatch(CustomerOrder::isConfirmed) ? ErrorCode.REORDER_NEW_AFTER_CONFIRMED
+                    : ErrorCode.REORDER_NEW_AFTER_PICKUP);
         }
         return List.of();
     }

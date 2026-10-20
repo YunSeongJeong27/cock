@@ -1,6 +1,7 @@
 package com.depositcock.security;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,7 +18,7 @@ public final class CurrentSeller {
     public static Long id() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof Jwt jwt)) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
+            throw new ApiException(ErrorCode.LOGIN_REQUIRED);
         }
         return Long.valueOf(jwt.getSubject());
     }

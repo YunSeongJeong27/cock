@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 
 import com.depositcock.comment.ImportedCommentRepository;
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import com.depositcock.customer.Customers;
 import com.depositcock.deposit.AliasBook;
 import com.depositcock.deposit.DepositRowRepository;
@@ -59,16 +60,16 @@ public class OrderDeletion {
         GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         Set<Long> ids = new LinkedHashSet<>(orderIds);
         if (ids.isEmpty()) {
-            throw ApiException.badRequest("지울 주문을 골라 주세요.");
+            throw new ApiException(ErrorCode.DELETE_NOTHING_SELECTED);
         }
         List<CustomerOrder> orders = new ArrayList<>();
         for (Long id : ids) {
             orders.add(orderRepository.findByIdAndGroupBuyId(id, groupBuy.getId())
-                    .orElseThrow(() -> ApiException.notFound("주문을 찾을 수 없습니다.")));
+                    .orElseThrow(() -> new ApiException(ErrorCode.ORDER_NOT_FOUND)));
         }
         List<String> notFinished = orders.stream().filter(o -> !o.isFinished()).map(o -> o.getOrderNo() + "번").toList();
         if (!notFinished.isEmpty()) {
-            throw ApiException.badRequest("완료된 주문만 지울 수 있습니다. 아직 처리 중인 주문: " + String.join(", ", notFinished));
+            throw new ApiException(ErrorCode.DELETE_ONLY_FINISHED, String.join(", ", notFinished));
         }
 
         aliasBook.undoAll(sellerId, orders);

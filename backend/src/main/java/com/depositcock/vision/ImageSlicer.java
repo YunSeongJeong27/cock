@@ -1,5 +1,6 @@
 package com.depositcock.vision;
 
+import com.depositcock.common.ErrorCode;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -61,10 +62,17 @@ public final class ImageSlicer {
     public record Piece(byte[] data, String mediaType) {
     }
 
-    /** API 로 보낼 수 없는 이미지 (너무 크거나 줄이지 못함). 메시지는 화면에 그대로 보여 준다 */
+    /** API 로 보낼 수 없는 이미지 (너무 크거나 줄이지 못함). 문구는 ErrorCode, 화면에 그대로 보여 준다 */
     public static class UnusableImageException extends RuntimeException {
-        public UnusableImageException(String message) {
-            super(message);
+        private final ErrorCode code;
+
+        public UnusableImageException(ErrorCode code, Object... args) {
+            super(code.message(args));
+            this.code = code;
+        }
+
+        public ErrorCode getCode() {
+            return code;
         }
     }
 
@@ -83,19 +91,20 @@ public final class ImageSlicer {
      * 사용량(하루 장수)을 잡기 전에 불러서, 보내지도 못할 이미지가 장수를 쓰지 않게 한다.
      */
     public static String rejectReason(byte[] data) {
-        return rejectReason(header(data), data.length);
+        UnusableImageException rejected = rejection(header(data), data.length);
+        return rejected == null ? null : rejected.getMessage();
     }
 
-    private static String rejectReason(Header header, int size) {
+    private static UnusableImageException rejection(Header header, int size) {
         if (header == null) {
             // webp 등 서버에서 열 수 없는 형식은 줄일 수 없으므로 용량만 본다 (크기는 API 가 판단)
-            return size > MAX_BYTES ? "용량이 너무 큽니다. 7MB 이하로 줄이거나 png·jpg로 저장해서 올려 주세요." : null;
+            return size > MAX_BYTES ? new UnusableImageException(ErrorCode.IMAGE_TOO_HEAVY) : null;
         }
         if (header.width() <= 0 || header.height() <= 0) {
-            return "이미지 크기를 읽을 수 없습니다.";
+            return new UnusableImageException(ErrorCode.IMAGE_SIZE_UNREADABLE);
         }
         if (header.pixels() > MAX_DECODE_PIXELS) {
-            return "이미지가 너무 큽니다 (" + header.width() + "×" + header.height() + "). 나눠서 캡처해 올려 주세요.";
+            return new UnusableImageException(ErrorCode.IMAGE_TOO_LARGE, header.width(), header.height());
         }
         return null;
     }
@@ -107,9 +116,9 @@ public final class ImageSlicer {
      */
     public static List<Piece> prepare(byte[] data, String mediaType) {
         Header header = header(data);
-        String reason = rejectReason(header, data.length);
-        if (reason != null) {
-            throw new UnusableImageException(reason);
+        UnusableImageException rejected = rejection(header, data.length);
+        if (rejected != null) {
+            throw rejected;
         }
         if (header == null) {
             return List.of(new Piece(data, mediaType));
@@ -126,7 +135,7 @@ public final class ImageSlicer {
             if (withinLimits) {
                 return List.of(new Piece(data, header.mediaType()));
             }
-            throw new UnusableImageException("이미지를 줄이지 못했습니다. 줄여서 다시 올려 주세요.");
+            throw new UnusableImageException(ErrorCode.IMAGE_SHRINK_FAILED);
         }
         List<Piece> result = new ArrayList<>();
         try {
@@ -140,7 +149,7 @@ public final class ImageSlicer {
             if (withinLimits) {
                 return List.of(new Piece(data, header.mediaType()));
             }
-            throw new UnusableImageException("이미지를 줄이지 못했습니다. 줄여서 다시 올려 주세요.");
+            throw new UnusableImageException(ErrorCode.IMAGE_SHRINK_FAILED);
         }
         return result;
     }
@@ -197,7 +206,7 @@ public final class ImageSlicer {
                 return new Piece(jpeg, "image/jpeg");
             }
         }
-        throw new UnusableImageException("이미지를 줄이지 못했습니다. 줄여서 다시 올려 주세요.");
+        throw new UnusableImageException(ErrorCode.IMAGE_SHRINK_FAILED);
     }
 
     private static boolean fits(byte[] encoded) {

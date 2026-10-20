@@ -10,6 +10,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.PickupPoint;
 import com.depositcock.groupbuy.Product;
@@ -78,13 +79,13 @@ final class OrderUpdate {
             Product product = products.get(productId);
             if (product == null) {
                 // 주문 뒤에 상품이 지워진 경우는 없다 (주문 있는 상품은 삭제 불가). 안전하게 막는다
-                throw ApiException.badRequest("상품을 찾을 수 없습니다.");
+                throw new ApiException(ErrorCode.PRODUCT_NOT_FOUND);
             }
             if (after > before) {
                 if (product.isBlockWhenSoldOut()) {
                     if (productRepository.increaseSoldWithinStock(productId, after - before) == 0) {
                         em.refresh(product);
-                        throw ApiException.conflict(soldOutMessage(product, before, actor));
+                        throw notEnoughStock(product, before, actor);
                     }
                 } else {
                     productRepository.increaseSold(productId, after - before);
@@ -130,11 +131,11 @@ final class OrderUpdate {
         int shippingFee = v.receive() == ReceiveMethod.DELIVERY && groupBuy.getShippingFeeType() == ShippingFeeType.FIXED
                 ? groupBuy.getShippingFee() : 0;
         if (itemsAmount + shippingFee > PublicOrderService.MAX_ORDER_AMOUNT) {
-            throw ApiException.badRequest("주문 금액이 너무 큽니다. 수량을 확인해 주세요.");
+            throw new ApiException(ErrorCode.ORDER_AMOUNT_TOO_LARGE);
         }
         if (changes.isEmpty()) {
-            throw ApiException.badRequest(actor == ChangeActor.CUSTOMER
-                    ? order.getOrderNo() + "번 주문과 같은 내용입니다. 바뀐 내용이 없습니다." : "바뀐 내용이 없습니다.");
+            throw actor == ChangeActor.CUSTOMER ? new ApiException(ErrorCode.NO_CHANGE_CUSTOMER, order.getOrderNo())
+                    : new ApiException(ErrorCode.NO_CHANGE);
         }
         int beforeAmount = order.getExpectedAmount();
         order.fillCustomer(v.depositorName(), v.nickname(), v.unitAddress());
@@ -156,15 +157,15 @@ final class OrderUpdate {
         return summary;
     }
 
-    private static String soldOutMessage(Product product, int before, ChangeActor actor) {
+    private static ApiException notEnoughStock(Product product, int before, ChangeActor actor) {
+        int left = Math.max(0, product.remaining());
         if (actor == ChangeActor.SELLER) {
-            return "'" + product.getName() + "'의 남은 수량이 부족합니다. (남은 수량 " + Math.max(0, product.remaining())
-                    + "개, 품절로 막는 상품)";
+            return new ApiException(ErrorCode.NOT_ENOUGH_STOCK_SELLER, product.getName(), left);
         }
         // 고객에게는 이 주문에 이미 있던 수량까지 더해서 고를 수 있는 최대를 알려준다
-        int max = before + Math.max(0, product.remaining());
-        return "'" + product.getName() + "'은(는) 남은 수량이 부족해 최대 " + max + "개까지 주문할 수 있습니다."
-                + (before > 0 ? " (지금 주문한 " + before + "개 포함)" : "");
+        int max = before + left;
+        return before > 0 ? new ApiException(ErrorCode.NOT_ENOUGH_STOCK_WITH_CURRENT, product.getName(), max, before)
+                : new ApiException(ErrorCode.NOT_ENOUGH_STOCK, product.getName(), max);
     }
 
     private static Map<Long, OrderItem> currentItems(CustomerOrder order) {

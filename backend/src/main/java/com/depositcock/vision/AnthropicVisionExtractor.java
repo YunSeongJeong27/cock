@@ -1,5 +1,6 @@
 package com.depositcock.vision;
 
+import com.depositcock.common.ErrorCode;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
@@ -163,7 +164,7 @@ public class AnthropicVisionExtractor implements VisionExtractor {
             throw e;
         } catch (RuntimeException e) {
             // 원인 메시지(API 응답 원문, 모델 출력 원문 등)는 화면에 넣지 않는다. ApiExceptionHandler 가 cause 를 로그에 남긴다.
-            throw new ExternalApiException("비전 AI 호출에 실패했습니다. 직접 입력해 주세요.", e);
+            throw new ExternalApiException(ErrorCode.VISION_CALL_FAILED, e);
         }
     }
 }

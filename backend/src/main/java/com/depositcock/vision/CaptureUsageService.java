@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import com.depositcock.common.AppProperties;
 import com.depositcock.seller.Seller;
 import com.depositcock.seller.SellerRepository;
@@ -52,7 +53,7 @@ public class CaptureUsageService {
     @Transactional(readOnly = true)
     public Usage usage(Long sellerId) {
         Seller seller = sellerRepository.findById(sellerId)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."));
+                .orElseThrow(() -> new ApiException(ErrorCode.LOGIN_REQUIRED));
         return usage(seller);
     }
 

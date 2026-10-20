@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import com.depositcock.common.AppProperties;
 import com.depositcock.groupbuy.GroupBuyRepository;
 import com.depositcock.vision.CaptureUsageService;
@@ -45,7 +46,7 @@ public class SellerService {
     public Seller signup(SignupRequest request) {
         String email = normalizeEmail(request.email());
         if (sellerRepository.existsByEmail(email)) {
-            throw ApiException.conflict("이미 가입된 이메일입니다.");
+            throw new ApiException(ErrorCode.EMAIL_TAKEN);
         }
         LocalDateTime now = LocalDateTime.now(clock);
         Seller seller = new Seller(email, passwordEncoder.encode(request.password()), request.displayName().trim(),
@@ -55,16 +56,16 @@ public class SellerService {
 
     public Seller login(String email, String password) {
         Seller seller = sellerRepository.findByEmail(normalizeEmail(email))
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 맞지 않습니다."));
+                .orElseThrow(() -> new ApiException(ErrorCode.LOGIN_FAILED));
         if (!passwordEncoder.matches(password, seller.getPasswordHash())) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 맞지 않습니다.");
+            throw new ApiException(ErrorCode.LOGIN_FAILED);
         }
         return seller;
     }
 
     public Seller get(Long sellerId) {
         return sellerRepository.findById(sellerId)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."));
+                .orElseThrow(() -> new ApiException(ErrorCode.LOGIN_REQUIRED));
     }
 
     @Transactional
@@ -98,9 +99,9 @@ public class SellerService {
     @Transactional
     public void updateByAdmin(Long sellerId, AdminUpdateRequest request) {
         Seller seller = sellerRepository.findById(sellerId)
-                .orElseThrow(() -> ApiException.notFound("판매자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new ApiException(ErrorCode.SELLER_NOT_FOUND));
         if (seller.getRole() == Role.ADMIN && request.suspended()) {
-            throw ApiException.badRequest("관리자 계정은 사용 제한할 수 없습니다.");
+            throw new ApiException(ErrorCode.ADMIN_CANNOT_SUSPEND);
         }
         seller.updateByAdmin(request.plan(), request.paidUntil(), request.trialEndsAt(), request.suspended(),
                 blankToNull(request.adminMemo()));
@@ -117,9 +118,9 @@ public class SellerService {
     @Transactional
     public void deleteByAdmin(Long sellerId) {
         Seller seller = sellerRepository.findById(sellerId)
-                .orElseThrow(() -> ApiException.notFound("판매자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new ApiException(ErrorCode.SELLER_NOT_FOUND));
         if (seller.getRole() == Role.ADMIN) {
-            throw ApiException.badRequest("관리자 계정은 삭제할 수 없습니다.");
+            throw new ApiException(ErrorCode.ADMIN_CANNOT_DELETE);
         }
         sellerRepository.delete(seller);
     }
@@ -129,10 +130,10 @@ public class SellerService {
     public void withdraw(Long sellerId, String rawPassword) {
         Seller seller = get(sellerId);
         if (seller.getRole() == Role.ADMIN) {
-            throw ApiException.badRequest("관리자 계정은 탈퇴할 수 없습니다.");
+            throw new ApiException(ErrorCode.ADMIN_CANNOT_WITHDRAW);
         }
         if (rawPassword == null || !passwordEncoder.matches(rawPassword, seller.getPasswordHash())) {
-            throw ApiException.badRequest("비밀번호가 맞지 않습니다.");
+            throw new ApiException(ErrorCode.WRONG_PASSWORD);
         }
         sellerRepository.delete(seller);
     }

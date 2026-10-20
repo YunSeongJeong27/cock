@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,7 +55,7 @@ public class FeatureAccess {
 
     public void requireComments(Long sellerId) {
         if (!commentsAllowed(sellerId)) {
-            throw ApiException.forbidden("댓글 주문 기능은 아직 열려 있지 않습니다. 주문 링크로 주문을 받아 주세요.");
+            throw new ApiException(ErrorCode.COMMENT_FEATURE_CLOSED);
         }
     }
 }

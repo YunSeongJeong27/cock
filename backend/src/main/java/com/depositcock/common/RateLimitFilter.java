@@ -11,8 +11,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -58,13 +56,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String ip = request.getRemoteAddr();
         String uri = request.getRequestURI();
         if (!allow(general, ip, now, MINUTE, properties.publicRateLimitPerMinute())) {
-            reject(response, "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.");
+            ProblemWriter.write(response, ErrorCode.TOO_MANY_REQUESTS_ERROR);
             return;
         }
         if ((uri.endsWith("/identify") || uri.endsWith("/cancel") || uri.endsWith("/refund-request"))
                 && !allow(sensitive, ip + "|" + groupBuyPath(uri), now, TEN_MINUTES,
                 properties.sensitiveRateLimitPer10Minutes())) {
-            reject(response, "확인 시도가 너무 많습니다. 10분 뒤에 다시 시도해 주세요.");
+            ProblemWriter.write(response, ErrorCode.TOO_MANY_CHECKS);
             return;
         }
         chain.doFilter(request, response);
@@ -100,12 +98,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return allowed;
     }
 
-    private static void reject(HttpServletResponse response, String message) throws IOException {
-        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
-        response.getWriter().write("{\"status\":429,\"detail\":\"" + message + "\"}");
-    }
 
     /** 테스트용 */
     int trackedKeys() {

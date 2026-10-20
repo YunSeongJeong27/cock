@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 
 import com.depositcock.comment.CommentService;
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import com.depositcock.common.ExternalApiException;
 import com.depositcock.deposit.BankStatementReader;
 import com.depositcock.deposit.DepositLine;
@@ -112,20 +113,20 @@ public class ScreenshotService {
                 continue;
             }
             if (r.name().contains("[?]") || (r.datetimeText() != null && r.datetimeText().contains("[?]"))) {
-                throw ApiException.badRequest("읽지 못한 글자([?])가 남아 있습니다: " + no + "번째 줄");
+                throw new ApiException(ErrorCode.SCREENSHOT_UNREADABLE_CHARS, no);
             }
             // DB 열 길이(deposit_row.depositor_name 200, datetime_text 100)를 넘으면 409 "이미 같은 데이터" 로 잘못 안내되므로 먼저 막는다
             if (r.name().trim().length() > 200) {
-                throw ApiException.badRequest("입금자명이 너무 깁니다 (200자까지): " + no + "번째 줄");
+                throw new ApiException(ErrorCode.SCREENSHOT_NAME_TOO_LONG, no);
             }
             if (r.datetimeText() != null && r.datetimeText().trim().length() > 100) {
-                throw ApiException.badRequest("일시가 너무 깁니다 (100자까지): " + no + "번째 줄");
+                throw new ApiException(ErrorCode.SCREENSHOT_DATETIME_TOO_LONG, no);
             }
             lines.add(new DepositLine(no, r.name().trim(), r.amount(), blankToNull(r.datetimeText()),
                     BankStatementReader.parseDateTimeText(r.datetimeText())));
         }
         if (lines.isEmpty()) {
-            throw ApiException.badRequest("저장할 입금이 없습니다.");
+            throw new ApiException(ErrorCode.SCREENSHOT_NOTHING_TO_SAVE);
         }
         return depositService.saveDeposits(groupBuy.getId(), DepositSource.SCREENSHOT, "스크린샷", lines);
     }
@@ -192,7 +193,7 @@ public class ScreenshotService {
         }
         if (firstError != null && failed.size() == files.size()) {
             if (firstError instanceof ImageSlicer.UnusableImageException) {
-                throw ApiException.badRequest(firstError.getMessage());
+                throw ApiException.withMessage(((ImageSlicer.UnusableImageException) firstError).getCode(), firstError.getMessage());
             }
             throw firstError;
         }
@@ -204,7 +205,7 @@ public class ScreenshotService {
         for (int i = 0; i < files.size(); i++) {
             String reason = ImageSlicer.rejectReason(bytes(files.get(i)));
             if (reason != null) {
-                throw ApiException.badRequest((i + 1) + "번째 이미지: " + reason);
+                throw new ApiException(ErrorCode.IMAGE_REJECTED, i + 1, reason);
             }
         }
     }
@@ -240,14 +241,14 @@ public class ScreenshotService {
 
     private static List<MultipartFile> checked(List<MultipartFile> files) {
         if (files == null || files.isEmpty()) {
-            throw ApiException.badRequest("이미지를 선택해 주세요.");
+            throw new ApiException(ErrorCode.IMAGE_REQUIRED);
         }
         if (files.size() > MAX_IMAGES) {
-            throw ApiException.badRequest("한 번에 " + MAX_IMAGES + "장까지 올릴 수 있습니다.");
+            throw new ApiException(ErrorCode.TOO_MANY_IMAGES, MAX_IMAGES);
         }
         for (MultipartFile f : files) {
             if (!IMAGE_TYPES.contains(mediaType(f))) {
-                throw ApiException.badRequest("이미지(png, jpg, gif, webp)만 올릴 수 있습니다: " + f.getOriginalFilename());
+                throw new ApiException(ErrorCode.IMAGE_TYPE_NOT_ALLOWED, f.getOriginalFilename());
             }
         }
         return files;
@@ -262,7 +263,7 @@ public class ScreenshotService {
         try {
             return file.getBytes();
         } catch (IOException e) {
-            throw ApiException.badRequest("이미지를 읽을 수 없습니다.");
+            throw new ApiException(ErrorCode.IMAGE_UNREADABLE);
         }
     }
 

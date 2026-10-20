@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import com.depositcock.common.DataCipher;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.GroupBuyService;
@@ -58,7 +59,7 @@ public class SellerOrderService {
     private CustomerOrder getOwnedOrderForUpdate(Long sellerId, Long groupBuyId, Long orderId) {
         GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         return orderRepository.findByIdAndGroupBuyId(orderId, groupBuy.getId())
-                .orElseThrow(() -> ApiException.notFound("주문을 찾을 수 없습니다."));
+                .orElseThrow(() -> new ApiException(ErrorCode.ORDER_NOT_FOUND));
     }
 
     /**
@@ -67,7 +68,7 @@ public class SellerOrderService {
      */
     private static void requireNoRefundPending(CustomerOrder order) {
         if (order.isRefundPending()) {
-            throw ApiException.badRequest("고객이 환불 신청한 주문입니다. 먼저 [취소하고 환불] 또는 [취소 안 함]을 눌러 주세요.");
+            throw new ApiException(ErrorCode.REFUND_PENDING_DECIDE_FIRST);
         }
     }
 
@@ -75,7 +76,7 @@ public class SellerOrderService {
     public SellerOrder setPickedUp(Long sellerId, Long groupBuyId, Long orderId, boolean pickedUp) {
         CustomerOrder order = getOwnedOrderForUpdate(sellerId, groupBuyId, orderId);
         if (!order.isActive()) {
-            throw ApiException.badRequest("취소된 주문입니다.");
+            throw new ApiException(ErrorCode.ORDER_CANCELLED);
         }
         if (pickedUp) {
             requireNoRefundPending(order);
@@ -88,12 +89,12 @@ public class SellerOrderService {
     public SellerOrder cancel(Long sellerId, Long groupBuyId, Long orderId) {
         CustomerOrder order = getOwnedOrderForUpdate(sellerId, groupBuyId, orderId);
         if (!order.isActive()) {
-            throw ApiException.badRequest("이미 취소된 주문입니다.");
+            throw new ApiException(ErrorCode.ORDER_ALREADY_CANCELLED);
         }
         requireNoRefundPending(order);
         // 물건을 건넨 주문을 바로 취소하면 재고가 다시 늘어난다. 잘못 체크했으면 수령 체크를 해제한 뒤 취소 (2026-10-19)
         if (order.isPickedUp()) {
-            throw ApiException.badRequest("수령 완료된 주문입니다. 취소하려면 수령 체크를 먼저 해제해 주세요.");
+            throw new ApiException(ErrorCode.PICKED_UP_UNCHECK_FIRST);
         }
         OrderCancellation.cancel(order, productRepository, entityManager, stockAlerts, LocalDateTime.now(clock));
         return OrderMapper.toSellerOrder(order, false, cipher);
@@ -107,7 +108,7 @@ public class SellerOrderService {
     public SellerOrder decideRefund(Long sellerId, Long groupBuyId, Long orderId, boolean approve) {
         CustomerOrder order = getOwnedOrderForUpdate(sellerId, groupBuyId, orderId);
         if (!order.isRefundPending()) {
-            throw ApiException.badRequest("확인을 기다리는 환불 신청이 없습니다.");
+            throw new ApiException(ErrorCode.NO_PENDING_REFUND);
         }
         LocalDateTime now = LocalDateTime.now(clock);
         if (approve) {
@@ -122,10 +123,10 @@ public class SellerOrderService {
     public SellerOrder markRefunded(Long sellerId, Long groupBuyId, Long orderId) {
         CustomerOrder order = getOwnedOrderForUpdate(sellerId, groupBuyId, orderId);
         if (!order.isRefundRequired()) {
-            throw ApiException.badRequest("환불이 필요한 주문이 아닙니다.");
+            throw new ApiException(ErrorCode.REFUND_NOT_REQUIRED);
         }
         if (order.getRefundedAt() != null) {
-            throw ApiException.badRequest("이미 환불 완료된 주문입니다.");
+            throw new ApiException(ErrorCode.ALREADY_REFUNDED);
         }
         order.markRefunded(LocalDateTime.now(clock));
         return OrderMapper.toSellerOrder(order, false, cipher);
@@ -143,14 +144,14 @@ public class SellerOrderService {
         CustomerOrder order = getOwnedOrderForUpdate(sellerId, groupBuyId, orderId);
         GroupBuy groupBuy = order.getGroupBuy();
         if (!order.isActive()) {
-            throw ApiException.badRequest("취소된 주문은 바꿀 수 없습니다.");
+            throw new ApiException(ErrorCode.CANCELLED_CANNOT_EDIT);
         }
         if (order.isPickedUp()) {
-            throw ApiException.badRequest("수령 완료된 주문은 바꿀 수 없습니다.");
+            throw new ApiException(ErrorCode.PICKED_UP_CANNOT_EDIT);
         }
         requireNoRefundPending(order);
         if (order.isPaid()) {
-            throw ApiException.badRequest("입금 확정된 주문입니다. 바꾸려면 먼저 입금 확정을 취소해 주세요.");
+            throw new ApiException(ErrorCode.PAID_CANNOT_EDIT);
         }
         LocalDateTime now = LocalDateTime.now(clock);
 
@@ -164,12 +165,12 @@ public class SellerOrderService {
         if (receive == ReceiveMethod.DELIVERY) {
             recipientPhone = PhoneNumbers.normalize(r.recipientPhone());
             if (trimToNull(r.recipientName()) == null || recipientPhone == null || trimToNull(r.address()) == null) {
-                throw ApiException.badRequest("배송으로 바꾸려면 받는 분, 받는 분 연락처, 주소를 모두 입력해야 합니다.");
+                throw new ApiException(ErrorCode.DELIVERY_INFO_REQUIRED_FOR_CHANGE);
             }
         }
         String depositorName = trimToNull(r.depositorName());
         if (order.getSource() == OrderSource.FORM && depositorName == null) {
-            throw ApiException.badRequest("입금자명을 입력해 주세요.");
+            throw new ApiException(ErrorCode.DEPOSITOR_NAME_REQUIRED);
         }
 
         // 2) 상품 수량
@@ -181,12 +182,12 @@ public class SellerOrderService {
                 continue;
             }
             if (!productIds.contains(item.productId())) {
-                throw ApiException.badRequest("상품을 찾을 수 없습니다.");
+                throw new ApiException(ErrorCode.PRODUCT_NOT_FOUND);
             }
             wanted.merge(item.productId(), item.quantity(), Integer::sum);
         }
         if (wanted.isEmpty()) {
-            throw ApiException.badRequest("상품 수량을 1개 이상 넣어 주세요. 주문을 없애려면 주문 취소를 눌러 주세요.");
+            throw new ApiException(ErrorCode.QUANTITY_REQUIRED_FOR_CHANGE);
         }
 
         boolean delivery = receive == ReceiveMethod.DELIVERY;

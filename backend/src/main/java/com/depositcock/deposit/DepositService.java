@@ -14,6 +14,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import com.depositcock.deposit.DepositDtos.AliasResponse;
 import com.depositcock.deposit.DepositDtos.CandidateView;
 import com.depositcock.deposit.DepositDtos.ConfirmItem;
@@ -100,7 +101,7 @@ public class DepositService {
         String fileName = file.getOriginalFilename();
         ParsedStatement parsed = reader.read(fileName, bytes(file), resolved.mapping());
         if (!parsed.ok()) {
-            throw ApiException.badRequest(parsed.message());
+            throw ApiException.withMessage(ErrorCode.STATEMENT_COLUMNS_NOT_FOUND, parsed.message());
         }
         DepositSource source = fileName != null && fileName.toLowerCase(Locale.ROOT).endsWith(".csv")
                 ? DepositSource.CSV : DepositSource.EXCEL;
@@ -166,11 +167,11 @@ public class DepositService {
     public void deleteUpload(Long sellerId, Long groupBuyId, Long uploadId) {
         GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         DepositUpload upload = uploadRepository.findByIdAndGroupBuyId(uploadId, groupBuy.getId())
-                .orElseThrow(() -> ApiException.notFound("업로드를 찾을 수 없습니다."));
+                .orElseThrow(() -> new ApiException(ErrorCode.UPLOAD_NOT_FOUND));
         Set<Long> usedRows = usedRowIds(groupBuy.getId());
         boolean used = rowRepository.findByUploadId(upload.getId()).stream().anyMatch(r -> usedRows.contains(r.getId()));
         if (used) {
-            throw ApiException.badRequest("확정에 쓴 입금이 들어 있는 업로드는 지울 수 없습니다. 먼저 해당 입금 확정을 취소해 주세요.");
+            throw new ApiException(ErrorCode.UPLOAD_IN_USE);
         }
         uploadRepository.delete(upload);
     }
@@ -285,18 +286,18 @@ public class DepositService {
             DepositRow row = rowRepository.findByIdAndGroupBuyId(item.rowId(), groupBuy.getId()).orElse(null);
             CustomerOrder order = orderRepository.findByIdAndGroupBuyId(item.orderId(), groupBuy.getId()).orElse(null);
             if (row == null || order == null) {
-                errors.add("입금 또는 주문을 찾을 수 없습니다.");
+                errors.add(ErrorCode.DEPOSIT_OR_ORDER_NOT_FOUND.message());
                 continue;
             }
             if (confirmationRepository.existsByActiveDepositRowId(row.getId())) {
-                errors.add("'" + row.getDepositorName() + " " + row.getAmount() + "원' 입금은 이미 다른 주문에 확정되었습니다.");
+                errors.add(ErrorCode.DEPOSIT_ALREADY_USED.message(row.getDepositorName(), row.getAmount()));
                 continue;
             }
             // 취소된 주문도 환불 완료 전이면 받는다: 고객이 입금하고 바로 취소한 경우 → 입금 확정 + 환불 필요 (2026-10-19)
             boolean cancelled = !order.isActive();
             if ((cancelled && order.getRefundedAt() != null) || !order.isPrepaid() || order.isPaid()
                     || !usedOrders.add(order.getId())) {
-                errors.add(order.getOrderNo() + "번 주문은 입금 확정할 수 없는 상태입니다.");
+                errors.add(ErrorCode.ORDER_CANNOT_CONFIRM.message(order.getOrderNo()));
                 continue;
             }
             DepositConfirmation confirmation = cancelled
@@ -314,12 +315,12 @@ public class DepositService {
     public void unconfirm(Long sellerId, Long groupBuyId, Long orderId) {
         GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         CustomerOrder order = orderRepository.findByIdAndGroupBuyId(orderId, groupBuy.getId())
-                .orElseThrow(() -> ApiException.notFound("주문을 찾을 수 없습니다."));
+                .orElseThrow(() -> new ApiException(ErrorCode.ORDER_NOT_FOUND));
         if (!order.isPaid()) {
-            throw ApiException.badRequest("입금 확정된 주문이 아닙니다.");
+            throw new ApiException(ErrorCode.NOT_PAID);
         }
         if (order.getRefundedAt() != null) {
-            throw ApiException.badRequest("환불 완료된 주문은 입금 확정을 취소할 수 없습니다.");
+            throw new ApiException(ErrorCode.REFUNDED_CANNOT_UNCONFIRM);
         }
         aliasBook.undo(sellerId, order, Set.of(order.getId()));
         // 확정 기록은 지우지 않고 취소 시각만 남긴다. 취소된 주문이면 "입금 확정"이 잘못이었다는 뜻이므로 "환불 필요"도 함께 거둔다
@@ -331,9 +332,9 @@ public class DepositService {
     public void manualConfirm(Long sellerId, Long groupBuyId, Long orderId, String depositorName, int amount) {
         GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
         CustomerOrder order = orderRepository.findByIdAndGroupBuyId(orderId, groupBuy.getId())
-                .orElseThrow(() -> ApiException.notFound("주문을 찾을 수 없습니다."));
+                .orElseThrow(() -> new ApiException(ErrorCode.ORDER_NOT_FOUND));
         if (!order.isActive() || !order.isPrepaid() || order.isPaid()) {
-            throw ApiException.badRequest("입금 확정할 수 없는 상태입니다.");
+            throw new ApiException(ErrorCode.CANNOT_CONFIRM);
         }
         LocalDateTime now = LocalDateTime.now(clock);
         DepositConfirmation confirmation = order.confirmPaid(depositorName.trim(), amount, null, now);
@@ -370,7 +371,7 @@ public class DepositService {
     @Transactional
     public void deleteAlias(Long sellerId, Long aliasId) {
         aliasRepository.delete(aliasRepository.findByIdAndSellerId(aliasId, sellerId)
-                .orElseThrow(() -> ApiException.notFound("별칭을 찾을 수 없습니다.")));
+                .orElseThrow(() -> new ApiException(ErrorCode.ALIAS_NOT_FOUND)));
     }
 
     // ---------- 열 이름 프리셋 ----------
@@ -397,7 +398,7 @@ public class DepositService {
     @Transactional
     public void deletePreset(Long sellerId, Long presetId) {
         presetRepository.delete(presetRepository.findByIdAndSellerId(presetId, sellerId)
-                .orElseThrow(() -> ApiException.notFound("저장된 열 설정을 찾을 수 없습니다.")));
+                .orElseThrow(() -> new ApiException(ErrorCode.PRESET_NOT_FOUND)));
     }
 
     // ---------- 내부 ----------
@@ -408,7 +409,7 @@ public class DepositService {
     private ResolvedMapping resolveMapping(Long sellerId, ColumnMapping mapping, Long presetId) {
         if (presetId != null) {
             BankColumnPreset preset = presetRepository.findByIdAndSellerId(presetId, sellerId)
-                    .orElseThrow(() -> ApiException.notFound("저장된 열 설정을 찾을 수 없습니다."));
+                    .orElseThrow(() -> new ApiException(ErrorCode.PRESET_NOT_FOUND));
             return new ResolvedMapping(preset.toMapping(), preset.getName());
         }
         return new ResolvedMapping(mapping != null && mapping.isComplete() ? mapping : null, null);
@@ -436,12 +437,12 @@ public class DepositService {
 
     private static byte[] bytes(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw ApiException.badRequest("파일을 선택해 주세요.");
+            throw new ApiException(ErrorCode.FILE_REQUIRED);
         }
         try {
             return file.getBytes();
         } catch (IOException e) {
-            throw ApiException.badRequest("파일을 읽을 수 없습니다.");
+            throw new ApiException(ErrorCode.FILE_UNREADABLE);
         }
     }
 

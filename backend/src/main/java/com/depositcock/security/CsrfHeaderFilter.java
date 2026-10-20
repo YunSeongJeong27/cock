@@ -3,12 +3,12 @@ package com.depositcock.security;
 import java.io.IOException;
 import java.util.Set;
 
+import com.depositcock.common.ErrorCode;
+import com.depositcock.common.ProblemWriter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -35,10 +35,7 @@ public class CsrfHeaderFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String value = request.getHeader(HEADER);
         if (value == null || value.isBlank()) {
-            response.setStatus(HttpStatus.FORBIDDEN.value());
-            response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-            response.setCharacterEncoding("UTF-8");
-            response.getWriter().write("{\"status\":403,\"detail\":\"잘못된 요청입니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.\"}");
+            ProblemWriter.write(response, ErrorCode.CSRF_REJECTED);
             return;
         }
         chain.doFilter(request, response);

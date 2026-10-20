@@ -19,6 +19,7 @@ import java.util.Locale;
 import java.util.Set;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -80,7 +81,7 @@ public class BankStatementReader {
             return readExcel(content);
         }
         if (lower.endsWith(".pdf")) {
-            throw ApiException.badRequest("PDF 거래내역은 아직 읽을 수 없습니다. 은행 앱에서 엑셀(xlsx) 또는 CSV 로 받아 올려주세요.");
+            throw new ApiException(ErrorCode.STATEMENT_PDF_NOT_SUPPORTED);
         }
         return readCsv(content);
     }
@@ -113,7 +114,7 @@ public class BankStatementReader {
             }
             return rows;
         } catch (IOException | RuntimeException e) {
-            throw ApiException.badRequest("엑셀 파일을 읽을 수 없습니다. 파일이 손상되었거나 암호가 걸려 있는지 확인해 주세요.");
+            throw new ApiException(ErrorCode.STATEMENT_EXCEL_UNREADABLE);
         }
     }
 
@@ -244,10 +245,9 @@ public class BankStatementReader {
             return new ParsedStatement(used, !manual, r + 1, rows.get(r), options, preview, deposits, skipped, null);
         }
         String message = manual
-                ? "지정한 열 이름(이름: " + requested.nameColumn() + ", 금액: " + requested.amountColumn()
-                        + ")을 위쪽 " + HEADER_SEARCH_ROWS + "줄 안에서 찾지 못했습니다. 열 이름을 다시 확인해 주세요."
-                : "입금자명·금액 열을 자동으로 찾지 못했습니다. 은행마다 열 이름이 달라서 그렇습니다. "
-                        + "아래에서 입금자명 열과 금액 열을 직접 골라주세요.";
+                ? ErrorCode.STATEMENT_GIVEN_COLUMNS_NOT_FOUND.message(requested.nameColumn(), requested.amountColumn(),
+                        HEADER_SEARCH_ROWS)
+                : ErrorCode.STATEMENT_COLUMNS_NOT_FOUND.message();
         return new ParsedStatement(manual ? requested : new ColumnMapping(null, null, null, null), false, 0,
                 List.of(), options, preview, List.of(), 0, message);
     }

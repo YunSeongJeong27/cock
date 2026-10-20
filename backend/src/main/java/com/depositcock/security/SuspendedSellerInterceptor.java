@@ -1,11 +1,12 @@
 package com.depositcock.security;
 
+import com.depositcock.common.ErrorCode;
+import com.depositcock.common.ProblemWriter;
 import com.depositcock.seller.Seller;
 import com.depositcock.seller.SellerRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -37,10 +38,7 @@ public class SuspendedSellerInterceptor implements HandlerInterceptor {
             return false;
         }
         if (seller.isSuspended()) {
-            response.setStatus(HttpStatus.FORBIDDEN.value());
-            response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-            response.setCharacterEncoding("UTF-8");
-            response.getWriter().write("{\"status\":403,\"detail\":\"관리자가 사용을 제한한 계정입니다. 조회만 할 수 있습니다.\"}");
+            ProblemWriter.write(response, ErrorCode.SELLER_SUSPENDED);
             return false;
         }
         return true;

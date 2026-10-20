@@ -224,7 +224,7 @@ class M4M6ScreenshotAndCommentTest extends IntegrationTest {
         when(visionExtractor.provider()).thenReturn("test");
         when(visionExtractor.extractDeposits(any(), anyString()))
                 .thenReturn(List.of(new ExtractedDeposit("김지영", 3800, "", "입금", 0)))
-                .thenThrow(new com.depositcock.common.ExternalApiException("거절"))
+                .thenThrow(new com.depositcock.common.ExternalApiException(com.depositcock.common.ErrorCode.VISION_REFUSED))
                 .thenReturn(List.of(new ExtractedDeposit("박서준", 1900, "", "입금", 0)));
         Cookie seller = signup(uniqueEmail());
         long id = openGroupBuy(seller, groupBuyBody("부분 실패", List.of(product("x", 1000, null))));
@@ -235,7 +235,7 @@ class M4M6ScreenshotAndCommentTest extends IntegrationTest {
                 .andExpect(jsonPath("$.notice").value(org.hamcrest.Matchers.containsString("2번째 캡처는 읽지 못했습니다")));
 
         when(visionExtractor.extractDeposits(any(), anyString()))
-                .thenThrow(new com.depositcock.common.ExternalApiException("비전 AI 호출 실패"));
+                .thenThrow(new com.depositcock.common.ExternalApiException(com.depositcock.common.ErrorCode.VISION_CALL_FAILED));
         mvc.perform(multipart(url).file(image("1.png")).cookie(seller)).andExpect(status().isBadGateway());
     }
 

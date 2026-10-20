@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import com.depositcock.common.Tokens;
 import com.depositcock.customer.Customers;
 import com.depositcock.deposit.AliasBook;
@@ -83,7 +84,7 @@ public class GroupBuyService {
     /** 로그인한 판매자의 공구만 찾는다. 다른 판매자의 공구는 404 (존재 여부도 알려주지 않음). */
     public GroupBuy getOwned(Long sellerId, Long groupBuyId) {
         return groupBuyRepository.findByIdAndSellerId(groupBuyId, sellerId)
-                .orElseThrow(() -> ApiException.notFound("공구를 찾을 수 없습니다."));
+                .orElseThrow(() -> new ApiException(ErrorCode.GROUP_BUY_NOT_FOUND));
     }
 
     public List<GroupBuySummary> list(Long sellerId) {
@@ -132,7 +133,7 @@ public class GroupBuyService {
         LocalDateTime now = LocalDateTime.now(clock);
         validateOpenable(groupBuy);
         if (groupBuy.getCloseAt() != null && !groupBuy.getCloseAt().isAfter(now)) {
-            throw ApiException.badRequest("마감 일시가 지났습니다. 마감 일시를 바꾼 뒤 다시 열어주세요.");
+            throw new ApiException(ErrorCode.CLOSE_AT_PASSED);
         }
         groupBuy.changeStatus(GroupBuyStatus.OPEN, now);
         return GroupBuyResponse.of(groupBuy, now);
@@ -156,7 +157,7 @@ public class GroupBuyService {
         LocalDateTime now = LocalDateTime.now(clock);
         String link = blankToNull(r.linkUrl());
         if (link != null && !link.matches("(?i)^https?://\\S+$")) {
-            throw ApiException.badRequest("링크는 http:// 또는 https:// 로 시작하는 주소만 넣을 수 있습니다.");
+            throw new ApiException(ErrorCode.PAUSE_LINK_INVALID);
         }
         String message = blankToNull(r.message());
         groupBuy.changePause(r.paused(), message == null || message.equals(GroupBuy.DEFAULT_PAUSE_MESSAGE) ? null : message,
@@ -184,29 +185,29 @@ public class GroupBuyService {
 
     private void apply(GroupBuy groupBuy, GroupBuyRequest r, LocalDateTime now) {
         if (!r.pickupEnabled() && !r.deliveryEnabled()) {
-            throw ApiException.badRequest("픽업과 배송 중 하나 이상은 켜야 합니다.");
+            throw new ApiException(ErrorCode.RECEIVE_SETTING_REQUIRED);
         }
         if (r.pickupEnabled() && !r.pickupPrepayEnabled() && !r.pickupOnsiteEnabled()) {
-            throw ApiException.badRequest("픽업 결제 방식(선입금, 현장결제) 중 하나 이상은 켜야 합니다.");
+            throw new ApiException(ErrorCode.PICKUP_PAYMENT_SETTING_REQUIRED);
         }
         String kakaoUrl = blankToNull(r.kakaoInquiryUrl());
         if (kakaoUrl != null && !kakaoUrl.matches("(?i)^https?://\\S+$")) {
             // javascript: 같은 주소가 고객 화면 링크로 들어가지 않게 한다
-            throw ApiException.badRequest("카톡 문의 링크는 http:// 또는 https:// 로 시작하는 주소만 넣을 수 있습니다.");
+            throw new ApiException(ErrorCode.KAKAO_LINK_INVALID);
         }
         if (r.deliveryEnabled() && r.shippingFeeType() == ShippingFeeType.FIXED && r.shippingFee() <= 0) {
-            throw ApiException.badRequest("고정 배송비 금액을 입력해 주세요.");
+            throw new ApiException(ErrorCode.SHIPPING_FEE_REQUIRED);
         }
         if (r.orderChannel() == OrderChannel.LINK_AND_COMMENT && groupBuy.getOrderChannel() != OrderChannel.LINK_AND_COMMENT
                 && !featureAccess.commentsAllowed(groupBuy.getSeller())) {
             // 관리자가 댓글 주문 기능을 열지 않은 판매자 (이미 "링크 + 댓글"인 공구는 그대로 둘 수 있게 바꾸는 경우만 막는다)
-            throw ApiException.badRequest("댓글 주문 기능이 아직 열려 있지 않아 '주문 링크 + 댓글'을 고를 수 없습니다.");
+            throw new ApiException(ErrorCode.COMMENT_CHANNEL_CLOSED);
         }
         if (r.orderChannel() == OrderChannel.LINK_ONLY && groupBuy.getId() != null
                 && orderRepository.findByGroupBuyIdAndSource(groupBuy.getId(), OrderSource.COMMENT).stream()
                 .anyMatch(CustomerOrder::isActive)) {
             // 링크만 쓰는 공구에서는 댓글 집계를 숨기므로, 이미 있는 댓글 주문을 관리할 수 없게 된다
-            throw ApiException.badRequest("댓글 주문이 있어 '주문 링크만'으로 바꿀 수 없습니다. 댓글 주문을 먼저 취소해 주세요.");
+            throw new ApiException(ErrorCode.COMMENT_ORDERS_EXIST);
         }
         groupBuy.updateSettings(new GroupBuySettings(
                 r.title().trim(), blankToNull(r.description()), r.closeAt(),
@@ -240,7 +241,7 @@ public class GroupBuyService {
                 stockAlerts.check(product);
                 kept.add(r.id());
             } else if (r.id() != null) {
-                throw ApiException.badRequest("상품을 찾을 수 없습니다: " + r.id());
+                throw new ApiException(ErrorCode.PRODUCT_ID_NOT_FOUND, r.id());
             } else {
                 groupBuy.getProducts().add(new Product(groupBuy, r.name().trim(), r.unitPrice(), r.stockLimit(),
                         r.perOrderLimit(), order, r.stockAlertThreshold(), r.blockWhenSoldOut()));
@@ -249,7 +250,7 @@ public class GroupBuyService {
         for (Product product : List.copyOf(groupBuy.getProducts())) {
             if (product.getId() != null && !kept.contains(product.getId())) {
                 if (orderRepository.existsByItemsProductId(product.getId())) {
-                    throw ApiException.badRequest("주문이 있는 상품('" + product.getName() + "')은 삭제할 수 없습니다.");
+                    throw new ApiException(ErrorCode.PRODUCT_HAS_ORDERS, product.getName());
                 }
                 groupBuy.getProducts().remove(product);
             }
@@ -274,7 +275,7 @@ public class GroupBuyService {
             if (point.getId() != null && !kept.contains(point.getId())) {
                 // 지우면 그 지점을 고른 주문의 픽업 지점이 조용히 비워지므로(FK SET NULL) 막는다
                 if (orderRepository.existsByPickupPointId(point.getId())) {
-                    throw ApiException.badRequest("주문이 있는 픽업 지점('" + point.getName() + "')은 삭제할 수 없습니다.");
+                    throw new ApiException(ErrorCode.PICKUP_POINT_HAS_ORDERS, point.getName());
                 }
                 groupBuy.getPickupPoints().remove(point);
             }
@@ -283,11 +284,11 @@ public class GroupBuyService {
 
     private void validateOpenable(GroupBuy groupBuy) {
         if (groupBuy.getProducts().isEmpty()) {
-            throw ApiException.badRequest("상품을 1개 이상 등록해야 공구를 열 수 있습니다.");
+            throw new ApiException(ErrorCode.PRODUCT_REQUIRED_TO_OPEN);
         }
         if (groupBuy.usesPrepay() && (groupBuy.getBankName() == null || groupBuy.getAccountNumber() == null
                 || groupBuy.getAccountHolder() == null)) {
-            throw ApiException.badRequest("선입금(배송 또는 픽업 선입금)을 받으려면 입금 계좌(은행·계좌번호·예금주)를 입력해야 합니다.");
+            throw new ApiException(ErrorCode.ACCOUNT_REQUIRED_FOR_PREPAY);
         }
     }
 

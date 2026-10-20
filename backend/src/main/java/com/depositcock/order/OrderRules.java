@@ -3,6 +3,7 @@ package com.depositcock.order;
 import java.util.List;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.PickupPoint;
 
@@ -20,13 +21,13 @@ final class OrderRules {
     static ReceiveMethod receiveMethod(GroupBuy groupBuy, ReceiveMethod requested) {
         if (groupBuy.isPickupEnabled() && groupBuy.isDeliveryEnabled()) {
             if (requested == null) {
-                throw ApiException.badRequest("수령 방법(픽업/배송)을 선택해 주세요.");
+                throw new ApiException(ErrorCode.RECEIVE_METHOD_REQUIRED);
             }
             return requested;
         }
         ReceiveMethod only = groupBuy.isPickupEnabled() ? ReceiveMethod.PICKUP : ReceiveMethod.DELIVERY;
         if (requested != null && requested != only) {
-            throw ApiException.badRequest("선택할 수 없는 수령 방법입니다.");
+            throw new ApiException(ErrorCode.RECEIVE_METHOD_NOT_ALLOWED);
         }
         return only;
     }
@@ -37,13 +38,13 @@ final class OrderRules {
         }
         if (groupBuy.isPickupPrepayEnabled() && groupBuy.isPickupOnsiteEnabled()) {
             if (requested == null) {
-                throw ApiException.badRequest("결제 방식(선입금/현장결제)을 선택해 주세요.");
+                throw new ApiException(ErrorCode.PAYMENT_METHOD_REQUIRED);
             }
             return requested;
         }
         PaymentMethod only = groupBuy.isPickupPrepayEnabled() ? PaymentMethod.PREPAID : PaymentMethod.ONSITE;
         if (requested != null && requested != only) {
-            throw ApiException.badRequest("선택할 수 없는 결제 방식입니다.");
+            throw new ApiException(ErrorCode.PAYMENT_METHOD_NOT_ALLOWED);
         }
         return only;
     }
@@ -57,9 +58,9 @@ final class OrderRules {
             return points.get(0);
         }
         if (pickupPointId == null) {
-            throw ApiException.badRequest("픽업 지점을 선택해 주세요.");
+            throw new ApiException(ErrorCode.PICKUP_POINT_REQUIRED);
         }
         return points.stream().filter(p -> p.getId().equals(pickupPointId)).findFirst()
-                .orElseThrow(() -> ApiException.badRequest("픽업 지점을 찾을 수 없습니다."));
+                .orElseThrow(() -> new ApiException(ErrorCode.PICKUP_POINT_NOT_FOUND));
     }
 }

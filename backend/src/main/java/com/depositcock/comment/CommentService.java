@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 
 import com.depositcock.comment.OrderAggregator.CustomerTotal;
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import com.depositcock.common.Tokens;
 import com.depositcock.customer.Customer;
 import com.depositcock.customer.Customers;
@@ -203,11 +204,11 @@ public class CommentService {
                 continue;
             }
             if (author.isEmpty()) {
-                throw ApiException.badRequest("작성자가 비어 있는 댓글이 있습니다: " + content);
+                throw new ApiException(ErrorCode.COMMENT_AUTHOR_EMPTY, content);
             }
             if (author.contains("[?]") || content.contains("[?]")) {
                 // 읽지 못한 글자가 남은 채로 저장하면 그 닉네임이 고객 키가 되어 주문으로 만들어진다
-                throw ApiException.badRequest("읽지 못한 글자([?])가 남아 있습니다: " + author + " " + content);
+                throw new ApiException(ErrorCode.COMMENT_UNREADABLE_CHARS, author, content);
             }
             commentRepository.save(new ImportedComment(groupBuy.getId(), source, ++seq, truncate(author, 200),
                     truncate(content, 2000), in.duplicateSuspected(), now));
@@ -221,12 +222,12 @@ public class CommentService {
                        Integer manualQuantity) {
         GroupBuy groupBuy = owned(sellerId, groupBuyId);
         ImportedComment comment = commentRepository.findByIdAndGroupBuyId(commentId, groupBuy.getId())
-                .orElseThrow(() -> ApiException.notFound("댓글을 찾을 수 없습니다."));
+                .orElseThrow(() -> new ApiException(ErrorCode.COMMENT_NOT_FOUND));
         if (manualQuantity != null && (manualQuantity < 0 || manualQuantity > 999)) {
-            throw ApiException.badRequest("수량을 확인해 주세요.");
+            throw new ApiException(ErrorCode.COMMENT_QUANTITY_INVALID);
         }
         if (authorName.contains("[?]") || content.contains("[?]")) {
-            throw ApiException.badRequest("읽지 못한 글자([?])를 고친 뒤 저장해 주세요.");
+            throw new ApiException(ErrorCode.COMMENT_FIX_UNREADABLE);
         }
         comment.update(authorName.trim(), content.trim(), manualQuantity);
     }
@@ -235,7 +236,7 @@ public class CommentService {
     public void delete(Long sellerId, Long groupBuyId, Long commentId) {
         GroupBuy groupBuy = owned(sellerId, groupBuyId);
         commentRepository.delete(commentRepository.findByIdAndGroupBuyId(commentId, groupBuy.getId())
-                .orElseThrow(() -> ApiException.notFound("댓글을 찾을 수 없습니다.")));
+                .orElseThrow(() -> new ApiException(ErrorCode.COMMENT_NOT_FOUND)));
     }
 
     @Transactional
@@ -301,8 +302,7 @@ public class CommentService {
     /** 주문 링크만 쓰는 공구는 링크 주문에 닉네임이 없을 수 있어 댓글 주문과 같은 사람인지 비교할 수 없다 → 댓글 주문을 만들지 않는다 */
     public static void requireCommentOrders(GroupBuy groupBuy) {
         if (!groupBuy.isCommentOrdersEnabled()) {
-            throw ApiException.badRequest("'주문 링크만' 쓰는 공구입니다. 댓글 주문도 받으려면 공구 수정에서 주문 받는 방법을 "
-                    + "'주문 링크 + 댓글'로 바꿔 주세요.");
+            throw new ApiException(ErrorCode.COMMENT_CHANNEL_LINK_ONLY);
         }
     }
 
@@ -312,8 +312,7 @@ public class CommentService {
      */
     public static void requireSingleProduct(GroupBuy groupBuy) {
         if (groupBuy.getProducts().size() > 1) {
-            throw ApiException.badRequest("상품이 여러 개인 공구는 아직 댓글 주문을 받을 수 없습니다 "
-                    + "(댓글을 상품별로 나눠 세는 기능 준비 중). 주문 링크로 받아 주세요.");
+            throw new ApiException(ErrorCode.COMMENT_MULTI_PRODUCT);
         }
     }
 
@@ -327,11 +326,11 @@ public class CommentService {
         List<Product> products = groupBuy.sortedProducts();
         if (productId != null) {
             return products.stream().filter(p -> p.getId().equals(productId)).findFirst()
-                    .orElseThrow(() -> ApiException.badRequest("상품을 찾을 수 없습니다."));
+                    .orElseThrow(() -> new ApiException(ErrorCode.PRODUCT_NOT_FOUND));
         }
         if (products.isEmpty()) {
             if (required) {
-                throw ApiException.badRequest("공구에 상품을 먼저 등록해 주세요.");
+                throw new ApiException(ErrorCode.PRODUCT_REQUIRED);
             }
             return null;
         }
