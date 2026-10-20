@@ -62,8 +62,10 @@ public class SellerService {
     @Transactional
     public Seller updateProfile(Long sellerId, UpdateProfileRequest request) {
         Seller seller = get(sellerId);
-        seller.updateDefaults(request.displayName().trim(), blankToNull(request.defaultBankName()),
-                blankToNull(request.defaultAccountNumber()), blankToNull(request.defaultAccountHolder()));
+        seller.setDisplayName(request.displayName().trim());
+        seller.setDefaultBankName(blankToNull(request.defaultBankName()));
+        seller.setDefaultAccountNumber(blankToNull(request.defaultAccountNumber()));
+        seller.setDefaultAccountHolder(blankToNull(request.defaultAccountHolder()));
         return seller;
     }
 
@@ -111,9 +113,9 @@ public class SellerService {
         }
         seller.updateByAdmin(request.plan(), request.paidUntil(), request.trialEndsAt(), request.suspended(),
                 blankToNull(request.adminMemo()));
-        seller.changeDailyCaptureLimit(request.dailyCaptureLimit());
+        seller.setDailyCaptureLimit(request.dailyCaptureLimit());
         if (request.commentFeatureEnabled() != null) {
-            seller.changeCommentFeature(request.commentFeatureEnabled());
+            seller.setCommentFeatureEnabled(request.commentFeatureEnabled());
         }
     }
 

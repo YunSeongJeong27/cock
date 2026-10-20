@@ -98,7 +98,7 @@
             <artifactId>spring-ai-client-chat</artifactId>
         </dependency>
 
-        <!-- getter·생성자 같은 반복 코드를 컴파일할 때 만들어 준다 (2026-10-20 사용자 결정). 엔티티는 @Getter 만 쓰고 @Setter·@Data 는 쓰지 않는다 -->
+        <!-- getter·setter·생성자 같은 반복 코드를 컴파일할 때 만들어 준다 (2026-10-20 사용자 결정) -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

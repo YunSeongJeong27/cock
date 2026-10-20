@@ -13,6 +13,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "order_item")
@@ -35,6 +36,8 @@ public class OrderItem {
     @Column(nullable = false)
     private String productNameSnapshot;
 
+    /** 주문 변경(OrderUpdate)에서만 바꾼다. 단가는 주문 당시 그대로 */
+    @Setter(AccessLevel.PACKAGE)
     @Column(nullable = false)
     private int quantity;
 
@@ -47,11 +50,6 @@ public class OrderItem {
         this.productNameSnapshot = product.getName();
         this.quantity = quantity;
         this.unitPriceSnapshot = product.getUnitPrice();
-    }
-
-    /** 판매자가 주문을 바꿀 때 수량만 바꾼다 (단가는 주문 당시 그대로) */
-    void changeQuantity(int quantity) {
-        this.quantity = quantity;
     }
 
     public int amount() {

@@ -231,7 +231,9 @@ public class CommentService {
             throw new ApiException(ErrorCode.COMMENT_FIX_UNREADABLE);
         }
         // 저장할 때와 같이 칸 길이에 맞춰 자른다 (넘기면 409 "이미 같은 데이터" 로 잘못 안내됐음, 2026-10-20 점검)
-        comment.update(truncate(authorName.trim(), 200), truncate(content.trim(), 2000), manualQuantity);
+        comment.setAuthorName(truncate(authorName.trim(), 200));
+        comment.setContent(truncate(content.trim(), 2000));
+        comment.setManualQuantity(manualQuantity);
     }
 
     @Transactional
@@ -293,8 +295,9 @@ public class CommentService {
             Customer customer = customers.byCommentNickname(groupBuy.getSeller().getId(), t.authorName().trim(), now);
             CustomerOrder order = new CustomerOrder(groupBuy, groupBuy.nextOrderNo(maxOrderNo), OrderSource.COMMENT, customer,
                     Tokens.random(16), now);
-            order.fillCustomer(null, t.authorName(), null);
-            order.fillReceive(receive, null, payment);
+            order.setNickname(t.authorName());
+            order.setReceiveMethod(receive);
+            order.setPaymentMethod(payment);
             order.addItem(new OrderItem(order, product, t.quantity()));
             order.fillAmounts((int) amount, 0);
             orderRepository.save(order);

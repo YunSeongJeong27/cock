@@ -32,11 +32,26 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class OrderUpdate {
 
-    /** 바꿀 값. 입력 검사(필수값, 수령·결제 규칙, 배송 정보)는 부르는 쪽에서 끝낸 값 */
+    /** 바꿀 값. 입력 검사(필수값, 수령·결제 규칙, 배송 정보)는 부르는 쪽에서 끝낸 값. 배송이 아니면 배송 칸은 null */
     @Builder
     record Values(Map<Long, Integer> quantities, ReceiveMethod receive, PickupPoint point, PaymentMethod payment,
                   String depositorName, String nickname, String unitAddress, String recipientName,
                   String recipientPhone, String zipcode, String address, String addressDetail) {
+    }
+
+    /** 수량·금액 말고 주문서 칸을 넣는다 (새 주문, 주문 변경). 배송이 아니면 배송 칸이 null 로 지워진다 */
+    static void fill(CustomerOrder order, Values v) {
+        order.setDepositorName(v.depositorName());
+        order.setNickname(v.nickname());
+        order.setUnitAddress(v.unitAddress());
+        order.setReceiveMethod(v.receive());
+        order.setPickupPoint(v.point());
+        order.setPaymentMethod(v.payment());
+        order.setRecipientName(v.recipientName());
+        order.setRecipientPhone(v.recipientPhone());
+        order.setZipcode(v.zipcode());
+        order.setAddress(v.address());
+        order.setAddressDetail(v.addressDetail());
     }
 
     /** 상품 수량이 어떻게 바뀌는지 ("사과 2→3개", 뺀 상품 "사과 2→0개", 새 상품 "배 0→1개") */
@@ -102,7 +117,7 @@ final class OrderUpdate {
             } else if (after == 0) {
                 order.removeItem(item);
             } else {
-                item.changeQuantity(after);
+                item.setQuantity(after);
             }
         }
         // 판매 수량이 바뀐 상품만 다시 읽는다 (전에는 공구의 모든 상품을 다시 읽었음, 2026-10-20 점검)
@@ -144,13 +159,7 @@ final class OrderUpdate {
                     : new ApiException(ErrorCode.NO_CHANGE);
         }
         int beforeAmount = order.getExpectedAmount();
-        order.fillCustomer(v.depositorName(), v.nickname(), v.unitAddress());
-        order.fillReceive(v.receive(), v.point(), v.payment());
-        if (v.receive() == ReceiveMethod.DELIVERY) {
-            order.fillDelivery(v.recipientName(), v.recipientPhone(), v.zipcode(), v.address(), v.addressDetail());
-        } else {
-            order.fillDelivery(null, null, null, null, null);
-        }
+        fill(order, v);
         order.fillAmounts((int) itemsAmount, shippingFee);
         if (order.getExpectedAmount() != beforeAmount) {
             changes.add("금액 " + won(beforeAmount) + "→" + won(order.getExpectedAmount()));

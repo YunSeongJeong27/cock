@@ -249,12 +249,8 @@ public class PublicOrderService {
                                    Map<Long, Product> products, LocalDateTime now) {
         CustomerOrder order = new CustomerOrder(groupBuy, groupBuy.nextOrderNo(orderRepository.maxOrderNo(groupBuy.getId())),
                 OrderSource.FORM, customer, Tokens.random(16), now);
-        order.placedFrom(deviceToken);
-        order.fillCustomer(v.depositorName(), v.nickname(), v.unitAddress());
-        order.fillReceive(v.receive(), v.point(), v.payment());
-        if (v.receive() == ReceiveMethod.DELIVERY) {
-            order.fillDelivery(v.recipientName(), v.recipientPhone(), v.zipcode(), v.address(), v.addressDetail());
-        }
+        order.setDeviceToken(deviceToken);
+        OrderUpdate.fill(order, v);
 
         long itemsAmount = 0;
         for (Map.Entry<Long, Integer> e : v.quantities().entrySet()) {

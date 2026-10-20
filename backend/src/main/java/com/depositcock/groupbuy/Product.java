@@ -13,6 +13,7 @@ import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "product")
@@ -28,23 +29,29 @@ public class Product {
     @JoinColumn(name = "group_buy_id")
     private GroupBuy groupBuy;
 
+    @Setter
     @Column(nullable = false)
     private String name;
 
+    @Setter
     @Column(nullable = false)
     private int unitPrice;
 
     /** 준비 수량(재고). null 이면 제한 없음. 넘어도 주문은 막지 않는다 (2026-10-16) */
+    @Setter
     private Integer stockLimit;
 
     /** 남은 수량이 이 값 이하가 되면 판매자에게 알림 (화면·메일). null 이면 알림 없음 */
+    @Setter
     private Integer stockAlertThreshold;
 
-    /** 알림 메일을 보냈는지. 남은 수량이 기준보다 다시 많아지면 false 로 돌아가 다음에 또 보낸다 */
+    /** 알림 메일을 보냈는지. 남은 수량이 기준보다 다시 많아지면 false 로 돌아가 다음에 또 보낸다 (StockAlerts 만 바꿈) */
+    @Setter(AccessLevel.PACKAGE)
     @Column(nullable = false)
     private boolean stockAlertSent;
 
     /** 켜면 준비 수량에 도달했을 때 품절로 주문을 막는다 (판매자 선택, 기본 꺼짐. 2026-10-16) */
+    @Setter
     @Column(nullable = false)
     private boolean blockWhenSoldOut;
 
@@ -56,8 +63,10 @@ public class Product {
     private int sold;
 
     /** null 이면 1인 최대 수량 제한 없음 */
+    @Setter
     private Integer perOrderLimit;
 
+    @Setter
     @Column(nullable = false)
     private int sortOrder;
 
@@ -68,17 +77,6 @@ public class Product {
     public Product(GroupBuy groupBuy, String name, int unitPrice, Integer stockLimit, Integer perOrderLimit, int sortOrder,
                    Integer stockAlertThreshold, boolean blockWhenSoldOut) {
         this.groupBuy = groupBuy;
-        this.name = name;
-        this.unitPrice = unitPrice;
-        this.stockLimit = stockLimit;
-        this.perOrderLimit = perOrderLimit;
-        this.sortOrder = sortOrder;
-        this.stockAlertThreshold = stockAlertThreshold;
-        this.blockWhenSoldOut = blockWhenSoldOut;
-    }
-
-    public void update(String name, int unitPrice, Integer stockLimit, Integer perOrderLimit, int sortOrder,
-                       Integer stockAlertThreshold, boolean blockWhenSoldOut) {
         this.name = name;
         this.unitPrice = unitPrice;
         this.stockLimit = stockLimit;
@@ -106,9 +104,5 @@ public class Product {
     public Integer publicRemaining() {
         Integer remaining = remaining();
         return remaining == null || remaining < 1 ? null : remaining;
-    }
-
-    void markStockAlertSent(boolean sent) {
-        this.stockAlertSent = sent;
     }
 }

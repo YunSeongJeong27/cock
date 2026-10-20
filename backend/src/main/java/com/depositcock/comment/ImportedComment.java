@@ -13,6 +13,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * 2단계: 스크린샷·텍스트로 받은 댓글 (검수 후 저장한 것).
@@ -38,9 +39,11 @@ public class ImportedComment {
     @Column(nullable = false)
     private int seq;
 
+    @Setter
     @Column(nullable = false)
     private String authorName;
 
+    @Setter
     @Column(nullable = false)
     private String content;
 
@@ -48,6 +51,7 @@ public class ImportedComment {
     private boolean duplicateSuspected;
 
     /** 판매자가 직접 정한 수량. 있으면 해석 결과보다 우선 */
+    @Setter
     private Integer manualQuantity;
 
     @Column(nullable = false)
@@ -62,11 +66,5 @@ public class ImportedComment {
         this.content = content;
         this.duplicateSuspected = duplicateSuspected;
         this.createdAt = createdAt;
-    }
-
-    public void update(String authorName, String content, Integer manualQuantity) {
-        this.authorName = authorName;
-        this.content = content;
-        this.manualQuantity = manualQuantity;
     }
 }

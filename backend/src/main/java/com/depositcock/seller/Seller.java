@@ -23,6 +23,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "seller")
@@ -40,6 +41,7 @@ public class Seller {
     @Column(nullable = false)
     private String passwordHash;
 
+    @Setter
     @Column(nullable = false)
     private String displayName;
 
@@ -63,14 +65,19 @@ public class Seller {
     private String adminMemo;
 
     /** 하루 캡처(비전 AI) 제한 장수. null 이면 설정 기본값 */
+    @Setter
     private Integer dailyCaptureLimit;
 
     /** 판매자별 댓글 주문 기능 허용 (관리자가 켬). 전체 공개 여부는 FeatureAccess */
+    @Setter
     @Column(nullable = false)
     private boolean commentFeatureEnabled;
 
+    @Setter
     private String defaultBankName;
+    @Setter
     private String defaultAccountNumber;
+    @Setter
     private String defaultAccountHolder;
 
     @Column(nullable = false)
@@ -109,13 +116,6 @@ public class Seller {
         return trialEndsAt.isBefore(now);
     }
 
-    public void updateDefaults(String displayName, String bankName, String accountNumber, String accountHolder) {
-        this.displayName = displayName;
-        this.defaultBankName = bankName;
-        this.defaultAccountNumber = accountNumber;
-        this.defaultAccountHolder = accountHolder;
-    }
-
     public boolean isNotificationOn(NotificationType type) {
         return notifications.getOrDefault(type, type.isDefaultOn());
     }
@@ -136,14 +136,6 @@ public class Seller {
                 notifications.put(type, on);
             }
         });
-    }
-
-    public void changeDailyCaptureLimit(Integer dailyCaptureLimit) {
-        this.dailyCaptureLimit = dailyCaptureLimit;
-    }
-
-    public void changeCommentFeature(boolean enabled) {
-        this.commentFeatureEnabled = enabled;
     }
 
     public void updateByAdmin(Plan plan, LocalDate paidUntil, LocalDateTime trialEndsAt, boolean suspended, String adminMemo) {

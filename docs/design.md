@@ -321,10 +321,10 @@
 - 배경: 처음 설계 문서의 확정 기술 스택 목록에 Lombok 이 빠져 있어서 1차 개발 때 넣지 않았고, 그대로 getter·생성자를 손으로 써 왔음. 안 쓰기로 정한 기록은 없었음 [사실]. 사용자가 "롬복을 쓰면 좋은 부분은 전부 롬복으로" 결정 [결정]
 - 적용한 것 [사실]
   - 엔티티 16개: `@Getter` + `@NoArgsConstructor(access = AccessLevel.PROTECTED)` (JPA 용 빈 생성자). 손으로 쓴 단순 getter 166개 삭제. getter 가 없던 내부 필드 6개(GroupBuy.lastOrderNo, Product.version, DepositConfirmation.activeOrderId·activeDepositRowId, OrderChange.order, Seller.notifications)는 `@Getter(AccessLevel.NONE)` 로 막아 밖에서 보이는 메서드는 전과 같음
-  - 엔티티에 `@Setter`·`@Data`·`@EqualsAndHashCode`·`@AllArgsConstructor` 는 쓰지 않음 (값은 지금처럼 이름 있는 메서드로만 바꿈: `cancel()`, `markPickedUp()` 등). 계산하는 getter(`getPhone()`, `getPaidAt()` 등)는 그대로 손으로 씀
+  - 계산하는 getter(`getPhone()`, `getPaidAt()` 등)는 손으로 씀 (필드 값을 그대로 돌려주는 게 아니라서)
   - 생성자 주입만 하는 서비스·컨트롤러·컴포넌트 32개: `@RequiredArgsConstructor` (final 필드 생성자)
   - 생성자·getter 만 있는 enum 8개(ErrorCode, Notice, MailText 등): `@RequiredArgsConstructor`, `getLabel()`·`isDefaultOn()` 은 `@Getter`. `label()`·`status()`·`text()` 처럼 get 이 안 붙은 메서드는 이름이 바뀌므로 그대로 둠
-- 그대로 둔 것 [판단]: 요청·응답 DTO 는 record 그대로 (record 가 이미 생성자·접근자를 만들어 Lombok 이 필요 없음), 생성자에 로직이 있는 클래스(`@Value` 주입하는 SellerMail, 키를 만드는 DataCipher, VisionConfig 등)·예외 클래스, private 생성자만 있는 도우미 클래스(Lombok `@UtilityClass` 는 실험 기능이라 안 씀)
+- 그대로 둔 것 [판단]: 요청·응답 DTO 는 record 그대로 (record 가 이미 생성자·접근자를 만들어 Lombok 이 필요 없음), 생성자에 로직이 있는 클래스(`@Value` 주입하는 SellerMail, 키를 만드는 DataCipher, VisionConfig 등)·예외 클래스
 - 설정: `backend/pom.xml` 에 lombok(버전은 Spring Boot 가 관리, 1.18.40), 컴파일러 annotationProcessorPaths, 실행 jar 에서는 뺌. `backend/lombok.config` (위 폴더 설정 안 읽음, `@Generated` 붙임)
 - 확인: 테스트 200개 통과 (H2·PostgreSQL 16), 실행 jar 에 lombok 없음, jar 로 브라우저 시나리오(주문·재주문 경고·수동 입금 확정·환불·픽업 끈 뒤 주문 변경·입금 대조·댓글 반영) 통과 [사실]
 - 검토 (원래 작업 에이전트, 점검기록 7장): 지운 것은 단순 getter·생성자뿐, Lombok 전후 공개 메서드 목록이 완전히 같음(javap 비교), enum 생성자 순서 문제없음. PR 브랜치에 merge 후 테스트 202개(H2·PostgreSQL 16)·브라우저 확인 [사실]
@@ -339,6 +339,14 @@
   - enum 값 꺼내는 메서드 이름 통일: `label()`(GroupBuyStatus·PaymentMethod·ReceiveMethod)·`status()`(ErrorCode) → Lombok `getLabel()`·`getStatus()` (DisplayStatus·NotificationType 과 같게). DepositMatcher.Evidence 의 손 생성자·getter 도 `@Getter`·`@RequiredArgsConstructor`. 문구를 조립하는 `message(...)`·`text(...)` 는 계산하는 메서드라 그대로
   - import 묶음 순서 맞춤 (java → javax → 나머지)
   - 확인 [사실]: 테스트 202개 (H2·PostgreSQL 16), 바꾸기 전 jar 와 API 응답 34개 다시 비교 → 같음
+- `@Setter` (사용자 "setter 를 쓰면 좋은 곳은 다 바꿔", 2026-10-20) [결정]
+  - 전에 이 절에 있던 "엔티티에 `@Setter`·`@Data` 쓰지 않음", "`@UtilityClass` 안 씀" 문구는 사용자가 정한 적 없는 내용이라 지움 [사실]
+  - 바꾼 기준 [판단]: 값만 넣고 다른 일은 안 하는 엔티티 메서드 → 그 필드에 `@Setter` (클래스 전체가 아니라 필드마다). 같은 타입 값을 순서대로 넘기던 메서드(`Product.update` 7개, `Seller.updateDefaults` String 4개, `fillDelivery` String 5개)는 순서가 바뀌어도 컴파일러가 못 잡았는데, `setName(...)` 처럼 이름으로 넣게 됨
+  - 바꾼 것 [사실]: ImportedComment.update → authorName·content·manualQuantity, PickupPoint.update → name·info·sortOrder, Product.update → name·unitPrice·stockLimit·perOrderLimit·sortOrder·stockAlertThreshold·blockWhenSoldOut, Product.markStockAlertSent → stockAlertSent(같은 패키지만), Seller.updateDefaults·changeDailyCaptureLimit·changeCommentFeature → displayName·기본 계좌 3칸·dailyCaptureLimit·commentFeatureEnabled, CustomerOrder.fillCustomer·fillReceive·fillDelivery·placedFrom → 주문서 칸 11개·deviceToken, OrderItem.changeQuantity → quantity(같은 패키지만), DepositorAlias.changeCustomer → customerId
+  - 새 주문·주문 변경 두 곳이 주문서 칸 11개를 똑같이 넣어서 `OrderUpdate.fill(order, values)` 하나로 모음. 배송이 아니면 values 의 배송 칸이 이미 null 이라 전의 `fillDelivery(null, ...)` 분기는 없앰 (결과 같음)
+  - 그대로 둔 것 [판단]: 값을 넣으면서 다른 일도 하는 메서드. 시각을 같이 남김(`confirmPaid`·`cancel`·`markPickedUp`·`requestRefund`·`changeStatus`·`changePause`·`updateSettings`·`recordChange` 등), 계산함(`fillAmounts` 는 합계 금액, `CaptureUsage.add` 는 더하기), 조건이 있음(`Seller.updateByAdmin` 은 체험 종료일이 비면 안 바꿈, `CustomerDevice.seen`), 묶음 값을 풀어 넣음(`BankColumnPreset.update(mapping)`), 맵 일부만 바꿈(`changeNotifications`). setter 로 쪼개면 부르는 곳마다 같이 해야 할 일을 빠뜨릴 수 있음
+  - 판매 수량 `sold`·`@Version` 같은 필드에는 setter 를 안 붙임 (원자 UPDATE 로만 바꾸는 값)
+  - 확인 [사실]: 테스트 202개 (H2·PostgreSQL 16), 바꾸기 전 jar 와 API 응답 34개 비교 → 같음. 비교에 없던 상품·픽업 지점 수정, 댓글 수정, 관리자 수정, 프로필 수정은 jar 를 띄워 API 로 따로 확인
 - 내 맥북 IntelliJ: Lombok 플러그인은 기본 포함. 처음 열 때 "Enable annotation processing" 안내가 뜨면 켠다 [사실: IntelliJ 2020.3 이후 기본 포함. 사용자 판(Community/Ultimate)은 미확인]
 
 ### 2026-10-20 전체 점검 2차 (사용자 요청: 이상한 판매자·고객 가정, 디버깅, 고치고 테스트) — 자세한 기록 `docs/점검기록-2026-10-20.md`
@@ -676,7 +684,7 @@
 ### 설정
 - `application.yml`(공통), `application-local.yml`(맥북, H2), `application-prod.yml`(운영, PostgreSQL) 프로필 분리 [제안]
 - 앱 고유 설정 값은 `@ConfigurationProperties` record로 묶어서 주입 [제안]
-- 반복 코드는 Lombok: 엔티티 `@Getter`·`@NoArgsConstructor(PROTECTED)`, 서비스 `@RequiredArgsConstructor`, 로거 `@Slf4j`, 값 8개 이상·같은 타입 4개 이상인 record 는 `@Builder` 로 만든다. 도우미 클래스는 `@NoArgsConstructor(access = PRIVATE)`, enum 값은 `@Getter`(`getLabel()` 등). 엔티티에 `@Setter`·`@Data` 금지. DTO 는 record (2026-10-20 사용자 결정, 위 "Lombok 사용") [결정]
+- 반복 코드는 Lombok: 엔티티 `@Getter`·`@NoArgsConstructor(PROTECTED)`, 서비스 `@RequiredArgsConstructor`, 로거 `@Slf4j`, 값 8개 이상·같은 타입 4개 이상인 record 는 `@Builder` 로 만든다. 도우미 클래스는 `@NoArgsConstructor(access = PRIVATE)`, enum 값은 `@Getter`(`getLabel()` 등). 엔티티에서 값만 넣는 필드는 필드 `@Setter` (값을 넣으면서 시각 기록·계산·조건 검사를 같이 하면 이름 있는 메서드). DTO 는 record (2026-10-20 사용자 결정, 위 "Lombok 사용") [결정]
 - API 키·비밀번호 등 비밀값은 환경변수로만. 깃허브에 올리지 않는다 [결정]
 
 ### 사용자 환경 (내 맥북)

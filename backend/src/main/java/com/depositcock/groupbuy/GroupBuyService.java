@@ -235,8 +235,13 @@ public class GroupBuyService {
             if (r.id() != null && existing.containsKey(r.id())) {
                 Product product = existing.get(r.id());
                 // 재고를 이미 팔린 수량보다 작게 바꿔도 된다 (넘친 만큼 초과로 보임, 2026-10-16)
-                product.update(r.name().trim(), r.unitPrice(), r.stockLimit(), r.perOrderLimit(), order,
-                        r.stockAlertThreshold(), r.blockWhenSoldOut());
+                product.setName(r.name().trim());
+                product.setUnitPrice(r.unitPrice());
+                product.setStockLimit(r.stockLimit());
+                product.setPerOrderLimit(r.perOrderLimit());
+                product.setSortOrder(order);
+                product.setStockAlertThreshold(r.stockAlertThreshold());
+                product.setBlockWhenSoldOut(r.blockWhenSoldOut());
                 stockAlerts.check(product);
                 kept.add(r.id());
             } else if (r.id() != null) {
@@ -264,7 +269,10 @@ public class GroupBuyService {
         for (PickupPointRequest r : requests) {
             order++;
             if (r.id() != null && existing.containsKey(r.id())) {
-                existing.get(r.id()).update(r.name().trim(), blankToNull(r.info()), order);
+                PickupPoint point = existing.get(r.id());
+                point.setName(r.name().trim());
+                point.setInfo(blankToNull(r.info()));
+                point.setSortOrder(order);
                 kept.add(r.id());
             } else {
                 groupBuy.getPickupPoints().add(new PickupPoint(groupBuy, r.name().trim(), blankToNull(r.info()), order));

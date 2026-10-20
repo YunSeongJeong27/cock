@@ -46,12 +46,12 @@ public class StockAlerts {
         Integer remaining = product.remaining();
         if (threshold == null || remaining == null) {
             if (product.isStockAlertSent()) {
-                product.markStockAlertSent(false);
+                product.setStockAlertSent(false);
             }
             return;
         }
         if (remaining <= threshold && !product.isStockAlertSent()) {
-            product.markStockAlertSent(true);
+            product.setStockAlertSent(true);
             GroupBuy groupBuy = product.getGroupBuy();
             if (!groupBuy.getSeller().isNotificationOn(NotificationType.MAIL_STOCK)) {
                 return;
@@ -59,7 +59,7 @@ public class StockAlerts {
             events.publishEvent(new StockAlertEvent(groupBuy.getSeller().getEmail(), groupBuy.getId(),
                     groupBuy.getTitle(), product.getName(), remaining));
         } else if (remaining > threshold && product.isStockAlertSent()) {
-            product.markStockAlertSent(false);
+            product.setStockAlertSent(false);
         }
     }
 }

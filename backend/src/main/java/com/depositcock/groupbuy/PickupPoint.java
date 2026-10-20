@@ -12,6 +12,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "pickup_point")
@@ -27,22 +28,19 @@ public class PickupPoint {
     @JoinColumn(name = "group_buy_id")
     private GroupBuy groupBuy;
 
+    @Setter
     @Column(nullable = false)
     private String name;
 
+    @Setter
     private String info;
 
+    @Setter
     @Column(nullable = false)
     private int sortOrder;
 
     public PickupPoint(GroupBuy groupBuy, String name, String info, int sortOrder) {
         this.groupBuy = groupBuy;
-        this.name = name;
-        this.info = info;
-        this.sortOrder = sortOrder;
-    }
-
-    public void update(String name, String info, int sortOrder) {
         this.name = name;
         this.info = info;
         this.sortOrder = sortOrder;

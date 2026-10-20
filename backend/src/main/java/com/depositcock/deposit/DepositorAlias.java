@@ -11,6 +11,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * 입금자명 → 고객 키. 입금을 확정할 때 저장하고 다음 공구부터 자동 매칭에 쓴다 (단골 반복).
@@ -33,6 +34,7 @@ public class DepositorAlias {
     private String depositorName;
 
     /** 이 입금자명이 가리키는 고객 */
+    @Setter
     @Column(nullable = false)
     private Long customerId;
 
@@ -44,9 +46,5 @@ public class DepositorAlias {
         this.depositorName = depositorName;
         this.customerId = customerId;
         this.createdAt = createdAt;
-    }
-
-    public void changeCustomer(Long customerId) {
-        this.customerId = customerId;
     }
 }

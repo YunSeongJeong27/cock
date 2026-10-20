@@ -11,6 +11,7 @@ import jakarta.persistence.CascadeType;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.DynamicUpdate;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -57,24 +58,35 @@ public class CustomerOrder {
     @JoinColumn(name = "customer_id")
     private Customer customer;
 
+    @Setter
     private String depositorName;
+    @Setter
     private String nickname;
+    @Setter
     private String unitAddress;
 
+    @Setter
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ReceiveMethod receiveMethod;
 
+    @Setter
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pickup_point_id")
     private PickupPoint pickupPoint;
 
+    @Setter
     private String recipientName;
+    @Setter
     private String recipientPhone;
+    @Setter
     private String zipcode;
+    @Setter
     private String address;
+    @Setter
     private String addressDetail;
 
+    @Setter
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PaymentMethod paymentMethod;
@@ -126,6 +138,7 @@ public class CustomerOrder {
     private String refundAccount;
 
     /** 이 주문을 넣은 고객 기기의 쿠키 토큰. 그 기기에만 주문 내용·이전 입력값을 보여준다 (댓글 주문 등은 null) */
+    @Setter
     private String deviceToken;
 
     /** 내부용 랜덤 토큰 (고객에게 안내하지 않음) */
@@ -153,27 +166,6 @@ public class CustomerOrder {
         this.status = OrderStatus.ORDERED;
         this.orderedAt = now;
         this.updatedAt = now;
-    }
-
-    public void fillCustomer(String depositorName, String nickname, String unitAddress) {
-        this.depositorName = depositorName;
-        this.nickname = nickname;
-        this.unitAddress = unitAddress;
-    }
-
-    public void fillReceive(ReceiveMethod receiveMethod, PickupPoint pickupPoint, PaymentMethod paymentMethod) {
-        this.receiveMethod = receiveMethod;
-        this.pickupPoint = pickupPoint;
-        this.paymentMethod = paymentMethod;
-    }
-
-    public void fillDelivery(String recipientName, String recipientPhone, String zipcode, String address,
-                             String addressDetail) {
-        this.recipientName = recipientName;
-        this.recipientPhone = recipientPhone;
-        this.zipcode = zipcode;
-        this.address = address;
-        this.addressDetail = addressDetail;
     }
 
     /** 주문 내용을 바꿨다는 기록을 남긴다 */
@@ -234,10 +226,6 @@ public class CustomerOrder {
             return DisplayStatus.PAID;
         }
         return DisplayStatus.AWAITING_DEPOSIT;
-    }
-
-    public void placedFrom(String deviceToken) {
-        this.deviceToken = deviceToken;
     }
 
     /** 입금 확정. 확정 기록을 새로 남기고 돌려준다 (depositRowId 는 수동 확정이면 null) */

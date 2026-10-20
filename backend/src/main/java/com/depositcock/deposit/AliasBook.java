@@ -38,7 +38,7 @@ public class AliasBook {
             confirmation.recordAliasChange(PaidAliasChange.CREATED, null);
         } else if (!alias.getCustomerId().equals(customerId)) {
             confirmation.recordAliasChange(PaidAliasChange.CHANGED, alias.getCustomerId());
-            alias.changeCustomer(customerId);
+            alias.setCustomerId(customerId);
         }
     }
 
@@ -66,7 +66,7 @@ public class AliasBook {
             return;
         }
         if (confirmation.getAliasChange() == PaidAliasChange.CHANGED && confirmation.getAliasPreviousCustomerId() != null) {
-            alias.changeCustomer(confirmation.getAliasPreviousCustomerId());
+            alias.setCustomerId(confirmation.getAliasPreviousCustomerId());
         } else {
             aliasRepository.delete(alias);
         }

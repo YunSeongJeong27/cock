@@ -180,7 +180,7 @@ class ReviewFixesOrderTest extends IntegrationTest {
         tx.executeWithoutResult(status -> {
             Product loaded = productRepository.findById(g.productId()).orElseThrow(); // sold = 0 인 상태로 읽음
             productRepository.increaseSold(g.productId(), 3);                         // 그 사이 다른 주문이 3개
-            loaded.update("상품 이름 변경", 1000, 10, null, 1, null, false);                         // 판매자 수정 (옛 sold 를 들고 있음)
+            loaded.setName("상품 이름 변경");                                          // 판매자 수정 (옛 sold 를 들고 있음)
         });
         assertThat(productRepository.findById(g.productId()).orElseThrow().getSold()).isEqualTo(3);
     }
