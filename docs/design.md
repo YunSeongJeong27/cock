@@ -327,6 +327,7 @@
 - 그대로 둔 것 [판단]: 요청·응답 DTO 는 record 그대로 (record 가 이미 생성자·접근자를 만들어 Lombok 이 필요 없음), 생성자에 로직이 있는 클래스(`@Value` 주입하는 SellerMail, 키를 만드는 DataCipher, VisionConfig 등)·예외 클래스, private 생성자만 있는 도우미 클래스(Lombok `@UtilityClass` 는 실험 기능이라 안 씀)
 - 설정: `backend/pom.xml` 에 lombok(버전은 Spring Boot 가 관리, 1.18.40), 컴파일러 annotationProcessorPaths, 실행 jar 에서는 뺌. `backend/lombok.config` (위 폴더 설정 안 읽음, `@Generated` 붙임)
 - 확인: 테스트 200개 통과 (H2·PostgreSQL 16), 실행 jar 에 lombok 없음, jar 로 브라우저 시나리오(주문·재주문 경고·수동 입금 확정·환불·픽업 끈 뒤 주문 변경·입금 대조·댓글 반영) 통과 [사실]
+- 검토 (원래 작업 에이전트, 점검기록 7장): 지운 것은 단순 getter·생성자뿐, Lombok 전후 공개 메서드 목록이 완전히 같음(javap 비교), enum 생성자 순서 문제없음. PR 브랜치에 merge 후 테스트 202개(H2·PostgreSQL 16)·브라우저 확인 [사실]
 - 내 맥북 IntelliJ: Lombok 플러그인은 기본 포함. 처음 열 때 "Enable annotation processing" 안내가 뜨면 켠다 [사실: IntelliJ 2020.3 이후 기본 포함. 사용자 판(Community/Ultimate)은 미확인]
 
 ### 2026-10-20 전체 점검 2차 (사용자 요청: 이상한 판매자·고객 가정, 디버깅, 고치고 테스트) — 자세한 기록 `docs/점검기록-2026-10-20.md`
