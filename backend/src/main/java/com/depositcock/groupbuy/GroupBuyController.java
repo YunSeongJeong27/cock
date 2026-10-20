@@ -9,6 +9,7 @@ import com.depositcock.groupbuy.GroupBuyDtos.GroupBuySummary;
 import com.depositcock.groupbuy.GroupBuyDtos.PauseRequest;
 import com.depositcock.security.CurrentSeller;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,13 +21,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/seller/group-buys")
+@RequiredArgsConstructor
 public class GroupBuyController {
 
     private final GroupBuyService groupBuyService;
-
-    public GroupBuyController(GroupBuyService groupBuyService) {
-        this.groupBuyService = groupBuyService;
-    }
 
     @GetMapping
     public List<GroupBuySummary> list() {

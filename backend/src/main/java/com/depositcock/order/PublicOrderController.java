@@ -14,6 +14,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,17 +30,13 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/public/g/{token}")
+@RequiredArgsConstructor
 public class PublicOrderController {
 
     private static final Duration COOKIE_AGE = Duration.ofDays(365);
 
     private final PublicOrderService service;
     private final AppProperties properties;
-
-    public PublicOrderController(PublicOrderService service, AppProperties properties) {
-        this.service = service;
-        this.properties = properties;
-    }
 
     @GetMapping
     public PublicGroupBuy view(@PathVariable String token, HttpServletRequest request) {

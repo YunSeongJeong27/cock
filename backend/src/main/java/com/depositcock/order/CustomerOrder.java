@@ -8,6 +8,9 @@ import com.depositcock.customer.Customer;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.PickupPoint;
 import jakarta.persistence.CascadeType;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.DynamicUpdate;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -29,6 +32,8 @@ import jakarta.persistence.Table;
 @Entity
 @DynamicUpdate
 @Table(name = "customer_order")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CustomerOrder {
 
     @Id
@@ -138,9 +143,6 @@ public class CustomerOrder {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
-    protected CustomerOrder() {
-    }
-
     public CustomerOrder(GroupBuy groupBuy, int orderNo, OrderSource source, Customer customer, String lookupToken,
                          LocalDateTime now) {
         this.groupBuy = groupBuy;
@@ -178,10 +180,6 @@ public class CustomerOrder {
     public void recordChange(String summary, ChangeActor actor, LocalDateTime now) {
         changes.add(new OrderChange(this, summary, actor, now));
         this.updatedAt = now;
-    }
-
-    public List<OrderChange> getChanges() {
-        return changes;
     }
 
     /** 수량이 0 이 된 상품 줄은 지운다 (orphanRemoval) */
@@ -371,46 +369,8 @@ public class CustomerOrder {
         this.refundAccount = null;
     }
 
-    public LocalDateTime getRefundRequestedAt() {
-        return refundRequestedAt;
-    }
-
-    public LocalDateTime getRefundRejectedAt() {
-        return refundRejectedAt;
-    }
-
-    public String getRefundBank() {
-        return refundBank;
-    }
-
-    /** 암호화된 계좌번호 */
-    public String getRefundAccount() {
-        return refundAccount;
-    }
-
-
     public int totalQuantity() {
         return items.stream().mapToInt(OrderItem::getQuantity).sum();
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public GroupBuy getGroupBuy() {
-        return groupBuy;
-    }
-
-    public int getOrderNo() {
-        return orderNo;
-    }
-
-    public OrderSource getSource() {
-        return source;
-    }
-
-    public Customer getCustomer() {
-        return customer;
     }
 
     public Long getCustomerId() {
@@ -420,66 +380,6 @@ public class CustomerOrder {
     /** 주문한 고객의 휴대폰 번호 (댓글 주문은 null) */
     public String getPhone() {
         return customer.getPhone();
-    }
-
-    public String getDepositorName() {
-        return depositorName;
-    }
-
-    public String getNickname() {
-        return nickname;
-    }
-
-    public String getUnitAddress() {
-        return unitAddress;
-    }
-
-    public ReceiveMethod getReceiveMethod() {
-        return receiveMethod;
-    }
-
-    public PickupPoint getPickupPoint() {
-        return pickupPoint;
-    }
-
-    public String getRecipientName() {
-        return recipientName;
-    }
-
-    public String getRecipientPhone() {
-        return recipientPhone;
-    }
-
-    public String getZipcode() {
-        return zipcode;
-    }
-
-    public String getAddress() {
-        return address;
-    }
-
-    public String getAddressDetail() {
-        return addressDetail;
-    }
-
-    public PaymentMethod getPaymentMethod() {
-        return paymentMethod;
-    }
-
-    public int getItemsAmount() {
-        return itemsAmount;
-    }
-
-    public int getShippingFee() {
-        return shippingFee;
-    }
-
-    public int getExpectedAmount() {
-        return expectedAmount;
-    }
-
-    public OrderStatus getStatus() {
-        return status;
     }
 
     public boolean isPaid() {
@@ -494,55 +394,7 @@ public class CustomerOrder {
         return activeConfirmation().map(DepositConfirmation::getDepositorName).orElse(null);
     }
 
-    public List<DepositConfirmation> getConfirmations() {
-        return confirmations;
-    }
-
-    public String getDeviceToken() {
-        return deviceToken;
-    }
-
     public Integer getPaidAmount() {
         return activeConfirmation().map(DepositConfirmation::getAmount).orElse(null);
-    }
-
-    public boolean isOnsitePaid() {
-        return onsitePaid;
-    }
-
-    public boolean isPickedUp() {
-        return pickedUp;
-    }
-
-    public LocalDateTime getPickedUpAt() {
-        return pickedUpAt;
-    }
-
-    public boolean isRefundRequired() {
-        return refundRequired;
-    }
-
-    public LocalDateTime getRefundedAt() {
-        return refundedAt;
-    }
-
-    public String getLookupToken() {
-        return lookupToken;
-    }
-
-    public LocalDateTime getOrderedAt() {
-        return orderedAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public LocalDateTime getCancelledAt() {
-        return cancelledAt;
-    }
-
-    public List<OrderItem> getItems() {
-        return items;
     }
 }

@@ -13,6 +13,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /**
  * 입금 확정 1건. 확정을 취소해도 지우지 않고 cancelledAt 을 채워 이력으로 남긴다 (누가 언제 무엇으로 확정했다가 취소했는지).
@@ -21,6 +24,8 @@ import jakarta.persistence.Table;
  */
 @Entity
 @Table(name = "deposit_confirmation")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DepositConfirmation {
 
     @Id
@@ -56,12 +61,11 @@ public class DepositConfirmation {
 
     private LocalDateTime cancelledAt;
 
+    @Getter(AccessLevel.NONE)
     private Long activeOrderId;
 
+    @Getter(AccessLevel.NONE)
     private Long activeDepositRowId;
-
-    protected DepositConfirmation() {
-    }
 
     DepositConfirmation(CustomerOrder order, Long depositRowId, String depositorName, int amount, LocalDateTime now) {
         this.order = order;
@@ -88,45 +92,5 @@ public class DepositConfirmation {
 
     public boolean isActive() {
         return cancelledAt == null;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public CustomerOrder getOrder() {
-        return order;
-    }
-
-    public Long getDepositRowId() {
-        return depositRowId;
-    }
-
-    public boolean isManual() {
-        return manual;
-    }
-
-    public String getDepositorName() {
-        return depositorName;
-    }
-
-    public int getAmount() {
-        return amount;
-    }
-
-    public PaidAliasChange getAliasChange() {
-        return aliasChange;
-    }
-
-    public Long getAliasPreviousCustomerId() {
-        return aliasPreviousCustomerId;
-    }
-
-    public LocalDateTime getConfirmedAt() {
-        return confirmedAt;
-    }
-
-    public LocalDateTime getCancelledAt() {
-        return cancelledAt;
     }
 }

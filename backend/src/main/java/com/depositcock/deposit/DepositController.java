@@ -15,6 +15,7 @@ import com.depositcock.deposit.DepositDtos.UploadSummary;
 import com.depositcock.order.OrderDtos.ManualPaidRequest;
 import com.depositcock.security.CurrentSeller;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,15 +27,12 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
+@RequiredArgsConstructor
 public class DepositController {
 
     private static final String BASE = "/api/seller/group-buys/{groupBuyId}/deposits";
 
     private final DepositService service;
-
-    public DepositController(DepositService service) {
-        this.service = service;
-    }
 
     /** 자동 탐지에 쓰는 기본 열 이름 후보 (화면 안내용) */
     @GetMapping("/api/seller/bank-columns/defaults")

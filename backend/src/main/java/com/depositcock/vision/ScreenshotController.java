@@ -9,6 +9,7 @@ import com.depositcock.vision.ScreenshotService.DepositExtractResponse;
 import com.depositcock.vision.ScreenshotService.SaveRow;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,17 +19,12 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
+@RequiredArgsConstructor
 public class ScreenshotController {
 
     private final ScreenshotService service;
     private final CaptureUsageService usageService;
     private final VisionExtractor extractor;
-
-    public ScreenshotController(ScreenshotService service, CaptureUsageService usageService, VisionExtractor extractor) {
-        this.service = service;
-        this.usageService = usageService;
-        this.extractor = extractor;
-    }
 
     public record CaptureStatus(boolean visionAvailable, CaptureUsageService.Usage usage) {
     }

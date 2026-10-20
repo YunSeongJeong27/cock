@@ -1,10 +1,13 @@
 package com.depositcock.common;
 
+import lombok.RequiredArgsConstructor;
+
 /**
  * 서버가 만들어 화면에 보내는 안내 문구 (2026-10-20). 오류는 ErrorCode, 메일은 MailText.
  * 서버와 화면이 같이 쓰는 문장은 여기 하나만 두고 응답으로 보낸다 (프론트에 같은 문장을 또 적지 않는다).
  * 값이 들어가는 문장은 %s·%d 자리에 순서대로 넣는다.
  */
+@RequiredArgsConstructor
 public enum Notice {
 
     // 공구·주문
@@ -41,10 +44,6 @@ public enum Notice {
             + "(관리자: 환경변수 APP_VISION_PROVIDER=anthropic, ANTHROPIC_API_KEY 설정)");
 
     private final String format;
-
-    Notice(String format) {
-        this.format = format;
-    }
 
     public String text(Object... args) {
         return args.length == 0 ? format : String.format(format, args);

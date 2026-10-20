@@ -11,6 +11,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -26,6 +27,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * 프록시 뒤에서는 server.forward-headers-strategy 설정으로 실제 IP 가 getRemoteAddr 에 들어온다.
  */
 @Component
+@RequiredArgsConstructor
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final long MINUTE = 60_000;
@@ -36,11 +38,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final Map<String, Deque<Long>> sensitive = new ConcurrentHashMap<>();
     private final AppProperties properties;
     private final Clock clock;
-
-    public RateLimitFilter(AppProperties properties, Clock clock) {
-        this.properties = properties;
-        this.clock = clock;
-    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -97,7 +94,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
         return allowed;
     }
-
 
     /** 테스트용 */
     int trackedKeys() {

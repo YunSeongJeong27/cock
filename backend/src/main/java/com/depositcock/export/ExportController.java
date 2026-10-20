@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 import com.depositcock.deposit.DepositDtos.AnnouncementResponse;
 import com.depositcock.security.CurrentSeller;
+import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -16,13 +17,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@RequiredArgsConstructor
 public class ExportController {
 
     private final ExportService service;
-
-    public ExportController(ExportService service) {
-        this.service = service;
-    }
 
     @GetMapping("/api/seller/group-buys/{groupBuyId}/export.xlsx")
     public ResponseEntity<byte[]> orderSheet(@PathVariable Long groupBuyId,

@@ -7,6 +7,7 @@ import java.time.Instant;
 import com.depositcock.common.AppProperties;
 import com.depositcock.seller.Seller;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -17,17 +18,12 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class TokenService {
 
     private final JwtEncoder jwtEncoder;
     private final AppProperties properties;
     private final Clock clock;
-
-    public TokenService(JwtEncoder jwtEncoder, AppProperties properties, Clock clock) {
-        this.jwtEncoder = jwtEncoder;
-        this.properties = properties;
-        this.clock = clock;
-    }
 
     public String issue(Seller seller) {
         Instant now = clock.instant();

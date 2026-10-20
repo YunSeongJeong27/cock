@@ -2,6 +2,7 @@ package com.depositcock.groupbuy;
 
 import com.depositcock.common.Notice;
 import com.depositcock.seller.NotificationType;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
  * 판매자가 알림 설정에서 재고 메일을 껐으면 메일만 안 보낸다 (보낸 것으로 표시는 그대로, 2026-10-19).
  */
 @Service
+@RequiredArgsConstructor
 public class StockAlerts {
 
     /** 메일 보내기는 트랜잭션이 끝난 뒤 (주문이 롤백되면 보내지 않음) */
@@ -20,10 +22,6 @@ public class StockAlerts {
     }
 
     private final ApplicationEventPublisher events;
-
-    public StockAlerts(ApplicationEventPublisher events) {
-        this.events = events;
-    }
 
     /** 알림 문장 (화면 알림 칸·메일 공통). 남은 수량이 0 이하면 소진·초과로 쓴다 */
     public static String headline(String productName, int remaining) {

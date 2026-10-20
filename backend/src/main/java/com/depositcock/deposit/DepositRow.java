@@ -8,9 +8,14 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "deposit_row")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DepositRow {
 
     /** deposit_row.depositor_name·datetime_text 칸 길이 */
@@ -39,9 +44,6 @@ public class DepositRow {
     /** 변환한 입금 시각 (형식을 모르면 null) */
     private LocalDateTime depositedAt;
 
-    protected DepositRow() {
-    }
-
     public DepositRow(Long uploadId, int rowNo, String depositorName, int amount, String datetimeText,
                       LocalDateTime depositedAt) {
         this.uploadId = uploadId;
@@ -59,33 +61,5 @@ public class DepositRow {
     /** 같은 입금인지 비교하는 키 (이름 + 금액 + 시각 원문) */
     public static String dedupeKey(String depositorName, int amount, String datetimeText) {
         return depositorName + "|" + amount + "|" + (datetimeText == null ? "" : datetimeText);
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public Long getUploadId() {
-        return uploadId;
-    }
-
-    public int getRowNo() {
-        return rowNo;
-    }
-
-    public String getDepositorName() {
-        return depositorName;
-    }
-
-    public int getAmount() {
-        return amount;
-    }
-
-    public String getDatetimeText() {
-        return datetimeText;
-    }
-
-    public LocalDateTime getDepositedAt() {
-        return depositedAt;
     }
 }

@@ -44,6 +44,7 @@ import com.depositcock.order.CustomerOrderRepository;
 import com.depositcock.order.DepositConfirmation;
 import com.depositcock.order.DepositConfirmationRepository;
 import com.depositcock.order.PhoneNumbers;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -53,6 +54,7 @@ import org.springframework.web.multipart.MultipartFile;
  */
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class DepositService {
 
     private final GroupBuyService groupBuyService;
@@ -66,24 +68,6 @@ public class DepositService {
     private final BankColumnPresetRepository presetRepository;
     private final BankStatementReader reader;
     private final Clock clock;
-
-    public DepositService(GroupBuyService groupBuyService, CustomerOrderRepository orderRepository,
-                          DepositUploadRepository uploadRepository, DepositRowRepository rowRepository,
-                          DepositorAliasRepository aliasRepository, AliasBook aliasBook,
-                          DepositConfirmationRepository confirmationRepository, CustomerRepository customerRepository, BankColumnPresetRepository presetRepository,
-                          BankStatementReader reader, Clock clock) {
-        this.groupBuyService = groupBuyService;
-        this.orderRepository = orderRepository;
-        this.uploadRepository = uploadRepository;
-        this.rowRepository = rowRepository;
-        this.aliasRepository = aliasRepository;
-        this.aliasBook = aliasBook;
-        this.confirmationRepository = confirmationRepository;
-        this.customerRepository = customerRepository;
-        this.presetRepository = presetRepository;
-        this.reader = reader;
-        this.clock = clock;
-    }
 
     // ---------- 업로드 ----------
 

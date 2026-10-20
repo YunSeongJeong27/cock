@@ -11,6 +11,7 @@ import static org.springframework.http.HttpStatus.PAYLOAD_TOO_LARGE;
 import static org.springframework.http.HttpStatus.TOO_MANY_REQUESTS;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -22,6 +23,7 @@ import org.springframework.http.HttpStatus;
  * ApiExceptionHandler 가 그 이름의 문구·code 로 응답한다. 어노테이션 값은 상수만 되므로 이름을 글자로 적고,
  * 없는 이름을 적으면 ErrorResponseTest 가 잡는다. 검사용 코드는 값(%s)을 넣지 않고 상태는 400.
  */
+@RequiredArgsConstructor
 public enum ErrorCode {
 
     // ---- 공통 ----
@@ -263,11 +265,6 @@ public enum ErrorCode {
 
     private final HttpStatus status;
     private final String format;
-
-    ErrorCode(HttpStatus status, String format) {
-        this.status = status;
-        this.format = format;
-    }
 
     public HttpStatus status() {
         return status;

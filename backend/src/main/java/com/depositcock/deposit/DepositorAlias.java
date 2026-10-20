@@ -8,12 +8,17 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /**
  * 입금자명 → 고객 키. 입금을 확정할 때 저장하고 다음 공구부터 자동 매칭에 쓴다 (단골 반복).
  */
 @Entity
 @Table(name = "depositor_alias")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DepositorAlias {
 
     @Id
@@ -34,9 +39,6 @@ public class DepositorAlias {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    protected DepositorAlias() {
-    }
-
     public DepositorAlias(Long sellerId, String depositorName, Long customerId, LocalDateTime createdAt) {
         this.sellerId = sellerId;
         this.depositorName = depositorName;
@@ -46,25 +48,5 @@ public class DepositorAlias {
 
     public void changeCustomer(Long customerId) {
         this.customerId = customerId;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public Long getSellerId() {
-        return sellerId;
-    }
-
-    public String getDepositorName() {
-        return depositorName;
-    }
-
-    public Long getCustomerId() {
-        return customerId;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
     }
 }

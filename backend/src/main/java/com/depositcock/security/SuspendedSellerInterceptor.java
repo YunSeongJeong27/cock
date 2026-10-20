@@ -6,6 +6,7 @@ import com.depositcock.seller.Seller;
 import com.depositcock.seller.SellerRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -14,13 +15,10 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * 이미 열려 있는 공구의 고객 주문(/api/public)은 막지 않는다. 탈퇴는 허용한다.
  */
 @Component
+@RequiredArgsConstructor
 public class SuspendedSellerInterceptor implements HandlerInterceptor {
 
     private final SellerRepository sellerRepository;
-
-    public SuspendedSellerInterceptor(SellerRepository sellerRepository) {
-        this.sellerRepository = sellerRepository;
-    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {

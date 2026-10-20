@@ -10,12 +10,17 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /**
  * 2단계: 스크린샷·텍스트로 받은 댓글 (검수 후 저장한 것).
  */
 @Entity
 @Table(name = "imported_comment")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ImportedComment {
 
     @Id
@@ -48,9 +53,6 @@ public class ImportedComment {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    protected ImportedComment() {
-    }
-
     public ImportedComment(Long groupBuyId, CommentSource source, int seq, String authorName, String content,
                            boolean duplicateSuspected, LocalDateTime createdAt) {
         this.groupBuyId = groupBuyId;
@@ -66,41 +68,5 @@ public class ImportedComment {
         this.authorName = authorName;
         this.content = content;
         this.manualQuantity = manualQuantity;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public Long getGroupBuyId() {
-        return groupBuyId;
-    }
-
-    public CommentSource getSource() {
-        return source;
-    }
-
-    public int getSeq() {
-        return seq;
-    }
-
-    public String getAuthorName() {
-        return authorName;
-    }
-
-    public String getContent() {
-        return content;
-    }
-
-    public boolean isDuplicateSuspected() {
-        return duplicateSuspected;
-    }
-
-    public Integer getManualQuantity() {
-        return manualQuantity;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
     }
 }

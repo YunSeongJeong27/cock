@@ -20,9 +20,14 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.MapKeyColumn;
 import jakarta.persistence.MapKeyEnumerated;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "seller")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Seller {
 
     @Id
@@ -77,10 +82,8 @@ public class Seller {
     @MapKeyEnumerated(EnumType.STRING)
     @MapKeyColumn(name = "notification_type")
     @Column(name = "enabled", nullable = false)
+    @Getter(AccessLevel.NONE)
     private Map<NotificationType, Boolean> notifications = new HashMap<>();
-
-    protected Seller() {
-    }
 
     public Seller(String email, String passwordHash, String displayName, Role role,
                   LocalDateTime createdAt, LocalDateTime trialEndsAt) {
@@ -139,14 +142,6 @@ public class Seller {
         this.dailyCaptureLimit = dailyCaptureLimit;
     }
 
-    public Integer getDailyCaptureLimit() {
-        return dailyCaptureLimit;
-    }
-
-    public boolean isCommentFeatureEnabled() {
-        return commentFeatureEnabled;
-    }
-
     public void changeCommentFeature(boolean enabled) {
         this.commentFeatureEnabled = enabled;
     }
@@ -159,61 +154,5 @@ public class Seller {
         }
         this.suspended = suspended;
         this.adminMemo = adminMemo;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public String getPasswordHash() {
-        return passwordHash;
-    }
-
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public Role getRole() {
-        return role;
-    }
-
-    public Plan getPlan() {
-        return plan;
-    }
-
-    public LocalDateTime getTrialEndsAt() {
-        return trialEndsAt;
-    }
-
-    public LocalDate getPaidUntil() {
-        return paidUntil;
-    }
-
-    public boolean isSuspended() {
-        return suspended;
-    }
-
-    public String getAdminMemo() {
-        return adminMemo;
-    }
-
-    public String getDefaultBankName() {
-        return defaultBankName;
-    }
-
-    public String getDefaultAccountNumber() {
-        return defaultAccountNumber;
-    }
-
-    public String getDefaultAccountHolder() {
-        return defaultAccountHolder;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
     }
 }

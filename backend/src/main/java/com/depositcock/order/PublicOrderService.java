@@ -45,6 +45,7 @@ import com.depositcock.order.OrderDtos.PublicGroupBuy;
 import com.depositcock.order.OrderDtos.PublicProduct;
 import com.depositcock.order.OrderDtos.RefundRequest;
 import com.depositcock.seller.NotificationType;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import jakarta.persistence.EntityManager;
@@ -57,6 +58,7 @@ import org.springframework.web.ErrorResponseException;
  */
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class PublicOrderService {
 
     private final GroupBuyRepository groupBuyRepository;
@@ -70,24 +72,6 @@ public class PublicOrderService {
     private final StockAlerts stockAlerts;
     private final DataCipher cipher;
     private final SellerNotices notices;
-
-    public PublicOrderService(GroupBuyRepository groupBuyRepository, ProductRepository productRepository,
-                              CustomerOrderRepository orderRepository, CustomerDeviceRepository deviceRepository,
-                              CustomerRepository customerRepository, Customers customers,
-                              EntityManager entityManager, Clock clock, StockAlerts stockAlerts, DataCipher cipher,
-                              SellerNotices notices) {
-        this.notices = notices;
-        this.cipher = cipher;
-        this.stockAlerts = stockAlerts;
-        this.customerRepository = customerRepository;
-        this.customers = customers;
-        this.entityManager = entityManager;
-        this.groupBuyRepository = groupBuyRepository;
-        this.productRepository = productRepository;
-        this.orderRepository = orderRepository;
-        this.deviceRepository = deviceRepository;
-        this.clock = clock;
-    }
 
     /** 공개 화면 결과 + 쿠키에 새로 넣을 토큰(있으면) */
     /** 주문 1건 금액 상한 (int 넘침 방지). 공구 주문으로 1억원은 넘지 않는다고 본다 [판단] */

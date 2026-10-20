@@ -1,6 +1,7 @@
 package com.depositcock.seller;
 
 import com.depositcock.common.AppProperties;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -11,17 +12,13 @@ import org.springframework.stereotype.Component;
  * 앱 시작 시 app.admin-email / app.admin-password 로 관리자 계정을 만든다 (이미 있으면 그대로 둔다).
  */
 @Component
+@RequiredArgsConstructor
 public class AdminBootstrap implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(AdminBootstrap.class);
 
     private final SellerService sellerService;
     private final AppProperties properties;
-
-    public AdminBootstrap(SellerService sellerService, AppProperties properties) {
-        this.sellerService = sellerService;
-        this.properties = properties;
-    }
 
     @Override
     public void run(ApplicationArguments args) {

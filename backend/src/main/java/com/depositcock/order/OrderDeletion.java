@@ -17,6 +17,7 @@ import com.depositcock.deposit.DepositRowRepository;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.GroupBuyService;
 import jakarta.persistence.EntityManager;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 주문번호는 다시 쓰지 않는다 (GroupBuy.lastOrderNo).
  */
 @Service
+@RequiredArgsConstructor
 public class OrderDeletion {
 
     private final GroupBuyService groupBuyService;
@@ -41,18 +43,6 @@ public class OrderDeletion {
     private final DepositRowRepository rowRepository;
     private final ImportedCommentRepository commentRepository;
     private final EntityManager entityManager;
-
-    public OrderDeletion(GroupBuyService groupBuyService, CustomerOrderRepository orderRepository, AliasBook aliasBook,
-                         Customers customers, DepositRowRepository rowRepository, ImportedCommentRepository commentRepository,
-                         EntityManager entityManager) {
-        this.groupBuyService = groupBuyService;
-        this.orderRepository = orderRepository;
-        this.aliasBook = aliasBook;
-        this.customers = customers;
-        this.rowRepository = rowRepository;
-        this.commentRepository = commentRepository;
-        this.entityManager = entityManager;
-    }
 
     /** @return 지운 주문 수 */
     @Transactional

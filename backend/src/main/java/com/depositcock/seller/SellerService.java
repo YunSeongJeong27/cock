@@ -15,6 +15,7 @@ import com.depositcock.seller.SellerDtos.AdminSellerRow;
 import com.depositcock.seller.SellerDtos.AdminUpdateRequest;
 import com.depositcock.seller.SellerDtos.SignupRequest;
 import com.depositcock.seller.SellerDtos.UpdateProfileRequest;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class SellerService {
 
     private final SellerRepository sellerRepository;
@@ -30,17 +32,6 @@ public class SellerService {
     private final AppProperties properties;
     private final CaptureUsageService captureUsageService;
     private final Clock clock;
-
-    public SellerService(SellerRepository sellerRepository, GroupBuyRepository groupBuyRepository,
-                         PasswordEncoder passwordEncoder, AppProperties properties,
-                         CaptureUsageService captureUsageService, Clock clock) {
-        this.sellerRepository = sellerRepository;
-        this.groupBuyRepository = groupBuyRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.properties = properties;
-        this.captureUsageService = captureUsageService;
-        this.clock = clock;
-    }
 
     @Transactional
     public Seller signup(SignupRequest request) {
