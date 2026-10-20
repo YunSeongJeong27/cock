@@ -86,7 +86,7 @@ final class OrderMapper {
                 status.getLabel(), o.isActive(), o.isFinished(), o.isPaid(), o.getPaidAt(),
                 o.getPaidDepositorName(), o.getPaidAmount(), o.isOnsitePaid(), o.isPickedUp(), o.getPickedUpAt(),
                 o.isRefundRequired(), o.getRefundedAt(), o.getRefundRequestedAt(), o.getRefundRejectedAt(),
-                o.getRefundBank(), cipher.decrypt(o.getRefundAccount()), o.getRefundHolder(), duplicateContact, o.getOrderedAt(), o.getUpdatedAt(), o.getCancelledAt(),
+                o.getRefundBank(), cipher.decrypt(o.getRefundAccount()), duplicateContact, o.getOrderedAt(), o.getUpdatedAt(), o.getCancelledAt(),
                 o.getConfirmations().stream().map(c -> new PaymentRecord(c.getDepositorName(), c.getAmount(),
                         c.isManual(), c.getConfirmedAt(), c.getCancelledAt())).toList(),
                 o.getChanges().stream().map(c -> new ChangeRecord(c.getSummary(), c.getChangedBy(), c.getChangedAt())).toList(),

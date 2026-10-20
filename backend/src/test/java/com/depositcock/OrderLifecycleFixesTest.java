@@ -70,7 +70,7 @@ class OrderLifecycleFixesTest extends IntegrationTest {
 
     private void requestRefund(Opened g, String phone, String depositor) throws Exception {
         mvc.perform(withJson(post(g.pub() + "/refund-request"), Map.of("phone", phone, "depositorName", depositor,
-                "bankName", "국민", "accountNumber", "110123456789", "accountHolder", depositor))).andExpect(status().isOk());
+                "bankName", "국민", "accountNumber", "110123456789"))).andExpect(status().isOk());
     }
 
     private JsonNode sellerOrder(Opened g, int orderNo) throws Exception {

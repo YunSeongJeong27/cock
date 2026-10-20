@@ -150,7 +150,6 @@ CREATE TABLE customer_order (
     -- 환불받을 계좌. 계좌번호는 암호화해서 저장 (DataCipher). 환불 완료·반려·환불 없는 취소 때 지운다
     refund_bank         VARCHAR(50),
     refund_account      VARCHAR(200),
-    refund_holder       VARCHAR(50),
     lookup_token        VARCHAR(40)  NOT NULL UNIQUE,
     -- 이 주문을 넣은 고객 기기의 쿠키 토큰. 그 기기에만 주문 내용·이전 입력값을 보여준다 (댓글 주문 등은 NULL)
     device_token        VARCHAR(64),

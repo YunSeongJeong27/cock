@@ -393,12 +393,10 @@ public class PublicOrderService {
                     ? "이미 환불 신청한 주문입니다. 판매자가 확인 중입니다."
                     : "환불 신청이 반려된 주문입니다. 판매자에게 문의해 주세요.");
         }
-        // 휴대폰 번호 + 입금자명만 알면 남이 자기 계좌로 신청할 수 있어서, 예금주는 입금자명과 같아야 받는다 (2026-10-19 사용자 결정).
-        // 적힌 예금주는 확인할 수 없는 값이므로, 판매자 화면에서 송금할 때 은행 앱의 받는 분 이름도 확인하게 안내한다
-        if (!squash(r.accountHolder()).equals(squash(order.getDepositorName()))) {
-            throw ApiException.badRequest("예금주가 입금자명과 같아야 합니다. 다른 계좌로 받으려면 판매자에게 문의해 주세요.");
-        }
-        order.requestRefund(r.bankName().trim(), cipher.encrypt(account), r.accountHolder().trim(), now);
+        // 예금주는 받지 않는다 (2026-10-20 사용자 결정): 송금에는 은행·계좌번호면 되고, 고객이 적는 이름은 확인할 수 없어서.
+        // 휴대폰 번호 + 입금자명만 알면 남이 자기 계좌로 신청할 수 있으므로, 판매자 화면에서 송금할 때 은행 앱에 뜨는
+        // 받는 분 이름이 실제 입금된 이름(대조 전에는 주문서 입금자명)과 같은지 확인하게 안내한다
+        order.requestRefund(r.bankName().trim(), cipher.encrypt(account), now);
         notices.notify(groupBuy, NotificationType.MAIL_REFUND_REQUEST, order.getOrderNo() + "번 주문에 환불 신청이 들어왔습니다.",
                 List.of(noticeLine(order),
                         order.isConfirmed() ? "주문 확정된 주문입니다." : "주문 확정 전 주문입니다. 입금 내역을 먼저 확인해 주세요.",

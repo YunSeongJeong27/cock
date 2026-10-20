@@ -119,7 +119,6 @@ public class CustomerOrder {
     /** 환불받을 계좌. 계좌번호(refundAccount)는 암호화된 값. 환불 완료·반려·환불 없는 취소 때 지운다 */
     private String refundBank;
     private String refundAccount;
-    private String refundHolder;
 
     /** 이 주문을 넣은 고객 기기의 쿠키 토큰. 그 기기에만 주문 내용·이전 입력값을 보여준다 (댓글 주문 등은 null) */
     private String deviceToken;
@@ -312,12 +311,11 @@ public class CustomerOrder {
      *
      * @param encryptedAccount 암호화한 계좌번호
      */
-    public void requestRefund(String bank, String encryptedAccount, String holder, LocalDateTime now) {
+    public void requestRefund(String bank, String encryptedAccount, LocalDateTime now) {
         this.refundRequestedAt = now;
         this.refundRejectedAt = null;
         this.refundBank = bank;
         this.refundAccount = encryptedAccount;
-        this.refundHolder = holder;
         this.updatedAt = now;
     }
 
@@ -371,7 +369,6 @@ public class CustomerOrder {
     private void clearRefundAccount() {
         this.refundBank = null;
         this.refundAccount = null;
-        this.refundHolder = null;
     }
 
     public LocalDateTime getRefundRequestedAt() {
@@ -391,9 +388,6 @@ public class CustomerOrder {
         return refundAccount;
     }
 
-    public String getRefundHolder() {
-        return refundHolder;
-    }
 
     public int totalQuantity() {
         return items.stream().mapToInt(OrderItem::getQuantity).sum();

@@ -60,8 +60,7 @@ public final class OrderDtos {
             @NotBlank String phone,
             @NotBlank String depositorName,
             @NotBlank @Size(max = 30) String bankName,
-            @NotBlank @Size(max = 30) String accountNumber,
-            @NotBlank @Size(max = 30) String accountHolder) {
+            @NotBlank @Size(max = 30) String accountNumber) {
     }
 
     /**
@@ -221,7 +220,6 @@ public final class OrderDtos {
             /** 환불받을 계좌 (계좌번호는 복호화한 값. 키가 바뀌어 못 읽으면 null) */
             String refundBank,
             String refundAccount,
-            String refundHolder,
             /** 같은 공구에 같은 연락처의 다른 주문이 있음 (경고 표시용) */
             boolean duplicateContact,
             LocalDateTime orderedAt,

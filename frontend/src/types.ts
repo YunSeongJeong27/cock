@@ -161,7 +161,6 @@ export interface SellerOrder {
   /** 환불받을 계좌 (계좌번호는 서버에 암호화 저장, 환불 완료·반려 때 지움) */
   refundBank: string | null
   refundAccount: string | null
-  refundHolder: string | null
   duplicateContact: boolean
   orderedAt: string
   /** 마지막으로 바뀐 시각 (입금 신고·확정·수령·취소·판매자 변경 등) */

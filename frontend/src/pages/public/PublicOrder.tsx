@@ -66,7 +66,7 @@ interface View {
  */
 type CancelMode = 'cancel' | 'refund'
 const emptyCancel = {
-  mode: 'cancel' as CancelMode, orderNo: '', phone: '', depositorName: '', bankName: '', accountNumber: '', accountHolder: '',
+  mode: 'cancel' as CancelMode, orderNo: '', phone: '', depositorName: '', bankName: '', accountNumber: '',
   open: false, notice: '', error: '', choices: [] as MyOrder[],
 }
 /** 방금 넣거나 바꾼 주문의 최종 내용 (이번에 적은 값만 들어 있음) */
@@ -237,7 +237,7 @@ export default function PublicOrder() {
       const target = { orderNo: orderNo ?? (cancel.orderNo ? Number(cancel.orderNo) : null), phone: cancel.phone, depositorName: cancel.depositorName }
       const v = refund
         ? await api.post<View>(`${base}/refund-request`, {
-          ...target, bankName: cancel.bankName, accountNumber: cancel.accountNumber, accountHolder: cancel.accountHolder,
+          ...target, bankName: cancel.bankName, accountNumber: cancel.accountNumber,
         })
         : await api.post<View>(`${base}/cancel`, target)
       applyView(v)
@@ -248,7 +248,7 @@ export default function PublicOrder() {
       if (err instanceof ApiError && err.status === 409 && Array.isArray(err.body?.orders)) {
         setCancel({ ...cancel, error: '', choices: err.body.orders })
       } else if (err instanceof ApiError && err.status === 409 && err.body?.refundRequired) {
-        setCancel({ ...cancel, mode: 'refund', notice: errorMessage(err), error: '', choices: [], accountHolder: cancel.accountHolder || cancel.depositorName })
+        setCancel({ ...cancel, mode: 'refund', notice: errorMessage(err), error: '', choices: [] })
       } else {
         setCancel({ ...cancel, error: errorMessage(err), choices: [] })
       }
@@ -276,7 +276,6 @@ export default function PublicOrder() {
   function openCancel(orderNo?: number, mode: CancelMode = 'cancel') {
     setCancel({
       ...emptyCancel, mode, open: true, orderNo: orderNo ? String(orderNo) : '', phone: form.phone, depositorName: form.depositorName,
-      accountHolder: form.depositorName,
     })
     setTimeout(() => document.getElementById('cancel-form')?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
@@ -606,7 +605,6 @@ export default function PublicOrder() {
               <>
                 <label className="field"><span>환불받을 은행</span><input type="text" value={cancel.bankName} onChange={(e) => setCancel({ ...cancel, bankName: e.target.value })} required maxLength={30} placeholder="예: 국민은행" /></label>
                 <label className="field"><span>계좌번호</span><input type="text" inputMode="numeric" value={cancel.accountNumber} onChange={(e) => setCancel({ ...cancel, accountNumber: e.target.value })} required maxLength={30} placeholder="숫자만 (- 있어도 됨)" /></label>
-                <label className="field"><span>예금주 (입금자명과 같은 이름이어야 합니다)</span><input type="text" value={cancel.accountHolder} onChange={(e) => setCancel({ ...cancel, accountHolder: e.target.value })} required maxLength={30} /></label>
               </>
             )}
             {cancel.orderNo && cancel.choices.length === 0 && <div className="small muted mb">{cancel.orderNo}번 주문</div>}
@@ -625,7 +623,7 @@ export default function PublicOrder() {
               <div className="row">
                 <button className="btn danger" disabled={busy}>바로 취소</button>
                 <button type="button" className="btn" disabled={busy}
-                  onClick={() => setCancel({ ...cancel, mode: 'refund', notice: '', error: '', accountHolder: cancel.accountHolder || cancel.depositorName })}>
+                  onClick={() => setCancel({ ...cancel, mode: 'refund', notice: '', error: '' })}>
                   환불 신청
                 </button>
                 <button type="button" className="btn" onClick={() => setCancel(emptyCancel)}>닫기</button>

@@ -65,8 +65,7 @@ class CancelRefundPauseTest extends IntegrationTest {
     }
 
     private Map<String, Object> refund(String phone, String depositor, String account) {
-        return Map.of("phone", phone, "depositorName", depositor, "bankName", "국민", "accountNumber", account,
-                "accountHolder", depositor);
+        return Map.of("phone", phone, "depositorName", depositor, "bankName", "국민", "accountNumber", account);
     }
 
     private JsonNode sellerOrder(Opened g, int index) throws Exception {
@@ -285,20 +284,5 @@ class CancelRefundPauseTest extends IntegrationTest {
                 .andExpect(jsonPath("$.pauseLinkUrl").value("https://band.us/x"));
         mvc.perform(get(g.pub())).andExpect(jsonPath("$.paused").value(false)).andExpect(jsonPath("$.pauseMessage").isEmpty());
         mvc.perform(withJson(post(g.pub() + "/orders"), order(g, "010-8840-0002", "새손님"))).andExpect(status().isOk());
-    }
-
-    /** 예금주는 입금자명과 같아야 환불 신청을 받는다 (번호 + 입금자명만 알면 남이 자기 계좌로 신청할 수 있어서, 2026-10-19) */
-    @Test
-    void refundAccountHolderMustMatchDepositorName() throws Exception {
-        Opened g = open(false);
-        place(g, "010-8860-0001", "김예금");
-        Map<String, Object> other = new HashMap<>(refund("01088600001", "김예금", "1234567890"));
-        other.put("accountHolder", "남의이름");
-        mvc.perform(withJson(post(g.pub() + "/refund-request"), other)).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("예금주가 입금자명과 같아야 합니다. 다른 계좌로 받으려면 판매자에게 문의해 주세요."));
-        assertThat(sellerOrder(g, 0).get("refundRequestedAt").isNull()).isTrue();
-        // 띄어쓰기는 무시
-        other.put("accountHolder", "김 예금");
-        mvc.perform(withJson(post(g.pub() + "/refund-request"), other)).andExpect(status().isOk());
     }
 }

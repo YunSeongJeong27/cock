@@ -144,7 +144,7 @@ class M3DepositFlowTest extends IntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.refundRequired").value(true));
         mvc.perform(withJson(post(pub + "/refund-request"), Map.of("orderNo", 1, "phone", "01010000001",
-                "depositorName", "김지영", "bankName", "국민", "accountNumber", "123-456-7890", "accountHolder", "김지영")))
+                "depositorName", "김지영", "bankName", "국민", "accountNumber", "123-456-7890")))
                 .andExpect(status().isOk());
         long refundOrderId = read(mvc.perform(get("/api/seller/group-buys/" + id + "/orders").cookie(seller)).andReturn())
                 .get(0).get("id").asLong();
