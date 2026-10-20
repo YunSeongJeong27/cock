@@ -3,8 +3,7 @@ package com.depositcock.common;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -28,9 +27,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * 예상 못 한 오류는 내부 메시지를 숨기고 로그에만 남긴다.
  */
 @RestControllerAdvice
+@Slf4j
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
-
-    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     /** ErrorCode 로 응답 본문을 만든다. 409 처럼 추가 정보가 필요한 곳은 받은 값에 setProperty 로 더한다 */
     public static ProblemDetail problem(ErrorCode code, String message) {

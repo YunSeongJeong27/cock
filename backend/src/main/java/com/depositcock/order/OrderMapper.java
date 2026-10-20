@@ -24,21 +24,30 @@ final class OrderMapper {
 
     static MyOrder toMyOrder(CustomerOrder o, boolean acceptingOrders, Prefill editValues) {
         DisplayStatus status = o.displayStatus();
-        return new MyOrder(o.getOrderNo(),
-                o.getItems().stream().map(i -> new PublicItem(i.getProduct().getId(), i.getProductNameSnapshot(), i.getQuantity(),
-                        i.getUnitPriceSnapshot(), i.amount())).toList(),
-                o.getItemsAmount(), o.getShippingFee(), o.getExpectedAmount(), o.getReceiveMethod(),
-                o.getPickupPoint() == null ? null : o.getPickupPoint().getName(), o.getPaymentMethod(),
-                o.getDepositorName(), status, status.getLabel(),
-                status == DisplayStatus.AWAITING_DEPOSIT,
-                o.isActive() && acceptingOrders && !o.isPickedUp() && !o.isConfirmed() && !o.isRefundPending(),
-                o.canRequestRefund(),
-                o.isRefundPending() ? "REQUESTED" : o.isActive() && o.getRefundRejectedAt() != null ? "REJECTED" : null,
-                o.isRefundRequired() && o.getRefundedAt() == null,
-                o.isRefundRequired() ? o.getRefundedAt() : null,
-                o.getOrderedAt(),
-                lastChange(o, ChangeActor.SELLER), lastChange(o, ChangeActor.CUSTOMER),
-                acceptingOrders && o.isReplaceableByCustomer(), editValues);
+        return MyOrder.builder()
+                .orderNo(o.getOrderNo())
+                .items(o.getItems().stream().map(i -> new PublicItem(i.getProduct().getId(), i.getProductNameSnapshot(), i.getQuantity(), i.getUnitPriceSnapshot(), i.amount())).toList())
+                .itemsAmount(o.getItemsAmount())
+                .shippingFee(o.getShippingFee())
+                .expectedAmount(o.getExpectedAmount())
+                .receiveMethod(o.getReceiveMethod())
+                .pickupPointName(o.getPickupPoint() == null ? null : o.getPickupPoint().getName())
+                .paymentMethod(o.getPaymentMethod())
+                .depositorName(o.getDepositorName())
+                .status(status)
+                .statusLabel(status.getLabel())
+                .awaitingConfirm(status == DisplayStatus.AWAITING_DEPOSIT)
+                .cancellable(o.isActive() && acceptingOrders && !o.isPickedUp() && !o.isConfirmed() && !o.isRefundPending())
+                .refundRequestable(o.canRequestRefund())
+                .refundState(o.isRefundPending() ? "REQUESTED" : o.isActive() && o.getRefundRejectedAt() != null ? "REJECTED" : null)
+                .refundRequired(o.isRefundRequired() && o.getRefundedAt() == null)
+                .refundedAt(o.isRefundRequired() ? o.getRefundedAt() : null)
+                .orderedAt(o.getOrderedAt())
+                .changedAt(lastChange(o, ChangeActor.SELLER))
+                .customerChangedAt(lastChange(o, ChangeActor.CUSTOMER))
+                .replaceable(acceptingOrders && o.isReplaceableByCustomer())
+                .editValues(editValues)
+                .build();
     }
 
     private static java.time.LocalDateTime lastChange(CustomerOrder o, ChangeActor actor) {
@@ -74,22 +83,53 @@ final class OrderMapper {
     static SellerOrder toSellerOrder(CustomerOrder o, boolean duplicateContact, List<Integer> sameNicknameOrderNos,
                                      DataCipher cipher) {
         DisplayStatus status = o.displayStatus();
-        return new SellerOrder(o.getId(), o.getOrderNo(), o.getSource(), o.getCustomerId(),
-                PhoneNumbers.format(o.getPhone()), o.getDepositorName(), o.getNickname(), o.getUnitAddress(),
-                o.getReceiveMethod(), o.getPickupPoint() == null ? null : o.getPickupPoint().getId(),
-                o.getPickupPoint() == null ? null : o.getPickupPoint().getName(), o.getRecipientName(),
-                PhoneNumbers.format(o.getRecipientPhone()), o.getZipcode(), o.getAddress(), o.getAddressDetail(),
-                o.getPaymentMethod(),
-                o.getItems().stream().map(i -> new SellerOrderItem(i.getProduct().getId(), i.getProductNameSnapshot(),
-                        i.getQuantity(), i.getUnitPriceSnapshot())).toList(),
-                o.totalQuantity(), o.getItemsAmount(), o.getShippingFee(), o.getExpectedAmount(), status,
-                status.getLabel(), o.isActive(), o.isFinished(), o.isPaid(), o.getPaidAt(),
-                o.getPaidDepositorName(), o.getPaidAmount(), o.isOnsitePaid(), o.isPickedUp(), o.getPickedUpAt(),
-                o.isRefundRequired(), o.getRefundedAt(), o.getRefundRequestedAt(), o.getRefundRejectedAt(),
-                o.getRefundBank(), cipher.decrypt(o.getRefundAccount()), duplicateContact, o.getOrderedAt(), o.getUpdatedAt(), o.getCancelledAt(),
-                o.getConfirmations().stream().map(c -> new PaymentRecord(c.getDepositorName(), c.getAmount(),
-                        c.isManual(), c.getConfirmedAt(), c.getCancelledAt())).toList(),
-                o.getChanges().stream().map(c -> new ChangeRecord(c.getSummary(), c.getChangedBy(), c.getChangedAt())).toList(),
-                sameNicknameOrderNos);
+        return SellerOrder.builder()
+                .id(o.getId())
+                .orderNo(o.getOrderNo())
+                .source(o.getSource())
+                .customerId(o.getCustomerId())
+                .phone(PhoneNumbers.format(o.getPhone()))
+                .depositorName(o.getDepositorName())
+                .nickname(o.getNickname())
+                .unitAddress(o.getUnitAddress())
+                .receiveMethod(o.getReceiveMethod())
+                .pickupPointId(o.getPickupPoint() == null ? null : o.getPickupPoint().getId())
+                .pickupPointName(o.getPickupPoint() == null ? null : o.getPickupPoint().getName())
+                .recipientName(o.getRecipientName())
+                .recipientPhone(PhoneNumbers.format(o.getRecipientPhone()))
+                .zipcode(o.getZipcode())
+                .address(o.getAddress())
+                .addressDetail(o.getAddressDetail())
+                .paymentMethod(o.getPaymentMethod())
+                .items(o.getItems().stream().map(i -> new SellerOrderItem(i.getProduct().getId(), i.getProductNameSnapshot(), i.getQuantity(), i.getUnitPriceSnapshot())).toList())
+                .totalQuantity(o.totalQuantity())
+                .itemsAmount(o.getItemsAmount())
+                .shippingFee(o.getShippingFee())
+                .expectedAmount(o.getExpectedAmount())
+                .status(status)
+                .statusLabel(status.getLabel())
+                .active(o.isActive())
+                .finished(o.isFinished())
+                .paid(o.isPaid())
+                .paidAt(o.getPaidAt())
+                .paidDepositorName(o.getPaidDepositorName())
+                .paidAmount(o.getPaidAmount())
+                .onsitePaid(o.isOnsitePaid())
+                .pickedUp(o.isPickedUp())
+                .pickedUpAt(o.getPickedUpAt())
+                .refundRequired(o.isRefundRequired())
+                .refundedAt(o.getRefundedAt())
+                .refundRequestedAt(o.getRefundRequestedAt())
+                .refundRejectedAt(o.getRefundRejectedAt())
+                .refundBank(o.getRefundBank())
+                .refundAccount(cipher.decrypt(o.getRefundAccount()))
+                .duplicateContact(duplicateContact)
+                .orderedAt(o.getOrderedAt())
+                .updatedAt(o.getUpdatedAt())
+                .cancelledAt(o.getCancelledAt())
+                .payments(o.getConfirmations().stream().map(c -> new PaymentRecord(c.getDepositorName(), c.getAmount(), c.isManual(), c.getConfirmedAt(), c.getCancelledAt())).toList())
+                .changes(o.getChanges().stream().map(c -> new ChangeRecord(c.getSummary(), c.getChangedBy(), c.getChangedAt())).toList())
+                .sameNicknameOrderNos(sameNicknameOrderNos)
+                .build();
     }
 }

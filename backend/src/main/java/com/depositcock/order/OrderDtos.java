@@ -12,6 +12,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lombok.Builder;
 
 public final class OrderDtos {
 
@@ -81,6 +82,8 @@ public final class OrderDtos {
     public record PublicItem(Long productId, String productName, int quantity, int unitPrice, int amount) {
     }
 
+    @Builder
+
     public record MyOrder(
             int orderNo,
             List<PublicItem> items,
@@ -122,11 +125,14 @@ public final class OrderDtos {
     /**
      * @param limited true 면 이 기기에서 넣은 주문이 아니라(내 주문 찾기 등) 휴대폰·동호수·배송지를 비워서 준다
      */
+    @Builder
     public record Prefill(String phone, String depositorName, String nickname, String unitAddress,
                           ReceiveMethod receiveMethod, Long pickupPointId, PaymentMethod paymentMethod,
                           String recipientName, String recipientPhone, String zipcode, String address,
                           String addressDetail, boolean limited) {
     }
+
+    @Builder
 
     public record PublicGroupBuy(
             String title,
@@ -172,6 +178,7 @@ public final class OrderDtos {
      * 방금 넣거나 바꾼 주문의 최종 내용 (완료 화면에 보여줌, 2026-10-18).
      * 바꾼 경우에도 모든 칸이 이번 요청에 적은 값으로 바뀌므로, 요청한 사람이 적지 않은 값(바뀌기 전 주소 등)은 들어 있지 않다
      */
+    @Builder
     public record FinalOrder(MyOrder order, String nickname, String unitAddress, String recipientName,
                              String recipientPhone, String zipcode, String address, String addressDetail) {
     }
@@ -180,6 +187,8 @@ public final class OrderDtos {
 
     public record SellerOrderItem(Long productId, String productName, int quantity, int unitPrice) {
     }
+
+    @Builder
 
     public record SellerOrder(
             Long id,

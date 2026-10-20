@@ -1,5 +1,6 @@
 package com.depositcock.common;
 
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -8,6 +9,7 @@ import org.springframework.http.HttpStatus;
  */
 public class ApiException extends RuntimeException {
 
+    @Getter
     private final ErrorCode code;
 
     /** @param args 문구의 %s·%d 자리에 넣을 값 (없으면 생략) */
@@ -24,10 +26,6 @@ public class ApiException extends RuntimeException {
     /** 문구가 enum 밖에서 정해지는 경우 (판매자가 적은 멈춤 문구, 여러 줄을 이어 붙인 확인 문구 등) */
     public static ApiException withMessage(ErrorCode code, String message) {
         return new ApiException(message, code);
-    }
-
-    public ErrorCode getCode() {
-        return code;
     }
 
     public HttpStatus getStatus() {

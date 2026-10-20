@@ -181,10 +181,20 @@ public class SellerOrderService {
         }
 
         boolean delivery = receive == ReceiveMethod.DELIVERY;
-        OrderUpdate.apply(order, new OrderUpdate.Values(wanted, receive, point, payment, depositorName,
-                trimToNull(r.nickname()), trimToNull(r.unitAddress()),
-                delivery ? r.recipientName().trim() : null, recipientPhone, delivery ? trimToNull(r.zipcode()) : null,
-                delivery ? r.address().trim() : null, delivery ? trimToNull(r.addressDetail()) : null),
+        OrderUpdate.apply(order, OrderUpdate.Values.builder()
+                .quantities(wanted)
+                .receive(receive)
+                .point(point)
+                .payment(payment)
+                .depositorName(depositorName)
+                .nickname(trimToNull(r.nickname()))
+                .unitAddress(trimToNull(r.unitAddress()))
+                .recipientName(delivery ? r.recipientName().trim() : null)
+                .recipientPhone(recipientPhone)
+                .zipcode(delivery ? trimToNull(r.zipcode()) : null)
+                .address(delivery ? r.address().trim() : null)
+                .addressDetail(delivery ? trimToNull(r.addressDetail()) : null)
+                .build(),
                 ChangeActor.SELLER, null, productRepository, entityManager, stockAlerts, now);
         orderRepository.flush();
         return OrderMapper.toSellerOrder(order, false, cipher);

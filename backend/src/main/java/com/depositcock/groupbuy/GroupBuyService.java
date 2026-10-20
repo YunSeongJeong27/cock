@@ -198,14 +198,24 @@ public class GroupBuyService {
             // 링크만 쓰는 공구에서는 댓글 집계를 숨기므로, 이미 있는 댓글 주문을 관리할 수 없게 된다
             throw new ApiException(ErrorCode.COMMENT_ORDERS_EXIST);
         }
-        groupBuy.updateSettings(new GroupBuySettings(
-                r.title().trim(), blankToNull(r.description()), r.closeAt(),
-                blankToNull(r.bankName()), blankToNull(r.accountNumber()), blankToNull(r.accountHolder()),
-                r.pickupEnabled(), r.pickupEnabled() && r.pickupPrepayEnabled(),
-                r.pickupEnabled() && r.pickupOnsiteEnabled(), r.deliveryEnabled(),
-                r.deliveryEnabled() ? r.shippingFeeType() : ShippingFeeType.NONE, r.shippingFee(),
-                r.orderChannel(), r.unitAddressFieldEnabled(), blankToNull(r.kakaoInquiryUrl()),
-                blankToNull(r.adminNames())), now);
+        groupBuy.updateSettings(GroupBuySettings.builder()
+                .title(r.title().trim())
+                .description(blankToNull(r.description()))
+                .closeAt(r.closeAt())
+                .bankName(blankToNull(r.bankName()))
+                .accountNumber(blankToNull(r.accountNumber()))
+                .accountHolder(blankToNull(r.accountHolder()))
+                .pickupEnabled(r.pickupEnabled())
+                .pickupPrepayEnabled(r.pickupEnabled() && r.pickupPrepayEnabled())
+                .pickupOnsiteEnabled(r.pickupEnabled() && r.pickupOnsiteEnabled())
+                .deliveryEnabled(r.deliveryEnabled())
+                .shippingFeeType(r.deliveryEnabled() ? r.shippingFeeType() : ShippingFeeType.NONE)
+                .shippingFee(r.shippingFee())
+                .orderChannel(r.orderChannel())
+                .unitAddressFieldEnabled(r.unitAddressFieldEnabled())
+                .kakaoInquiryUrl(blankToNull(r.kakaoInquiryUrl()))
+                .adminNames(blankToNull(r.adminNames()))
+                .build(), now);
         syncProducts(groupBuy, r.products());
         // 픽업을 꺼도 지점은 지우지 않는다: 이미 들어온 픽업 주문은 그 지점 그대로 두고, 새 주문만 픽업을 못 고른다 (2026-10-19).
         // 전에는 지점을 지우려다 "주문이 있는 픽업 지점은 삭제할 수 없습니다"로 막혀 배송만으로 바꿀 수 없었음
@@ -321,8 +331,19 @@ public class GroupBuyService {
                 pickedUp++;
             }
         }
-        return new Dashboard(orderCount, totalQuantity, totalAmount, prepaid, paid, unpaid, onsite, pickedUp,
-                refundPending, refundRequests, cancelled);
+        return Dashboard.builder()
+                .orderCount(orderCount)
+                .totalQuantity(totalQuantity)
+                .totalAmount(totalAmount)
+                .prepaidCount(prepaid)
+                .paidCount(paid)
+                .unpaidCount(unpaid)
+                .onsiteCount(onsite)
+                .pickedUpCount(pickedUp)
+                .refundPendingCount(refundPending)
+                .refundRequestCount(refundRequests)
+                .cancelledCount(cancelled)
+                .build();
     }
 
     private static String blankToNull(String value) {

@@ -213,10 +213,21 @@ public class DepositService {
             List<CandidateView> candidates = r.candidates().stream()
                     .map(c -> new CandidateView(brief(orderById.get(c.orderId())), c.evidence().getLabel(), c.amountDiff()))
                     .toList();
-            matchRows.add(new MatchRow(row.getId(), row.getRowNo(), row.getDepositorName(), row.getAmount(),
-                    row.getDatetimeText(), r.status(), statusLabel(r), r.orderId() == null ? null : brief(orderById.get(r.orderId())),
-                    r.evidence() == null ? null : r.evidence().getLabel(), r.amountDiff(), candidates,
-                    note(r.related(), orderById), refundCheckOrderId(r.related(), orderById)));
+            matchRows.add(MatchRow.builder()
+                    .rowId(row.getId())
+                    .rowNo(row.getRowNo())
+                    .depositorName(row.getDepositorName())
+                    .amount(row.getAmount())
+                    .datetimeText(row.getDatetimeText())
+                    .status(r.status())
+                    .statusLabel(statusLabel(r))
+                    .order(r.orderId() == null ? null : brief(orderById.get(r.orderId())))
+                    .evidence(r.evidence() == null ? null : r.evidence().getLabel())
+                    .amountDiff(r.amountDiff())
+                    .candidates(candidates)
+                    .note(note(r.related(), orderById))
+                    .refundCheckOrderId(refundCheckOrderId(r.related(), orderById))
+                    .build());
         }
         List<UsedRow> used = rows.stream().filter(r -> orderByRow.containsKey(r.getId()))
                 .map(r -> {
@@ -228,7 +239,16 @@ public class DepositService {
         List<OrderBrief> unpaid = outcome.unpaid().stream().map(p -> brief(orderById.get(p.orderId()))).toList();
         // 판매자가 직접 고를 수 있는 주문: 다른 입금에 추천된 주문까지 포함한 모든 미입금 선입금 주문
         List<OrderBrief> openOrders = payees.stream().map(p -> brief(orderById.get(p.orderId()))).toList();
-        return new MatchResponse(matchRows, unpaid, openOrders, used, matched, suggested, ambiguous, unrelated);
+        return MatchResponse.builder()
+                .rows(matchRows)
+                .unpaid(unpaid)
+                .openOrders(openOrders)
+                .used(used)
+                .matchedCount(matched)
+                .suggestedCount(suggested)
+                .ambiguousCount(ambiguous)
+                .unrelatedCount(unrelated)
+                .build();
     }
 
     /** 관련 없는 입금의 확인 안내 (중복 입금·환불 가능성) */

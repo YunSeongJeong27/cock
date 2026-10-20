@@ -21,6 +21,7 @@ import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageOutputStream;
+import lombok.Getter;
 
 /**
  * 비전 API 로 보내기 전에 이미지를 다듬는다.
@@ -64,15 +65,12 @@ public final class ImageSlicer {
 
     /** API 로 보낼 수 없는 이미지 (너무 크거나 줄이지 못함). 문구는 ErrorCode, 화면에 그대로 보여 준다 */
     public static class UnusableImageException extends RuntimeException {
+        @Getter
         private final ErrorCode code;
 
         public UnusableImageException(ErrorCode code, Object... args) {
             super(code.message(args));
             this.code = code;
-        }
-
-        public ErrorCode getCode() {
-            return code;
         }
     }
 

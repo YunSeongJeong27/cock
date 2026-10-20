@@ -45,8 +45,16 @@ public class ExportService {
                 .filter(o -> o.isActive() && o.isPaid())
                 .filter(o -> since == null || (o.getPaidAt() != null && !o.getPaidAt().isBefore(since)))
                 .sorted(Comparator.comparing(CustomerOrder::getPaidAt, Comparator.nullsLast(Comparator.naturalOrder())))
-                .map(o -> new AnnouncementLine(o.getId(), o.getOrderNo(), displayName(o), o.getNickname(),
-                        o.getDepositorName(), itemsText(o), o.getPaidAt(), o.isPickedUp()))
+                .map(o -> AnnouncementLine.builder()
+                        .orderId(o.getId())
+                        .orderNo(o.getOrderNo())
+                        .displayName(displayName(o))
+                        .nickname(o.getNickname())
+                        .depositorName(o.getDepositorName())
+                        .itemsText(itemsText(o))
+                        .paidAt(o.getPaidAt())
+                        .pickedUp(o.isPickedUp())
+                        .build())
                 .toList();
         StringBuilder text = new StringBuilder();
         text.append("[").append(groupBuy.getTitle()).append("] 입금 확인 안내\n");

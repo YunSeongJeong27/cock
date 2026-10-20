@@ -18,6 +18,7 @@ import com.depositcock.groupbuy.ProductRepository;
 import com.depositcock.groupbuy.ShippingFeeType;
 import com.depositcock.groupbuy.StockAlerts;
 import jakarta.persistence.EntityManager;
+import lombok.Builder;
 
 /**
  * 주문 내용 바꾸기 공통 처리: 판매자 "주문 변경"(2026-10-15)과 고객이 같은 휴대폰 번호로 다시 주문한 경우(2026-10-18).
@@ -32,6 +33,7 @@ final class OrderUpdate {
     }
 
     /** 바꿀 값. 입력 검사(필수값, 수령·결제 규칙, 배송 정보)는 부르는 쪽에서 끝낸 값 */
+    @Builder
     record Values(Map<Long, Integer> quantities, ReceiveMethod receive, PickupPoint point, PaymentMethod payment,
                   String depositorName, String nickname, String unitAddress, String recipientName,
                   String recipientPhone, String zipcode, String address, String addressDetail) {

@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lombok.Builder;
 
 public final class DepositDtos {
 
@@ -31,6 +32,8 @@ public final class DepositDtos {
 
     public record CandidateView(OrderBrief order, String evidence, int amountDiff) {
     }
+
+    @Builder
 
     public record MatchRow(
             Long rowId,
@@ -57,6 +60,7 @@ public final class DepositDtos {
      * @param unpaid     어떤 입금과도 연결되지 않은 미입금 주문
      * @param openOrders 판매자가 직접 고를 수 있는 모든 미입금 선입금 주문 (다른 입금에 추천된 주문 포함)
      */
+    @Builder
     public record MatchResponse(
             List<MatchRow> rows,
             List<OrderBrief> unpaid,
@@ -106,6 +110,8 @@ public final class DepositDtos {
     /** 입금 확인 문구 (밴드·카톡에 붙여넣기용) + 닉네임 목록 */
     public record AnnouncementResponse(String text, List<AnnouncementLine> lines) {
     }
+
+    @Builder
 
     public record AnnouncementLine(Long orderId, int orderNo, String displayName, String nickname, String depositorName,
                                    String itemsText, LocalDateTime paidAt, boolean pickedUp) {

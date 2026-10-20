@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lombok.Builder;
 
 public final class SellerDtos {
 
@@ -34,6 +35,8 @@ public final class SellerDtos {
             @Size(max = 50, message = "ACCOUNT_HOLDER_TOO_LONG") String defaultAccountHolder) {
     }
 
+    @Builder
+
     public record MeResponse(
             Long id,
             String email,
@@ -53,16 +56,30 @@ public final class SellerDtos {
             Map<NotificationType, Boolean> notifications) {
 
         public static MeResponse of(Seller s, LocalDateTime now, boolean commentFeatureEnabled) {
-            return new MeResponse(s.getId(), s.getEmail(), s.getDisplayName(), s.getRole(), s.getPlan(),
-                    s.getTrialEndsAt(), s.getPaidUntil(), s.isExpired(now), s.isSuspended(),
-                    s.getDefaultBankName(), s.getDefaultAccountNumber(), s.getDefaultAccountHolder(), commentFeatureEnabled,
-                    s.notificationSettings());
+            return MeResponse.builder()
+                    .id(s.getId())
+                    .email(s.getEmail())
+                    .displayName(s.getDisplayName())
+                    .role(s.getRole())
+                    .plan(s.getPlan())
+                    .trialEndsAt(s.getTrialEndsAt())
+                    .paidUntil(s.getPaidUntil())
+                    .expired(s.isExpired(now))
+                    .suspended(s.isSuspended())
+                    .defaultBankName(s.getDefaultBankName())
+                    .defaultAccountNumber(s.getDefaultAccountNumber())
+                    .defaultAccountHolder(s.getDefaultAccountHolder())
+                    .commentFeatureEnabled(commentFeatureEnabled)
+                    .notifications(s.notificationSettings())
+                    .build();
         }
     }
 
     /** 알림 켜고 끄기. 보낸 종류만 바뀐다 */
     public record UpdateNotificationsRequest(@NotNull(message = "NOTIFICATIONS_REQUIRED") Map<NotificationType, Boolean> notifications) {
     }
+
+    @Builder
 
     public record AdminSellerRow(
             Long id,

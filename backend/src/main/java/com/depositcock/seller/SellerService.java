@@ -79,10 +79,25 @@ public class SellerService {
         return sellerRepository.findAllByOrderByIdDesc().stream()
                 .map(s -> {
                     CaptureUsageService.Usage usage = captureUsageService.usage(s);
-                    return new AdminSellerRow(s.getId(), s.getEmail(), s.getDisplayName(), s.getRole(), s.getPlan(),
-                            s.getTrialEndsAt(), s.getPaidUntil(), s.isExpired(now), s.isSuspended(), s.getAdminMemo(),
-                            s.getCreatedAt(), groupBuyRepository.countBySellerId(s.getId()), usage.usedToday(),
-                            usage.usedThisMonth(), usage.dailyLimit(), usage.customLimit(), s.isCommentFeatureEnabled());
+                    return AdminSellerRow.builder()
+                            .id(s.getId())
+                            .email(s.getEmail())
+                            .displayName(s.getDisplayName())
+                            .role(s.getRole())
+                            .plan(s.getPlan())
+                            .trialEndsAt(s.getTrialEndsAt())
+                            .paidUntil(s.getPaidUntil())
+                            .expired(s.isExpired(now))
+                            .suspended(s.isSuspended())
+                            .adminMemo(s.getAdminMemo())
+                            .createdAt(s.getCreatedAt())
+                            .groupBuyCount(groupBuyRepository.countBySellerId(s.getId()))
+                            .captureToday(usage.usedToday())
+                            .captureThisMonth(usage.usedThisMonth())
+                            .dailyCaptureLimit(usage.dailyLimit())
+                            .customCaptureLimit(usage.customLimit())
+                            .commentFeatureEnabled(s.isCommentFeatureEnabled())
+                            .build();
                 })
                 .toList();
     }

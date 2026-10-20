@@ -33,6 +33,7 @@ import com.depositcock.order.PublicOrderService;
 import com.depositcock.order.ReceiveMethod;
 import com.depositcock.seller.FeatureAccess;
 import jakarta.persistence.EntityManager;
+import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +59,8 @@ public class CommentService {
 
     public record CommentInput(String author, String content, boolean duplicateSuspected) {
     }
+
+    @Builder
 
     public record CommentView(Long id, int seq, String authorName, String content, boolean duplicateSuspected,
                               Integer manualQuantity, ParseType type, Integer quantity, String memo,
@@ -122,8 +125,19 @@ public class CommentService {
             if (!admin && r.type() == ParseType.REVIEW && c.getManualQuantity() == null) {
                 reviewCount++;
             }
-            views.add(new CommentView(c.getId(), c.getSeq(), c.getAuthorName(), c.getContent(), c.isDuplicateSuspected(),
-                    c.getManualQuantity(), r.type(), r.quantity(), r.memo(), r.reviewReason(), admin));
+            views.add(CommentView.builder()
+                    .id(c.getId())
+                    .seq(c.getSeq())
+                    .authorName(c.getAuthorName())
+                    .content(c.getContent())
+                    .duplicateSuspected(c.isDuplicateSuspected())
+                    .manualQuantity(c.getManualQuantity())
+                    .type(r.type())
+                    .quantity(r.quantity())
+                    .memo(r.memo())
+                    .reviewReason(r.reviewReason())
+                    .excludedAsAdmin(admin)
+                    .build());
         }
         int unitPrice = product == null ? 0 : product.getUnitPrice();
         // 댓글에는 휴대폰 번호가 없어 링크 주문과는 닉네임으로만 비교할 수 있다

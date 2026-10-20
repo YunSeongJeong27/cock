@@ -1,10 +1,12 @@
 package com.depositcock.groupbuy;
 
 import java.time.LocalDateTime;
+import lombok.Builder;
 
 /**
  * 공구 설정 값 묶음 (요청 DTO 에서 정리한 값).
  */
+@Builder
 public record GroupBuySettings(
         String title,
         String description,

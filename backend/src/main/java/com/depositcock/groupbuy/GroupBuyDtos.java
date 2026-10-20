@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lombok.Builder;
 
 public final class GroupBuyDtos {
 
@@ -60,14 +61,25 @@ public final class GroupBuyDtos {
 
     /** 판매자용. remaining 은 재고보다 더 주문되면 음수 (초과 수량) */
     /** stockAlert: 판매자 화면 알림 칸 문장 (남은 수량이 알림 기준 이하이거나 준비 수량 초과일 때만, 아니면 null) */
+    @Builder
     public record ProductResponse(Long id, String name, int unitPrice, Integer stockLimit, int sold,
                                   Integer remaining, Integer perOrderLimit, Integer stockAlertThreshold,
                                   boolean blockWhenSoldOut, boolean soldOut, String stockAlert) {
 
         public static ProductResponse of(Product p) {
-            return new ProductResponse(p.getId(), p.getName(), p.getUnitPrice(), p.getStockLimit(), p.getSold(),
-                    p.remaining(), p.getPerOrderLimit(), p.getStockAlertThreshold(), p.isBlockWhenSoldOut(), p.isSoldOut(),
-                    StockAlerts.screenAlert(p));
+            return ProductResponse.builder()
+                    .id(p.getId())
+                    .name(p.getName())
+                    .unitPrice(p.getUnitPrice())
+                    .stockLimit(p.getStockLimit())
+                    .sold(p.getSold())
+                    .remaining(p.remaining())
+                    .perOrderLimit(p.getPerOrderLimit())
+                    .stockAlertThreshold(p.getStockAlertThreshold())
+                    .blockWhenSoldOut(p.isBlockWhenSoldOut())
+                    .soldOut(p.isSoldOut())
+                    .stockAlert(StockAlerts.screenAlert(p))
+                    .build();
         }
     }
 
@@ -77,6 +89,8 @@ public final class GroupBuyDtos {
             return new PickupPointResponse(p.getId(), p.getName(), p.getInfo());
         }
     }
+
+    @Builder
 
     public record GroupBuyResponse(
             Long id,
@@ -113,15 +127,37 @@ public final class GroupBuyDtos {
             String stockAlertWarning) {
 
         public static GroupBuyResponse of(GroupBuy g, LocalDateTime now) {
-            return new GroupBuyResponse(g.getId(), g.getTitle(), g.getDescription(), g.getPublicToken(), g.getStatus(),
-                    g.statusLabel(now), g.isAcceptingOrders(now), g.getCloseAt(), g.getBankName(), g.getAccountNumber(),
-                    g.getAccountHolder(), g.isPickupEnabled(), g.isPickupPrepayEnabled(), g.isPickupOnsiteEnabled(),
-                    g.isDeliveryEnabled(), g.getShippingFeeType(), g.getShippingFee(), g.getOrderChannel(),
-                    g.isUnitAddressFieldEnabled(), g.getKakaoInquiryUrl(), g.getAdminNames(), g.getCreatedAt(),
-                    g.sortedProducts().stream().map(ProductResponse::of).toList(),
-                    g.sortedPickupPoints().stream().map(PickupPointResponse::of).toList(),
-                    g.isPaused(), g.getPauseMessage(), g.getPauseLinkUrl(), Notice.PAUSE_DEFAULT.text(),
-                    Notice.STOCK_ABUSE_WARNING.text());
+            return GroupBuyResponse.builder()
+                    .id(g.getId())
+                    .title(g.getTitle())
+                    .description(g.getDescription())
+                    .publicToken(g.getPublicToken())
+                    .status(g.getStatus())
+                    .statusLabel(g.statusLabel(now))
+                    .acceptingOrders(g.isAcceptingOrders(now))
+                    .closeAt(g.getCloseAt())
+                    .bankName(g.getBankName())
+                    .accountNumber(g.getAccountNumber())
+                    .accountHolder(g.getAccountHolder())
+                    .pickupEnabled(g.isPickupEnabled())
+                    .pickupPrepayEnabled(g.isPickupPrepayEnabled())
+                    .pickupOnsiteEnabled(g.isPickupOnsiteEnabled())
+                    .deliveryEnabled(g.isDeliveryEnabled())
+                    .shippingFeeType(g.getShippingFeeType())
+                    .shippingFee(g.getShippingFee())
+                    .orderChannel(g.getOrderChannel())
+                    .unitAddressFieldEnabled(g.isUnitAddressFieldEnabled())
+                    .kakaoInquiryUrl(g.getKakaoInquiryUrl())
+                    .adminNames(g.getAdminNames())
+                    .createdAt(g.getCreatedAt())
+                    .products(g.sortedProducts().stream().map(ProductResponse::of).toList())
+                    .pickupPoints(g.sortedPickupPoints().stream().map(PickupPointResponse::of).toList())
+                    .paused(g.isPaused())
+                    .pauseMessage(g.getPauseMessage())
+                    .pauseLinkUrl(g.getPauseLinkUrl())
+                    .defaultPauseMessage(Notice.PAUSE_DEFAULT.text())
+                    .stockAlertWarning(Notice.STOCK_ABUSE_WARNING.text())
+                    .build();
         }
     }
 
@@ -132,6 +168,7 @@ public final class GroupBuyDtos {
     }
 
     /** 대시보드 (정리본 9장): 총 수량, 총 금액, 입금 완료 수, 미입금 수, 수령 수 */
+    @Builder
     public record Dashboard(
             int orderCount,
             int totalQuantity,

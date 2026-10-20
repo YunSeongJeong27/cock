@@ -183,10 +183,20 @@ public class PublicOrderService {
         }
 
         boolean delivery = receiveMethod == ReceiveMethod.DELIVERY;
-        OrderUpdate.Values values = new OrderUpdate.Values(quantities, receiveMethod, pickupPoint, paymentMethod,
-                depositorName, nickname, unitAddress, delivery ? r.recipientName().trim() : null, recipientPhone,
-                delivery ? trimToNull(r.zipcode()) : null, delivery ? r.address().trim() : null,
-                delivery ? trimToNull(r.addressDetail()) : null);
+        OrderUpdate.Values values = OrderUpdate.Values.builder()
+                .quantities(quantities)
+                .receive(receiveMethod)
+                .point(pickupPoint)
+                .payment(paymentMethod)
+                .depositorName(depositorName)
+                .nickname(nickname)
+                .unitAddress(unitAddress)
+                .recipientName(delivery ? r.recipientName().trim() : null)
+                .recipientPhone(recipientPhone)
+                .zipcode(delivery ? trimToNull(r.zipcode()) : null)
+                .address(delivery ? r.address().trim() : null)
+                .addressDetail(delivery ? trimToNull(r.addressDetail()) : null)
+                .build();
         CustomerOrder order;
         String newCookie;
         if (target != null) {
@@ -214,10 +224,16 @@ public class PublicOrderService {
         List<MyOrder> myOrders = myOrders(groupBuy, deviceRepository.findByCookieTokenAndGroupBuyId(deviceToken,
                 groupBuy.getId()).orElse(null), now);
         AccountInfo account = order.getPaymentMethod() == PaymentMethod.PREPAID ? account(groupBuy) : null;
-        FinalOrder finalOrder = new FinalOrder(OrderMapper.toMyOrder(order, groupBuy.isAcceptingOrders(now)),
-                order.getNickname(), order.getUnitAddress(), order.getRecipientName(),
-                PhoneNumbers.format(order.getRecipientPhone()), order.getZipcode(), order.getAddress(),
-                order.getAddressDetail());
+        FinalOrder finalOrder = FinalOrder.builder()
+                .order(OrderMapper.toMyOrder(order, groupBuy.isAcceptingOrders(now)))
+                .nickname(order.getNickname())
+                .unitAddress(order.getUnitAddress())
+                .recipientName(order.getRecipientName())
+                .recipientPhone(PhoneNumbers.format(order.getRecipientPhone()))
+                .zipcode(order.getZipcode())
+                .address(order.getAddress())
+                .addressDetail(order.getAddressDetail())
+                .build();
         return new WithCookie<>(new PlaceOrderResponse(order.getOrderNo(), order.getExpectedAmount(),
                 order.getPaymentMethod(), order.getDepositorName(), account, myOrders, target != null, finalOrder),
                 newCookie);
@@ -549,15 +565,31 @@ public class PublicOrderService {
         String closedReason = accepting ? null : Notice.ORDER_CLOSED.text();
         List<MyOrder> myOrders = myOrders(g, device, now);
         Prefill prefill = prefill(g, device);
-        return new PublicGroupBuy(g.getTitle(), g.getDescription(), g.getSeller().getDisplayName(), accepting,
-                closedReason, g.getCloseAt(),
-                g.sortedProducts().stream().map(p -> new PublicProduct(p.getId(), p.getName(), p.getUnitPrice(),
-                        p.publicRemaining(), p.getPerOrderLimit(), p.isBlockWhenSoldOut(), p.isSoldOut())).toList(),
-                g.sortedPickupPoints().stream().map(PickupPointResponse::of).toList(),
-                g.isPickupEnabled(), g.isPickupPrepayEnabled(), g.isPickupOnsiteEnabled(), g.isDeliveryEnabled(),
-                g.getShippingFeeType(), g.getShippingFee(), g.isNicknameRequired(), g.isUnitAddressFieldEnabled(),
-                g.getKakaoInquiryUrl(), g.usesPrepay() ? account(g) : null, myOrders, prefill, g.isPaused(),
-                g.isPaused() ? g.effectivePauseMessage() : null, g.isPaused() ? g.getPauseLinkUrl() : null);
+        return PublicGroupBuy.builder()
+                .title(g.getTitle())
+                .description(g.getDescription())
+                .sellerName(g.getSeller().getDisplayName())
+                .acceptingOrders(accepting)
+                .closedReason(closedReason)
+                .closeAt(g.getCloseAt())
+                .products(g.sortedProducts().stream().map(p -> new PublicProduct(p.getId(), p.getName(), p.getUnitPrice(), p.publicRemaining(), p.getPerOrderLimit(), p.isBlockWhenSoldOut(), p.isSoldOut())).toList())
+                .pickupPoints(g.sortedPickupPoints().stream().map(PickupPointResponse::of).toList())
+                .pickupEnabled(g.isPickupEnabled())
+                .pickupPrepayEnabled(g.isPickupPrepayEnabled())
+                .pickupOnsiteEnabled(g.isPickupOnsiteEnabled())
+                .deliveryEnabled(g.isDeliveryEnabled())
+                .shippingFeeType(g.getShippingFeeType())
+                .shippingFee(g.getShippingFee())
+                .nicknameRequired(g.isNicknameRequired())
+                .unitAddressFieldEnabled(g.isUnitAddressFieldEnabled())
+                .kakaoInquiryUrl(g.getKakaoInquiryUrl())
+                .account(g.usesPrepay() ? account(g) : null)
+                .myOrders(myOrders)
+                .prefill(prefill)
+                .paused(g.isPaused())
+                .pauseMessage(g.isPaused() ? g.effectivePauseMessage() : null)
+                .pauseLinkUrl(g.isPaused() ? g.getPauseLinkUrl() : null)
+                .build();
     }
 
     private List<MyOrder> myOrders(GroupBuy g, CustomerDevice device, LocalDateTime now) {
@@ -593,12 +625,37 @@ public class PublicOrderService {
     private static Prefill prefillOf(CustomerOrder o, boolean full) {
         Long pointId = o.getPickupPoint() == null ? null : o.getPickupPoint().getId();
         if (!full) {
-            return new Prefill(null, o.getDepositorName(), o.getNickname(), null, o.getReceiveMethod(), pointId,
-                    o.getPaymentMethod(), null, null, null, null, null, true);
+            return Prefill.builder()
+                    .phone(null)
+                    .depositorName(o.getDepositorName())
+                    .nickname(o.getNickname())
+                    .unitAddress(null)
+                    .receiveMethod(o.getReceiveMethod())
+                    .pickupPointId(pointId)
+                    .paymentMethod(o.getPaymentMethod())
+                    .recipientName(null)
+                    .recipientPhone(null)
+                    .zipcode(null)
+                    .address(null)
+                    .addressDetail(null)
+                    .limited(true)
+                    .build();
         }
-        return new Prefill(PhoneNumbers.format(o.getPhone()), o.getDepositorName(), o.getNickname(), o.getUnitAddress(),
-                o.getReceiveMethod(), pointId, o.getPaymentMethod(), o.getRecipientName(),
-                PhoneNumbers.format(o.getRecipientPhone()), o.getZipcode(), o.getAddress(), o.getAddressDetail(), false);
+        return Prefill.builder()
+                .phone(PhoneNumbers.format(o.getPhone()))
+                .depositorName(o.getDepositorName())
+                .nickname(o.getNickname())
+                .unitAddress(o.getUnitAddress())
+                .receiveMethod(o.getReceiveMethod())
+                .pickupPointId(pointId)
+                .paymentMethod(o.getPaymentMethod())
+                .recipientName(o.getRecipientName())
+                .recipientPhone(PhoneNumbers.format(o.getRecipientPhone()))
+                .zipcode(o.getZipcode())
+                .address(o.getAddress())
+                .addressDetail(o.getAddressDetail())
+                .limited(false)
+                .build();
     }
 
     private static AccountInfo account(GroupBuy g) {

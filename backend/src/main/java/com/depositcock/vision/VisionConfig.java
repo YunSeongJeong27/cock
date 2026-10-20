@@ -1,8 +1,7 @@
 package com.depositcock.vision;
 
 import com.depositcock.common.AppProperties;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -11,9 +10,8 @@ import org.springframework.context.annotation.Configuration;
  * 기본은 꺼짐.
  */
 @Configuration
+@Slf4j
 public class VisionConfig {
-
-    private static final Logger log = LoggerFactory.getLogger(VisionConfig.class);
 
     @Bean
     public VisionExtractor visionExtractor(AppProperties properties) {

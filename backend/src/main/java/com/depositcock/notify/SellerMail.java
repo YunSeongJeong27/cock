@@ -1,8 +1,7 @@
 package com.depositcock.notify;
 
 import jakarta.mail.internet.MimeMessage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -15,9 +14,8 @@ import org.springframework.web.util.HtmlUtils;
  * 처음에는 Gmail 계정 + 앱 비밀번호로 보내고, 판매자가 늘면 Amazon SES 등으로 설정만 바꾼다 [2026-10-16 사용자 결정].
  */
 @Component
+@Slf4j
 public class SellerMail {
-
-    private static final Logger log = LoggerFactory.getLogger(SellerMail.class);
 
     private final ObjectProvider<JavaMailSender> mailSender;
     private final String from;
