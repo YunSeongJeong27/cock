@@ -3,6 +3,7 @@ package com.depositcock.groupbuy;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.depositcock.common.Notice;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -58,13 +59,15 @@ public final class GroupBuyDtos {
     }
 
     /** 판매자용. remaining 은 재고보다 더 주문되면 음수 (초과 수량) */
+    /** stockAlert: 판매자 화면 알림 칸 문장 (남은 수량이 알림 기준 이하이거나 준비 수량 초과일 때만, 아니면 null) */
     public record ProductResponse(Long id, String name, int unitPrice, Integer stockLimit, int sold,
                                   Integer remaining, Integer perOrderLimit, Integer stockAlertThreshold,
-                                  boolean blockWhenSoldOut, boolean soldOut) {
+                                  boolean blockWhenSoldOut, boolean soldOut, String stockAlert) {
 
         public static ProductResponse of(Product p) {
             return new ProductResponse(p.getId(), p.getName(), p.getUnitPrice(), p.getStockLimit(), p.getSold(),
-                    p.remaining(), p.getPerOrderLimit(), p.getStockAlertThreshold(), p.isBlockWhenSoldOut(), p.isSoldOut());
+                    p.remaining(), p.getPerOrderLimit(), p.getStockAlertThreshold(), p.isBlockWhenSoldOut(), p.isSoldOut(),
+                    StockAlerts.screenAlert(p));
         }
     }
 
@@ -81,6 +84,7 @@ public final class GroupBuyDtos {
             String description,
             String publicToken,
             GroupBuyStatus status,
+            String statusLabel,
             boolean acceptingOrders,
             LocalDateTime closeAt,
             String bankName,
@@ -102,17 +106,22 @@ public final class GroupBuyDtos {
             boolean paused,
             /** 판매자가 적은 멈춤 문구 (null 이면 기본 문구를 씀) */
             String pauseMessage,
-            String pauseLinkUrl) {
+            String pauseLinkUrl,
+            /** 멈춤 기본 문구 (판매자가 문구를 안 적었을 때 고객에게 보이는 문장) */
+            String defaultPauseMessage,
+            /** 재고 알림 칸 아래 경고 (메일과 같은 문장) */
+            String stockAlertWarning) {
 
         public static GroupBuyResponse of(GroupBuy g, LocalDateTime now) {
             return new GroupBuyResponse(g.getId(), g.getTitle(), g.getDescription(), g.getPublicToken(), g.getStatus(),
-                    g.isAcceptingOrders(now), g.getCloseAt(), g.getBankName(), g.getAccountNumber(),
+                    g.statusLabel(now), g.isAcceptingOrders(now), g.getCloseAt(), g.getBankName(), g.getAccountNumber(),
                     g.getAccountHolder(), g.isPickupEnabled(), g.isPickupPrepayEnabled(), g.isPickupOnsiteEnabled(),
                     g.isDeliveryEnabled(), g.getShippingFeeType(), g.getShippingFee(), g.getOrderChannel(),
                     g.isUnitAddressFieldEnabled(), g.getKakaoInquiryUrl(), g.getAdminNames(), g.getCreatedAt(),
                     g.sortedProducts().stream().map(ProductResponse::of).toList(),
                     g.sortedPickupPoints().stream().map(PickupPointResponse::of).toList(),
-                    g.isPaused(), g.getPauseMessage(), g.getPauseLinkUrl());
+                    g.isPaused(), g.getPauseMessage(), g.getPauseLinkUrl(), Notice.PAUSE_DEFAULT.text(),
+                    Notice.STOCK_ABUSE_WARNING.text());
         }
     }
 
@@ -142,6 +151,7 @@ public final class GroupBuyDtos {
             Long id,
             String title,
             GroupBuyStatus status,
+            String statusLabel,
             boolean acceptingOrders,
             LocalDateTime closeAt,
             String publicToken,

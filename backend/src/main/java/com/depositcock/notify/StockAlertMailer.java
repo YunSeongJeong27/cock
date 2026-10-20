@@ -1,5 +1,7 @@
 package com.depositcock.notify;
 
+import com.depositcock.common.Notice;
+import com.depositcock.groupbuy.StockAlerts;
 import com.depositcock.groupbuy.StockAlerts.StockAlertEvent;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -14,33 +16,25 @@ import org.springframework.web.util.HtmlUtils;
 @Component
 public class StockAlertMailer {
 
-    static final String ABUSE_WARNING = "악용하는 고객이 있을 수 있으니 계좌 입금내역 대조를 통해 확인하십시오.";
-
     private final SellerMail mail;
 
     public StockAlertMailer(SellerMail mail) {
         this.mail = mail;
     }
 
-    /** 알림 제목·첫 줄. 남은 수량이 0 이하면 소진·초과로 쓴다 */
+    /** 알림 제목·첫 줄 (판매자 화면 알림 칸과 같은 문장) */
     static String headline(StockAlertEvent e) {
-        if (e.remaining() > 0) {
-            return "'" + e.productName() + "' 재고가 " + e.remaining() + "개 남았습니다.";
-        }
-        if (e.remaining() == 0) {
-            return "'" + e.productName() + "' 준비 수량이 모두 주문됐습니다.";
-        }
-        return "'" + e.productName() + "' 재고보다 " + (-e.remaining()) + "개 더 주문됐습니다.";
+        return StockAlerts.headline(e.productName(), e.remaining());
     }
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onStockAlert(StockAlertEvent e) {
-        mail.send(e.sellerEmail(), headline(e), "<p>공구: " + HtmlUtils.htmlEscape(e.groupBuyTitle()) + "</p>"
+        mail.send(e.sellerEmail(), headline(e), "<p>" + HtmlUtils.htmlEscape(MailText.GROUP_BUY.text(e.groupBuyTitle())) + "</p>"
                 + "<p><b>" + HtmlUtils.htmlEscape(headline(e)) + "</b></p>"
-                + "<p style=\"color:#dc2626;font-size:13px\">" + ABUSE_WARNING + "</p>"
+                + "<p style=\"color:#dc2626;font-size:13px\">" + Notice.STOCK_ABUSE_WARNING.text() + "</p>"
                 + mail.groupBuyLink(e.groupBuyId())
-                + "<p style=\"color:#6b7280;font-size:12px\">알림 기준은 공구 수정 화면에서 상품마다 바꿀 수 있습니다. "
-                + SellerNoticeMailer.SETTINGS_NOTE + "</p>");
+                + "<p style=\"color:#6b7280;font-size:12px\">" + MailText.STOCK_THRESHOLD_NOTE.text() + " "
+                + MailText.SETTINGS_NOTE.text() + "</p>");
     }
 }

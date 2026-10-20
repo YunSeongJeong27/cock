@@ -11,8 +11,6 @@ import org.springframework.web.util.HtmlUtils;
 @Component
 public class SellerNoticeMailer {
 
-    static final String SETTINGS_NOTE = "알림은 [내 정보 → 알림 설정]에서 끄고 켤 수 있습니다.";
-
     private final SellerMail mail;
 
     public SellerNoticeMailer(SellerMail mail) {
@@ -23,11 +21,11 @@ public class SellerNoticeMailer {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onNotice(SellerNoticeEvent e) {
         StringBuilder html = new StringBuilder()
-                .append("<p>공구: ").append(HtmlUtils.htmlEscape(e.groupBuyTitle(), "UTF-8")).append("</p>")
+                .append("<p>").append(HtmlUtils.htmlEscape(MailText.GROUP_BUY.text(e.groupBuyTitle()), "UTF-8")).append("</p>")
                 .append("<p><b>").append(HtmlUtils.htmlEscape(e.headline(), "UTF-8")).append("</b></p>");
         e.lines().forEach(line -> html.append("<p>").append(HtmlUtils.htmlEscape(line, "UTF-8")).append("</p>"));
         html.append(mail.groupBuyLink(e.groupBuyId()))
-                .append("<p style=\"color:#6b7280;font-size:12px\">").append(SETTINGS_NOTE).append("</p>");
+                .append("<p style=\"color:#6b7280;font-size:12px\">").append(MailText.SETTINGS_NOTE.text()).append("</p>");
         mail.send(e.sellerEmail(), e.headline(), html.toString());
     }
 }

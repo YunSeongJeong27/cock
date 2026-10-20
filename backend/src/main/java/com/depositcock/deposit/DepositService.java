@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
+import com.depositcock.common.Notice;
 import com.depositcock.deposit.DepositDtos.AliasResponse;
 import com.depositcock.deposit.DepositDtos.CandidateView;
 import com.depositcock.deposit.DepositDtos.ConfirmItem;
@@ -246,10 +247,10 @@ public class DepositService {
         CustomerOrder o = orderById.get(related.orderId());
         String no = o == null ? "" : o.getOrderNo() + "번 ";
         return switch (related.relation()) {
-            case LINKED -> no + "주문에 같은 입금자의 입금이 이미 연결됐습니다. 중복 입금인지 확인하세요.";
-            case PAID -> no + "주문(입금 확인됨)의 입금자와 같습니다. 중복 입금인지 확인하세요.";
-            case CANCELLED -> "취소된 " + no + "주문의 입금자와 같습니다. 환불이 필요한지 확인하세요.";
-            case SUGGESTED -> no + "주문에 같은 입금자의 다른 입금이 추천됐습니다. 나눠 보냈거나 중복 입금인지 확인하세요.";
+            case LINKED -> Notice.DEPOSIT_SAME_AS_LINKED.text(no);
+            case PAID -> Notice.DEPOSIT_SAME_AS_PAID.text(no);
+            case CANCELLED -> Notice.DEPOSIT_SAME_AS_CANCELLED.text(no);
+            case SUGGESTED -> Notice.DEPOSIT_SAME_AS_SUGGESTED.text(no);
         };
     }
 
@@ -267,10 +268,11 @@ public class DepositService {
 
     private static String statusLabel(Result r) {
         return switch (r.status()) {
-            case MATCHED -> "자동 매칭";
-            case SUGGESTED -> r.amountDiff() == 0 ? "추천" : "추천 (금액 차이 " + (r.amountDiff() > 0 ? "+" : "") + r.amountDiff() + "원)";
-            case AMBIGUOUS -> "후보 " + r.candidates().size() + "명 - 직접 선택";
-            case UNRELATED -> "관련 없는 입금";
+            case MATCHED -> Notice.MATCH_AUTO.text();
+            case SUGGESTED -> r.amountDiff() == 0 ? Notice.MATCH_SUGGESTED.text()
+                    : Notice.MATCH_SUGGESTED_DIFF.text((r.amountDiff() > 0 ? "+" : "") + r.amountDiff());
+            case AMBIGUOUS -> Notice.MATCH_AMBIGUOUS.text(r.candidates().size());
+            case UNRELATED -> Notice.MATCH_UNRELATED.text();
         };
     }
 

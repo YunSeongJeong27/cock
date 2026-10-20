@@ -1,6 +1,5 @@
 package com.depositcock.order;
 
-import com.depositcock.groupbuy.StockAlerts;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -15,8 +14,9 @@ import java.util.stream.Collectors;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ApiExceptionHandler;
-import com.depositcock.common.ErrorCode;
 import com.depositcock.common.DataCipher;
+import com.depositcock.common.ErrorCode;
+import com.depositcock.common.Notice;
 import com.depositcock.common.Tokens;
 import com.depositcock.customer.Customer;
 import com.depositcock.customer.CustomerRepository;
@@ -29,6 +29,8 @@ import com.depositcock.groupbuy.PickupPoint;
 import com.depositcock.groupbuy.Product;
 import com.depositcock.groupbuy.ProductRepository;
 import com.depositcock.groupbuy.ShippingFeeType;
+import com.depositcock.groupbuy.StockAlerts;
+import com.depositcock.notify.MailText;
 import com.depositcock.notify.SellerNotices;
 import com.depositcock.order.OrderDtos.AccountInfo;
 import com.depositcock.order.OrderDtos.CancelRequest;
@@ -211,16 +213,16 @@ public class PublicOrderService {
             // 번호만 알면 남이 바꿀 수도 있어서, 주문한 기기가 아닌 곳에서 바꾸면 판매자 기록에 표시한다
             boolean otherDevice = !Objects.equals(target.getDeviceToken(), newCookie != null ? newCookie : cookieToken);
             String summary = OrderUpdate.apply(order, values, ChangeActor.CUSTOMER,
-                    otherDevice ? "(주문한 기기와 다른 기기에서 바꿈)" : null, productRepository, entityManager, stockAlerts, now);
+                    otherDevice ? Notice.CHANGED_ON_OTHER_DEVICE.text() : null, productRepository, entityManager, stockAlerts, now);
             orderRepository.flush();
             notices.notify(groupBuy, NotificationType.MAIL_CUSTOMER_CHANGE,
-                    order.getOrderNo() + "번 주문을 고객이 수정했습니다.", List.of(summary));
+                    MailText.CUSTOMER_CHANGED.text(order.getOrderNo()), List.of(summary));
         } else {
             Customer customer = customers.byPhone(sellerId, phone, now);
             // 새 주문만으로는 본인 확인으로 치지 않는다 (남의 번호로 주문해 그 사람의 다른 주문을 보는 것 방지)
             newCookie = rememberDevice(groupBuy, cookieToken, customer.getId(), false, now);
             order = newOrder(groupBuy, customer, newCookie != null ? newCookie : cookieToken, values, products, now);
-            notices.notify(groupBuy, NotificationType.MAIL_NEW_ORDER, order.getOrderNo() + "번 새 주문이 들어왔습니다.",
+            notices.notify(groupBuy, NotificationType.MAIL_NEW_ORDER, MailText.NEW_ORDER.text(order.getOrderNo()),
                     List.of(noticeLine(order)));
         }
 
@@ -354,7 +356,7 @@ public class PublicOrderService {
             throw refundInstead();
         }
         OrderCancellation.cancel(order, productRepository, entityManager, stockAlerts, now);
-        notices.notify(groupBuy, NotificationType.MAIL_CUSTOMER_CANCEL, order.getOrderNo() + "번 주문을 고객이 취소했습니다.",
+        notices.notify(groupBuy, NotificationType.MAIL_CUSTOMER_CANCEL, MailText.CUSTOMER_CANCELLED.text(order.getOrderNo()),
                 List.of(noticeLine(order)));
         // 응답은 이 기기가 볼 수 있는 주문만 (취소 정보를 안다고 그 사람의 다른 주문까지 보여주지 않음)
         return toPublic(groupBuy, device(groupBuy, cookieToken).orElse(null), now);
@@ -394,10 +396,10 @@ public class PublicOrderService {
         // 휴대폰 번호 + 입금자명만 알면 남이 자기 계좌로 신청할 수 있으므로, 판매자 화면에서 송금할 때 은행 앱에 뜨는
         // 받는 분 이름이 실제 입금된 이름(대조 전에는 주문서 입금자명)과 같은지 확인하게 안내한다
         order.requestRefund(r.bankName().trim(), cipher.encrypt(account), now);
-        notices.notify(groupBuy, NotificationType.MAIL_REFUND_REQUEST, order.getOrderNo() + "번 주문에 환불 신청이 들어왔습니다.",
+        notices.notify(groupBuy, NotificationType.MAIL_REFUND_REQUEST, MailText.REFUND_REQUESTED.text(order.getOrderNo()),
                 List.of(noticeLine(order),
-                        order.isConfirmed() ? "주문 확정된 주문입니다." : "주문 확정 전 주문입니다. 입금 내역을 먼저 확인해 주세요.",
-                        "주문 목록에서 [취소하고 환불] 또는 [취소 안 함]을 눌러 주세요. 환불 계좌는 판매자 화면에서 볼 수 있습니다."));
+                        (order.isConfirmed() ? MailText.REFUND_ON_CONFIRMED : MailText.REFUND_ON_UNCONFIRMED).text(),
+                        MailText.REFUND_HOW_TO.text()));
         return toPublic(groupBuy, device(groupBuy, cookieToken).orElse(null), now);
     }
 
@@ -559,7 +561,7 @@ public class PublicOrderService {
 
     private PublicGroupBuy toPublic(GroupBuy g, CustomerDevice device, LocalDateTime now) {
         boolean accepting = g.isAcceptingOrders(now);
-        String closedReason = accepting ? null : "주문이 마감되었습니다.";
+        String closedReason = accepting ? null : Notice.ORDER_CLOSED.text();
         List<MyOrder> myOrders = myOrders(g, device, now);
         Prefill prefill = prefill(g, device);
         return new PublicGroupBuy(g.getTitle(), g.getDescription(), g.getSeller().getDisplayName(), accepting,

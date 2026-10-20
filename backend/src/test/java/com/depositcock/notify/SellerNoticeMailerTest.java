@@ -38,6 +38,6 @@ class SellerNoticeMailerTest {
         assertThat(m.getAllRecipients()[0].toString()).isEqualTo("seller@test.local");
         assertThat((String) m.getContent()).contains("홍게 &lt;공구&gt;").contains("홍게 2개 · 20,000원")
                 .contains("주문 확정된 주문입니다.").contains("https://example.com/seller/group-buys/9")
-                .contains(SellerNoticeMailer.SETTINGS_NOTE);
+                .contains(MailText.SETTINGS_NOTE.text());
     }
 }

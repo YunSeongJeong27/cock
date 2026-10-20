@@ -38,7 +38,7 @@ class StockAlertMailerTest {
         assertThat(m.getSubject()).isEqualTo("[입금콕] '홍게' 재고가 3개 남았습니다.");
         assertThat(m.getAllRecipients()[0].toString()).isEqualTo("seller@test.local");
         String body = (String) m.getContent();
-        assertThat(body).contains(StockAlertMailer.ABUSE_WARNING).contains("color:#dc2626")
+        assertThat(body).contains(com.depositcock.common.Notice.STOCK_ABUSE_WARNING.text()).contains("color:#dc2626")
                 .contains("https://example.com/seller/group-buys/7");
     }
 

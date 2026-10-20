@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import com.depositcock.notify.MailText;
 import com.depositcock.notify.SellerNotices;
 import com.depositcock.seller.NotificationType;
 import org.slf4j.Logger;
@@ -42,8 +43,8 @@ public class AutoCloseScheduler {
         for (GroupBuy groupBuy : groupBuyRepository.findExpiredOpen(now)) {
             if (groupBuyRepository.closeIfExpired(groupBuy.getId(), now) == 1) {
                 closed++;
-                notices.notify(groupBuy, NotificationType.MAIL_AUTO_CLOSE, "공구가 마감 시각이 돼 마감됐습니다.",
-                        List.of("마감 시각: " + groupBuy.getCloseAt().format(CLOSE_AT)));
+                notices.notify(groupBuy, NotificationType.MAIL_AUTO_CLOSE, MailText.AUTO_CLOSED.text(),
+                        List.of(MailText.AUTO_CLOSED_AT.text(groupBuy.getCloseAt().format(CLOSE_AT))));
             }
         }
         if (closed > 0) {

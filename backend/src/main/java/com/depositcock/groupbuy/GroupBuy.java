@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
+import com.depositcock.common.Notice;
 import com.depositcock.seller.Seller;
 import jakarta.persistence.CascadeType;
 import org.hibernate.annotations.DynamicUpdate;
@@ -154,9 +155,6 @@ public class GroupBuy {
         this.updatedAt = now;
     }
 
-    /** 멈춤 기본 문구 (2026-10-18 사용자 결정) */
-    public static final String DEFAULT_PAUSE_MESSAGE = "현재 주문 집계 중입니다. 판매자에게 문의해 주시면 감사하겠습니다.";
-
     /** 멈추거나 푼다. 문구·링크는 풀어도 남겨서 다음에 다시 쓴다 */
     public void changePause(boolean paused, String message, String linkUrl, LocalDateTime now) {
         this.paused = paused;
@@ -185,11 +183,16 @@ public class GroupBuy {
 
     /** 고객 화면에 보일 문구 */
     public String effectivePauseMessage() {
-        return pauseMessage == null ? DEFAULT_PAUSE_MESSAGE : pauseMessage;
+        return pauseMessage == null ? Notice.PAUSE_DEFAULT.text() : pauseMessage;
     }
 
     public String getPauseLinkUrl() {
         return pauseLinkUrl;
+    }
+
+    /** 화면에 보일 상태 이름 */
+    public String statusLabel(LocalDateTime now) {
+        return status == GroupBuyStatus.OPEN && !isAcceptingOrders(now) ? GroupBuyStatus.CLOSE_AT_PASSED_LABEL : status.label();
     }
 
     /** 고객이 지금 주문·취소할 수 있는지 (OPEN 이고 마감 시각 전) */

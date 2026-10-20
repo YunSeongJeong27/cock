@@ -36,7 +36,7 @@ public class SellerMail {
     String groupBuyLink(Long groupBuyId) {
         return baseUrl == null || baseUrl.isBlank() ? ""
                 : "<p><a href=\"" + HtmlUtils.htmlEscape(baseUrl.replaceAll("/+$", "") + "/seller/group-buys/" + groupBuyId)
-                + "\">공구 화면 열기</a></p>";
+                + "\">" + MailText.OPEN_GROUP_BUY.text() + "</a></p>";
     }
 
     /** 실패해도 예외를 던지지 않는다 (주문은 이미 저장됨, 화면 알림은 그대로 보인다) */
@@ -51,7 +51,7 @@ public class SellerMail {
             MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
             helper.setFrom(from);
             helper.setTo(to);
-            helper.setSubject("[입금콕] " + subject);
+            helper.setSubject(MailText.SUBJECT_PREFIX.text() + subject);
             helper.setText(html, true);
             sender.send(message);
         } catch (Exception ex) {

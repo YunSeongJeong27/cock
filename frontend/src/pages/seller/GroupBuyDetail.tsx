@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, dateTime, errorMessage, won } from '../../api'
 import { useAuth } from '../../auth'
 import { CopyButton, ErrorBox, Stat, StatusBadge } from '../../components/Ui'
-import { DEFAULT_PAUSE_MESSAGE, type Dashboard, type GroupBuy, type Product, type SellerOrder } from '../../types'
+import type { Dashboard, GroupBuy, Product, SellerOrder } from '../../types'
 import OrdersTab from './OrdersTab'
 import DepositTab from './DepositTab'
 import PickupTab from './PickupTab'
@@ -77,7 +77,7 @@ export default function GroupBuyDetail() {
     <div>
       <div className="row between">
         <h1>{groupBuy.title}</h1>
-        <StatusBadge status={groupBuy.status} label={groupBuy.status === 'DRAFT' ? '작성 중' : groupBuy.acceptingOrders ? '주문 받는 중' : '마감'} />
+        <StatusBadge status={groupBuy.status} label={groupBuy.statusLabel} />
       </div>
       <div className="muted small mb">{groupBuy.closeAt ? `마감 ${dateTime(groupBuy.closeAt)}` : '마감 시각 없음 (직접 마감)'}</div>
 
@@ -122,7 +122,7 @@ export default function GroupBuyDetail() {
           {dashboard.refundPendingCount > 0 && <Stat label="환불 필요" value={dashboard.refundPendingCount} tone="danger" />}
         </div>
       )}
-      <StockStatus products={groupBuy.products} showAlert={me?.notifications.SCREEN_STOCK !== false} />
+      <StockStatus products={groupBuy.products} warning={groupBuy.stockAlertWarning} showAlert={me?.notifications.SCREEN_STOCK !== false} />
       <ErrorBox message={error} />
 
       {/* 주문 링크만 쓰는 공구는 댓글 집계를 숨긴다 (저장된 탭이 댓글이었으면 주문 목록으로) */}
@@ -158,29 +158,20 @@ function localStorageSet(key: string, value: string) {
   }
 }
 
-/** 재고 알림 문구 (메일과 같은 문장) */
-function stockHeadline(p: Product): string {
-  const r = p.remaining ?? 0
-  if (r > 0) return `'${p.name}' 재고가 ${r}개 남았습니다.`
-  if (r === 0) return `'${p.name}' 준비 수량이 모두 주문됐습니다.`
-  return `'${p.name}' 재고보다 ${-r}개 더 주문됐습니다.`
-}
-
 /**
  * 판매자용 상품별 재고 현황 + 알림 (2026-10-16 사용자 결정). 재고로 주문을 막지 않으므로 초과 수량까지 그대로 보여 주고,
  * 남은 수량이 알림 기준 이하이거나 초과되면 맨 위에 알린다. 알림 칸은 판매자가 알림 설정에서 끌 수 있다 (표는 그대로, 2026-10-19).
  */
-function StockStatus({ products, showAlert }: { products: Product[]; showAlert: boolean }) {
+function StockStatus({ products, warning, showAlert }: { products: Product[]; warning: string; showAlert: boolean }) {
   const stocked = products.filter((p) => p.stockLimit != null)
   if (stocked.length === 0) return null
-  const alerts = stocked.filter((p) => (p.remaining ?? 0) < 0
-    || (p.stockAlertThreshold != null && p.remaining != null && p.remaining <= p.stockAlertThreshold))
+  const alerts = stocked.filter((p) => p.stockAlert)
   return (
     <>
       {showAlert && alerts.length > 0 && (
         <div className="warn-box">
-          {alerts.map((p) => <div key={p.id}><b>{stockHeadline(p)}</b></div>)}
-          <div className="small" style={{ color: 'var(--danger)', marginTop: 4 }}>악용하는 고객이 있을 수 있으니 계좌 입금내역 대조를 통해 확인하십시오.</div>
+          {alerts.map((p) => <div key={p.id}><b>{p.stockAlert}</b></div>)}
+          <div className="small" style={{ color: 'var(--danger)', marginTop: 4 }}>{warning}</div>
         </div>
       )}
       <div className="card">
@@ -191,7 +182,7 @@ function StockStatus({ products, showAlert }: { products: Product[]; showAlert: 
             <tbody>
               {stocked.map((p) => {
                 const r = p.remaining ?? 0
-                const alert = r < 0 || (p.stockAlertThreshold != null && r <= p.stockAlertThreshold)
+                const alert = p.stockAlert != null
                 return (
                   <tr key={p.id}>
                     <td className="stack-title"><b>{p.name}</b></td>
@@ -218,7 +209,7 @@ function StockStatus({ products, showAlert }: { products: Product[]; showAlert: 
  * 고객 화면 문구·링크(밴드 글 등)는 판매자가 정하고, 풀어도 남겨서 다음에 다시 쓴다
  */
 function PauseCard({ groupBuy, onChange }: { groupBuy: GroupBuy; onChange: (g: GroupBuy) => void }) {
-  const [message, setMessage] = useState(groupBuy.pauseMessage ?? DEFAULT_PAUSE_MESSAGE)
+  const [message, setMessage] = useState(groupBuy.pauseMessage ?? groupBuy.defaultPauseMessage)
   const [link, setLink] = useState(groupBuy.pauseLinkUrl ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)

@@ -8,6 +8,7 @@ import java.util.Map;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
+import com.depositcock.common.Notice;
 import com.depositcock.common.Tokens;
 import com.depositcock.customer.Customers;
 import com.depositcock.deposit.AliasBook;
@@ -90,7 +91,7 @@ public class GroupBuyService {
     public List<GroupBuySummary> list(Long sellerId) {
         LocalDateTime now = LocalDateTime.now(clock);
         return groupBuyRepository.findBySellerIdOrderByIdDesc(sellerId).stream()
-                .map(g -> new GroupBuySummary(g.getId(), g.getTitle(), g.getStatus(), g.isAcceptingOrders(now),
+                .map(g -> new GroupBuySummary(g.getId(), g.getTitle(), g.getStatus(), g.statusLabel(now), g.isAcceptingOrders(now),
                         g.getCloseAt(), g.getPublicToken(), g.getCreatedAt(),
                         dashboard(orderRepository.findByGroupBuyIdOrderByOrderNoAsc(g.getId())), g.isPaused()))
                 .toList();
@@ -160,7 +161,7 @@ public class GroupBuyService {
             throw new ApiException(ErrorCode.PAUSE_LINK_INVALID);
         }
         String message = blankToNull(r.message());
-        groupBuy.changePause(r.paused(), message == null || message.equals(GroupBuy.DEFAULT_PAUSE_MESSAGE) ? null : message,
+        groupBuy.changePause(r.paused(), message == null || message.equals(Notice.PAUSE_DEFAULT.text()) ? null : message,
                 link, now);
         return GroupBuyResponse.of(groupBuy, now);
     }

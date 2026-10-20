@@ -4,8 +4,6 @@ import { api, dateTime, errorMessage, won } from '../../api'
 import { ErrorBox, StatusBadge } from '../../components/Ui'
 import type { GroupBuySummary } from '../../types'
 
-const STATUS_LABEL = { DRAFT: '작성 중', OPEN: '주문 받는 중', CLOSED: '마감' } as const
-
 export default function GroupBuyList() {
   const [list, setList] = useState<GroupBuySummary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -34,7 +32,7 @@ export default function GroupBuyList() {
           <div className="card">
             <div className="row between">
               <h3 style={{ margin: 0 }}>{g.title}</h3>
-              <StatusBadge status={g.status} label={g.status === 'OPEN' && !g.acceptingOrders ? '마감 시각 지남' : STATUS_LABEL[g.status]} />
+              <StatusBadge status={g.status} label={g.statusLabel} />
             </div>
             <div className="muted small">
               {g.closeAt ? `마감 ${dateTime(g.closeAt)}` : '마감 시각 없음'} · 주문 {g.dashboard.orderCount}건 · {won(g.dashboard.totalAmount)}

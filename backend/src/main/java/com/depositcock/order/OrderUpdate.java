@@ -112,7 +112,7 @@ final class OrderUpdate {
                     + receiveLabel(v.receive(), v.point()));
         }
         if (v.payment() != order.getPaymentMethod()) {
-            changes.add("결제 " + paymentLabel(order.getPaymentMethod()) + "→" + paymentLabel(v.payment()));
+            changes.add("결제 " + order.getPaymentMethod().label() + "→" + v.payment().label());
         }
         addIfChanged(changes, "입금자명", order.getDepositorName(), v.depositorName());
         addIfChanged(changes, "닉네임", order.getNickname(), v.nickname());
@@ -187,14 +187,10 @@ final class OrderUpdate {
     }
 
     private static String receiveLabel(ReceiveMethod method, PickupPoint point) {
-        if (method == ReceiveMethod.DELIVERY) {
-            return "배송";
+        if (method == ReceiveMethod.DELIVERY || point == null) {
+            return method.label();
         }
-        return point == null ? "픽업" : "픽업(" + point.getName() + ")";
-    }
-
-    private static String paymentLabel(PaymentMethod method) {
-        return method == PaymentMethod.PREPAID ? "선입금" : "현장결제";
+        return method.label() + "(" + point.getName() + ")";
     }
 
     private static String deliveryText(String name, String phone, String zipcode, String address, String detail) {

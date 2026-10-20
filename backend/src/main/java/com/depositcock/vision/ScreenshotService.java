@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 import com.depositcock.comment.CommentService;
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
+import com.depositcock.common.Notice;
 import com.depositcock.common.ExternalApiException;
 import com.depositcock.deposit.BankStatementReader;
 import com.depositcock.deposit.DepositLine;
@@ -98,9 +99,7 @@ public class ScreenshotService {
                     type, item.duplicateSuspected(), item.imageIndex()));
         }
         return new DepositExtractResponse(drafts, skipped, extractor.provider(),
-                "AI가 읽은 결과입니다. 화면과 비교해 이름·금액을 꼭 확인하세요." + failedNote(failed)
-                        + " (오늘 남은 캡처 " + remainingAfter + "장)",
-                false, remainingAfter);
+                Notice.SCREENSHOT_DEPOSITS_READ.text(failedNote(failed), remainingAfter), false, remainingAfter);
     }
 
     public DepositService.SaveResult saveDeposits(Long sellerId, Long groupBuyId, List<SaveRow> rows) {
@@ -153,8 +152,7 @@ public class ScreenshotService {
                         i.duplicateSuspected(), i.imageIndex()))
                 .toList();
         return new CommentExtractResponse(drafts, extractor.provider(),
-                "AI가 읽은 결과입니다. 작성자·내용을 확인하세요." + failedNote(failed)
-                        + " (오늘 남은 캡처 " + remainingAfter + "장)", false, remainingAfter);
+                Notice.SCREENSHOT_COMMENTS_READ.text(failedNote(failed), remainingAfter), false, remainingAfter);
     }
 
     /**
@@ -214,8 +212,7 @@ public class ScreenshotService {
         if (failed.isEmpty()) {
             return "";
         }
-        return " " + failed.stream().map(String::valueOf).collect(Collectors.joining(", "))
-                + "번째 캡처는 읽지 못했습니다. 그 부분은 직접 입력해 주세요.";
+        return Notice.SCREENSHOT_PAGES_FAILED.text(failed.stream().map(String::valueOf).collect(Collectors.joining(", ")));
     }
 
     static String depositKey(ExtractedDeposit d) {
@@ -228,15 +225,13 @@ public class ScreenshotService {
 
     private static String limitNotice(CaptureUsageService.Reservation r, int requested) {
         if (r.remainingBefore() <= 0) {
-            return "오늘 캡처 한도(" + r.dailyLimit() + "장)를 초과했습니다. 아래 표에 직접 입력해 주세요. (내일 다시 쓸 수 있습니다)";
+            return Notice.CAPTURE_LIMIT_REACHED.text(r.dailyLimit());
         }
-        return "오늘 캡처 한도 초과: 남은 장수는 " + r.remainingBefore() + "장인데 " + requested
-                + "장을 올렸습니다. 장수를 줄여서 다시 올리거나 아래 표에 직접 입력해 주세요.";
+        return Notice.CAPTURE_LIMIT_OVER.text(r.remainingBefore(), requested);
     }
 
     private static String notConfigured() {
-        return "스크린샷 글자 읽기(비전 AI)가 아직 설정되지 않았습니다. 아래 표에 직접 입력해 주세요. "
-                + "(관리자: 환경변수 APP_VISION_PROVIDER=anthropic, ANTHROPIC_API_KEY 설정)";
+        return Notice.VISION_NOT_CONFIGURED.text();
     }
 
     private static List<MultipartFile> checked(List<MultipartFile> files) {

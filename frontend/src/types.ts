@@ -47,6 +47,8 @@ export interface Product {
   blockWhenSoldOut: boolean
   /** 품절로 막는 중 */
   soldOut: boolean
+  /** 재고 알림 칸 문장 (남은 수량이 알림 기준 이하이거나 초과일 때만, 서버가 메일과 같은 문장으로 만듦) */
+  stockAlert: string | null
 }
 
 export interface PickupPoint {
@@ -61,6 +63,8 @@ export interface GroupBuy {
   description: string | null
   publicToken: string
   status: GroupBuyStatus
+  /** 화면에 보일 상태 이름 (서버가 정함) */
+  statusLabel: string
   acceptingOrders: boolean
   closeAt: string | null
   bankName: string | null
@@ -84,10 +88,11 @@ export interface GroupBuy {
   /** 판매자가 적은 멈춤 문구 (null 이면 기본 문구) */
   pauseMessage: string | null
   pauseLinkUrl: string | null
+  /** 멈춤 기본 문구 (서버 Notice.PAUSE_DEFAULT) */
+  defaultPauseMessage: string
+  /** 재고 알림 칸 아래 경고 (서버 Notice.STOCK_ABUSE_WARNING) */
+  stockAlertWarning: string
 }
-
-/** 주문 잠시 멈춤 기본 문구 (서버 GroupBuy.DEFAULT_PAUSE_MESSAGE 와 같음) */
-export const DEFAULT_PAUSE_MESSAGE = '현재 주문 집계 중입니다. 판매자에게 문의해 주시면 감사하겠습니다.'
 
 export interface Dashboard {
   orderCount: number
@@ -108,6 +113,7 @@ export interface GroupBuySummary {
   id: number
   title: string
   status: GroupBuyStatus
+  statusLabel: string
   acceptingOrders: boolean
   closeAt: string | null
   publicToken: string
