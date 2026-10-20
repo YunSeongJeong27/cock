@@ -38,7 +38,7 @@ public class ScreenshotController {
         return new CaptureStatus(extractor.available(), usageService.usage(CurrentSeller.id()));
     }
 
-    public record SaveRequest(@NotNull List<SaveRow> rows) {
+    public record SaveRequest(@NotNull(message = "저장할 내용이 없습니다.") List<SaveRow> rows) {
     }
 
     @PostMapping("/api/seller/group-buys/{groupBuyId}/deposits/screenshots/extract")

@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -45,7 +46,8 @@ class SecurityReviewTest extends IntegrationTest {
                 .apply(springSecurity()).build();
         raw.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", uniqueEmail(), "password", "password123", "displayName", "x"))))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CSRF_REJECTED"));
         raw.perform(post("/api/auth/signup").header(CsrfHeaderFilter.HEADER, "depositcock")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", uniqueEmail(), "password", "password123", "displayName", "x"))))

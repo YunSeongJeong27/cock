@@ -68,21 +68,22 @@ public final class DepositDtos {
             int unrelatedCount) {
     }
 
-    public record ConfirmItem(@NotNull Long rowId, @NotNull Long orderId) {
+    public record ConfirmItem(@NotNull(message = "입금을 골라 주세요.") Long rowId,
+                              @NotNull(message = "주문을 골라 주세요.") Long orderId) {
     }
 
-    public record ConfirmRequest(@Valid @NotEmpty List<ConfirmItem> items) {
+    public record ConfirmRequest(@Valid @NotEmpty(message = "확정할 입금을 골라 주세요.") List<ConfirmItem> items) {
     }
 
     public record ConfirmResponse(int confirmedCount, List<String> errors) {
     }
 
     public record PresetRequest(
-            @NotBlank @Size(max = 100) String name,
-            @Size(max = 100) String dateColumn,
-            @NotBlank @Size(max = 100) String nameColumn,
-            @NotBlank @Size(max = 100) String amountColumn,
-            @Size(max = 100) String typeColumn) {
+            @NotBlank(message = "설정 이름을 입력해 주세요.") @Size(max = 100, message = "설정 이름은 100자까지 입력할 수 있습니다.") String name,
+            @Size(max = 100, message = "열 이름은 100자까지 입력할 수 있습니다.") String dateColumn,
+            @NotBlank(message = "입금자명 열을 골라 주세요.") @Size(max = 100, message = "열 이름은 100자까지 입력할 수 있습니다.") String nameColumn,
+            @NotBlank(message = "금액 열을 골라 주세요.") @Size(max = 100, message = "열 이름은 100자까지 입력할 수 있습니다.") String amountColumn,
+            @Size(max = 100, message = "열 이름은 100자까지 입력할 수 있습니다.") String typeColumn) {
     }
 
     public record PresetResponse(Long id, String name, String dateColumn, String nameColumn, String amountColumn,

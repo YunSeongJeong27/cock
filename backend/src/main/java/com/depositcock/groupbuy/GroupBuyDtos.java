@@ -17,41 +17,44 @@ public final class GroupBuyDtos {
 
     public record ProductRequest(
             Long id,
-            @NotBlank @Size(max = 200) String name,
-            @Min(0) @Max(100_000_000) int unitPrice,
-            @Min(1) Integer stockLimit,
-            @Min(1) Integer perOrderLimit,
+            @NotBlank(message = "상품 이름을 입력해 주세요.") @Size(max = 200, message = "상품 이름은 200자까지 입력할 수 있습니다.") String name,
+            @Min(value = 0, message = "가격은 0원 이상이어야 합니다.")
+            @Max(value = 100_000_000, message = "가격은 1억 원까지 넣을 수 있습니다.") int unitPrice,
+            @Min(value = 1, message = "준비 수량은 1개 이상이어야 합니다. 제한이 없으면 비워 두세요.") Integer stockLimit,
+            @Min(value = 1, message = "1인 최대 수량은 1개 이상이어야 합니다. 제한이 없으면 비워 두세요.") Integer perOrderLimit,
             /** 남은 수량이 이 값 이하가 되면 판매자에게 알림. 비우면 알림 없음 */
-            @Min(0) @Max(100_000) Integer stockAlertThreshold,
+            @Min(value = 0, message = "재고 알림 기준은 0개 이상이어야 합니다.")
+            @Max(value = 100_000, message = "재고 알림 기준은 100,000개까지 넣을 수 있습니다.") Integer stockAlertThreshold,
             /** 켜면 준비 수량에 도달했을 때 품절로 주문을 막음 (기본 꺼짐) */
             boolean blockWhenSoldOut) {
     }
 
     public record PickupPointRequest(
             Long id,
-            @NotBlank @Size(max = 100) String name,
-            @Size(max = 500) String info) {
+            @NotBlank(message = "픽업 지점 이름을 입력해 주세요.") @Size(max = 100, message = "픽업 지점 이름은 100자까지 입력할 수 있습니다.") String name,
+            @Size(max = 500, message = "픽업 안내는 500자까지 입력할 수 있습니다.") String info) {
     }
 
     public record GroupBuyRequest(
-            @NotBlank @Size(max = 200) String title,
-            @Size(max = 5000) String description,
+            @NotBlank(message = "공구 제목을 입력해 주세요.") @Size(max = 200, message = "공구 제목은 200자까지 입력할 수 있습니다.") String title,
+            @Size(max = 5000, message = "공구 설명은 5,000자까지 입력할 수 있습니다.") String description,
             LocalDateTime closeAt,
-            @Size(max = 50) String bankName,
-            @Size(max = 50) String accountNumber,
-            @Size(max = 50) String accountHolder,
+            @Size(max = 50, message = "은행 이름은 50자까지 입력할 수 있습니다.") String bankName,
+            @Size(max = 50, message = "계좌번호가 너무 깁니다.") String accountNumber,
+            @Size(max = 50, message = "예금주는 50자까지 입력할 수 있습니다.") String accountHolder,
             boolean pickupEnabled,
             boolean pickupPrepayEnabled,
             boolean pickupOnsiteEnabled,
             boolean deliveryEnabled,
-            @NotNull ShippingFeeType shippingFeeType,
-            @Min(0) @Max(1_000_000) int shippingFee,
+            @NotNull(message = "배송비 방식을 골라 주세요.") ShippingFeeType shippingFeeType,
+            @Min(value = 0, message = "배송비는 0원 이상이어야 합니다.")
+            @Max(value = 1_000_000, message = "배송비는 100만 원까지 넣을 수 있습니다.") int shippingFee,
             @NotNull(message = "주문 받는 방법(주문 링크만 / 주문 링크 + 댓글)을 골라 주세요.") OrderChannel orderChannel,
             boolean unitAddressFieldEnabled,
-            @Size(max = 500) String kakaoInquiryUrl,
-            @Size(max = 500) String adminNames,
-            @Valid @NotNull List<ProductRequest> products,
-            @Valid @NotNull List<PickupPointRequest> pickupPoints) {
+            @Size(max = 500, message = "카카오톡 문의 링크가 너무 깁니다.") String kakaoInquiryUrl,
+            @Size(max = 500, message = "관리자 닉네임은 500자까지 입력할 수 있습니다.") String adminNames,
+            @Valid @NotNull(message = "상품 목록이 없습니다.") List<ProductRequest> products,
+            @Valid @NotNull(message = "픽업 지점 목록이 없습니다.") List<PickupPointRequest> pickupPoints) {
     }
 
     /** 판매자용. remaining 은 재고보다 더 주문되면 음수 (초과 수량) */
@@ -114,7 +117,9 @@ public final class GroupBuyDtos {
     }
 
     /** 주문 잠시 멈춤 켜기/끄기 (문구·링크는 비우면 기본 문구, 링크 없음) */
-    public record PauseRequest(boolean paused, @Size(max = 300) String message, @Size(max = 500) String linkUrl) {
+    public record PauseRequest(boolean paused,
+                               @Size(max = 300, message = "멈춤 안내 문구는 300자까지 입력할 수 있습니다.") String message,
+                               @Size(max = 500, message = "멈춤 안내 링크가 너무 깁니다.") String linkUrl) {
     }
 
     /** 대시보드 (정리본 9장): 총 수량, 총 금액, 입금 완료 수, 미입금 수, 수령 수 */
