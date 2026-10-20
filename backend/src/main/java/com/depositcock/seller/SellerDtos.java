@@ -17,21 +17,21 @@ public final class SellerDtos {
     }
 
     public record SignupRequest(
-            @NotBlank(message = "이메일을 입력해 주세요.") @Email(message = "이메일 형식이 올바르지 않습니다.")
-            @Size(max = 255, message = "이메일이 너무 깁니다.") String email,
-            @NotBlank(message = "비밀번호를 입력해 주세요.") @Size(min = 8, max = 100, message = "비밀번호는 8~100자로 입력해 주세요.") String password,
-            @NotBlank(message = "판매자 이름을 입력해 주세요.") @Size(max = 100, message = "판매자 이름은 100자까지 입력할 수 있습니다.") String displayName) {
+            @NotBlank(message = "EMAIL_REQUIRED") @Email(message = "EMAIL_INVALID")
+            @Size(max = 255, message = "EMAIL_TOO_LONG") String email,
+            @NotBlank(message = "PASSWORD_REQUIRED") @Size(min = 8, max = 100, message = "PASSWORD_LENGTH") String password,
+            @NotBlank(message = "SELLER_NAME_REQUIRED") @Size(max = 100, message = "SELLER_NAME_TOO_LONG") String displayName) {
     }
 
-    public record LoginRequest(@NotBlank(message = "이메일을 입력해 주세요.") String email,
-                               @NotBlank(message = "비밀번호를 입력해 주세요.") String password) {
+    public record LoginRequest(@NotBlank(message = "EMAIL_REQUIRED") String email,
+                               @NotBlank(message = "PASSWORD_REQUIRED") String password) {
     }
 
     public record UpdateProfileRequest(
-            @NotBlank(message = "판매자 이름을 입력해 주세요.") @Size(max = 100, message = "판매자 이름은 100자까지 입력할 수 있습니다.") String displayName,
-            @Size(max = 50, message = "은행 이름은 50자까지 입력할 수 있습니다.") String defaultBankName,
-            @Size(max = 50, message = "계좌번호가 너무 깁니다.") String defaultAccountNumber,
-            @Size(max = 50, message = "예금주는 50자까지 입력할 수 있습니다.") String defaultAccountHolder) {
+            @NotBlank(message = "SELLER_NAME_REQUIRED") @Size(max = 100, message = "SELLER_NAME_TOO_LONG") String displayName,
+            @Size(max = 50, message = "BANK_NAME_TOO_LONG") String defaultBankName,
+            @Size(max = 50, message = "ACCOUNT_NUMBER_TOO_LONG") String defaultAccountNumber,
+            @Size(max = 50, message = "ACCOUNT_HOLDER_TOO_LONG") String defaultAccountHolder) {
     }
 
     public record MeResponse(
@@ -61,7 +61,7 @@ public final class SellerDtos {
     }
 
     /** 알림 켜고 끄기. 보낸 종류만 바뀐다 */
-    public record UpdateNotificationsRequest(@NotNull(message = "바꿀 알림을 골라 주세요.") Map<NotificationType, Boolean> notifications) {
+    public record UpdateNotificationsRequest(@NotNull(message = "NOTIFICATIONS_REQUIRED") Map<NotificationType, Boolean> notifications) {
     }
 
     public record AdminSellerRow(
@@ -86,14 +86,14 @@ public final class SellerDtos {
     }
 
     public record AdminUpdateRequest(
-            @NotNull(message = "플랜을 골라 주세요.") Plan plan,
+            @NotNull(message = "PLAN_REQUIRED") Plan plan,
             LocalDate paidUntil,
             LocalDateTime trialEndsAt,
             boolean suspended,
-            @Size(max = 1000, message = "메모는 1,000자까지 입력할 수 있습니다.") String adminMemo,
+            @Size(max = 1000, message = "ADMIN_MEMO_TOO_LONG") String adminMemo,
             /** 하루 캡처 제한 장수. null 이면 기본값(설정) 사용 */
-            @Min(value = 0, message = "캡처 제한은 0장 이상이어야 합니다.")
-            @Max(value = 10000, message = "캡처 제한은 10,000장까지 정할 수 있습니다.") Integer dailyCaptureLimit,
+            @Min(value = 0, message = "CAPTURE_LIMIT_RANGE")
+            @Max(value = 10000, message = "CAPTURE_LIMIT_RANGE") Integer dailyCaptureLimit,
             /** 판매자별 댓글 주문 기능 허용. null 이면 그대로 둔다 */
             Boolean commentFeatureEnabled) {
     }

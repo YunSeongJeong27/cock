@@ -29,18 +29,18 @@ public class CommentController {
         this.service = service;
     }
 
-    public record SaveRequest(@NotNull(message = "댓글을 어디서 가져왔는지 골라 주세요.") CommentSource source,
-                              @NotNull(message = "저장할 댓글이 없습니다.") List<CommentInput> comments) {
+    public record SaveRequest(@NotNull(message = "COMMENT_SOURCE_REQUIRED") CommentSource source,
+                              @NotNull(message = "COMMENTS_MISSING") List<CommentInput> comments) {
     }
 
-    public record UpdateRequest(@NotBlank(message = "작성자를 입력해 주세요.") String authorName,
-                                @NotNull(message = "댓글 내용이 없습니다.") String content, Integer manualQuantity) {
+    public record UpdateRequest(@NotBlank(message = "COMMENT_AUTHOR_REQUIRED") String authorName,
+                                @NotNull(message = "COMMENT_CONTENT_MISSING") String content, Integer manualQuantity) {
     }
 
-    public record TextRequest(@NotNull(message = "붙여 넣은 댓글이 없습니다.") String text) {
+    public record TextRequest(@NotNull(message = "COMMENT_TEXT_MISSING") String text) {
     }
 
-    public record ApplyRequest(@NotNull(message = "상품을 골라 주세요.") Long productId) {
+    public record ApplyRequest(@NotNull(message = "PRODUCT_NOT_CHOSEN") Long productId) {
     }
 
     @GetMapping

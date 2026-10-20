@@ -17,7 +17,9 @@ import org.springframework.http.HttpStatus;
  * 응답은 ProblemDetail 의 detail(문구) + code(이 enum 이름). 화면은 detail 을 그대로 보여 주고,
  * 따로 처리할 오류만 code 로 구분한다.
  * 문구 안의 %s(글자)·%d(숫자)는 ApiException 을 만들 때 넘긴 값으로 채운다 (String.format).
- * 입력값 검사 문구는 요청 DTO 의 어노테이션에 바로 적고, 응답 code 는 INVALID_INPUT.
+ * 입력값 검사도 이 enum 으로: 어노테이션 message 에 이름만 적으면 (@NotBlank(message = "PHONE_REQUIRED"))
+ * ApiExceptionHandler 가 그 이름의 문구·code 로 응답한다. 어노테이션 값은 상수만 되므로 이름을 글자로 적고,
+ * 없는 이름을 적으면 ErrorResponseTest 가 잡는다. 검사용 코드는 값(%s)을 넣지 않고 상태는 400.
  */
 public enum ErrorCode {
 
@@ -168,6 +170,72 @@ public enum ErrorCode {
             + "(댓글을 상품별로 나눠 세는 기능 준비 중). 주문 링크로 받아 주세요."),
     PRODUCT_REQUIRED(BAD_REQUEST, "공구에 상품을 먼저 등록해 주세요."),
 
+    // ---- 입력값 검사 (DTO 어노테이션 message 에 이름을 적음). 위 코드와 뜻이 같으면 위 코드를 씀 ----
+    EMAIL_REQUIRED(BAD_REQUEST, "이메일을 입력해 주세요."),
+    EMAIL_INVALID(BAD_REQUEST, "이메일 형식이 올바르지 않습니다."),
+    EMAIL_TOO_LONG(BAD_REQUEST, "이메일이 너무 깁니다."),
+    PASSWORD_REQUIRED(BAD_REQUEST, "비밀번호를 입력해 주세요."),
+    PASSWORD_LENGTH(BAD_REQUEST, "비밀번호는 8~100자로 입력해 주세요."),
+    SELLER_NAME_REQUIRED(BAD_REQUEST, "판매자 이름을 입력해 주세요."),
+    SELLER_NAME_TOO_LONG(BAD_REQUEST, "판매자 이름은 100자까지 입력할 수 있습니다."),
+    BANK_NAME_TOO_LONG(BAD_REQUEST, "은행 이름이 너무 깁니다."),
+    ACCOUNT_NUMBER_TOO_LONG(BAD_REQUEST, "계좌번호가 너무 깁니다."),
+    ACCOUNT_HOLDER_TOO_LONG(BAD_REQUEST, "예금주는 50자까지 입력할 수 있습니다."),
+    NOTIFICATIONS_REQUIRED(BAD_REQUEST, "바꿀 알림을 골라 주세요."),
+    PLAN_REQUIRED(BAD_REQUEST, "플랜을 골라 주세요."),
+    ADMIN_MEMO_TOO_LONG(BAD_REQUEST, "메모는 1,000자까지 입력할 수 있습니다."),
+    CAPTURE_LIMIT_RANGE(BAD_REQUEST, "캡처 제한은 0~10,000장으로 정해 주세요."),
+    TITLE_REQUIRED(BAD_REQUEST, "공구 제목을 입력해 주세요."),
+    TITLE_TOO_LONG(BAD_REQUEST, "공구 제목은 200자까지 입력할 수 있습니다."),
+    DESCRIPTION_TOO_LONG(BAD_REQUEST, "공구 설명은 5,000자까지 입력할 수 있습니다."),
+    PRODUCT_NAME_REQUIRED(BAD_REQUEST, "상품 이름을 입력해 주세요."),
+    PRODUCT_NAME_TOO_LONG(BAD_REQUEST, "상품 이름은 200자까지 입력할 수 있습니다."),
+    PRICE_RANGE(BAD_REQUEST, "가격은 0원~1억 원으로 넣어 주세요."),
+    STOCK_LIMIT_MIN(BAD_REQUEST, "준비 수량은 1개 이상이어야 합니다. 제한이 없으면 비워 두세요."),
+    PER_ORDER_LIMIT_MIN(BAD_REQUEST, "1인 최대 수량은 1개 이상이어야 합니다. 제한이 없으면 비워 두세요."),
+    STOCK_ALERT_RANGE(BAD_REQUEST, "재고 알림 기준은 0~100,000개로 넣어 주세요."),
+    PICKUP_POINT_NAME_REQUIRED(BAD_REQUEST, "픽업 지점 이름을 입력해 주세요."),
+    PICKUP_POINT_NAME_TOO_LONG(BAD_REQUEST, "픽업 지점 이름은 100자까지 입력할 수 있습니다."),
+    PICKUP_POINT_INFO_TOO_LONG(BAD_REQUEST, "픽업 안내는 500자까지 입력할 수 있습니다."),
+    SHIPPING_FEE_TYPE_REQUIRED(BAD_REQUEST, "배송비 방식을 골라 주세요."),
+    SHIPPING_FEE_RANGE(BAD_REQUEST, "배송비는 0원~100만 원으로 넣어 주세요."),
+    ORDER_CHANNEL_REQUIRED(BAD_REQUEST, "주문 받는 방법(주문 링크만 / 주문 링크 + 댓글)을 골라 주세요."),
+    KAKAO_LINK_TOO_LONG(BAD_REQUEST, "카카오톡 문의 링크가 너무 깁니다."),
+    ADMIN_NAMES_TOO_LONG(BAD_REQUEST, "관리자 닉네임은 500자까지 입력할 수 있습니다."),
+    PRODUCTS_MISSING(BAD_REQUEST, "상품 목록이 없습니다."),
+    PICKUP_POINTS_MISSING(BAD_REQUEST, "픽업 지점 목록이 없습니다."),
+    PAUSE_MESSAGE_TOO_LONG(BAD_REQUEST, "멈춤 안내 문구는 300자까지 입력할 수 있습니다."),
+    PAUSE_LINK_TOO_LONG(BAD_REQUEST, "멈춤 안내 링크가 너무 깁니다."),
+    PRODUCT_NOT_CHOSEN(BAD_REQUEST, "상품을 골라 주세요."),
+    QUANTITY_RANGE(BAD_REQUEST, "수량은 0~9,999개로 넣어 주세요."),
+    PHONE_REQUIRED(BAD_REQUEST, "휴대폰 번호를 입력해 주세요."),
+    DEPOSITOR_NAME_TOO_LONG(BAD_REQUEST, "입금자명이 너무 깁니다."),
+    NICKNAME_TOO_LONG(BAD_REQUEST, "닉네임이 너무 깁니다."),
+    UNIT_ADDRESS_TOO_LONG(BAD_REQUEST, "동·호수는 50자까지 입력할 수 있습니다."),
+    RECIPIENT_NAME_TOO_LONG(BAD_REQUEST, "받는 분 이름은 50자까지 입력할 수 있습니다."),
+    RECIPIENT_PHONE_TOO_LONG(BAD_REQUEST, "받는 분 연락처가 너무 깁니다."),
+    ZIPCODE_TOO_LONG(BAD_REQUEST, "우편번호가 너무 깁니다."),
+    ADDRESS_TOO_LONG(BAD_REQUEST, "주소는 300자까지 입력할 수 있습니다."),
+    ADDRESS_DETAIL_TOO_LONG(BAD_REQUEST, "상세주소는 300자까지 입력할 수 있습니다."),
+    ORDER_NO_FORMAT(BAD_REQUEST, "주문번호가 올바르지 않습니다."),
+    REFUND_BANK_REQUIRED(BAD_REQUEST, "환불받을 은행을 입력해 주세요."),
+    REFUND_ACCOUNT_REQUIRED(BAD_REQUEST, "환불받을 계좌번호를 입력해 주세요."),
+    DELETE_TOO_MANY(BAD_REQUEST, "한 번에 1,000건까지 삭제할 수 있습니다."),
+    AMOUNT_MIN(BAD_REQUEST, "금액은 0원 이상이어야 합니다."),
+    DEPOSIT_NOT_CHOSEN(BAD_REQUEST, "입금을 골라 주세요."),
+    ORDER_NOT_CHOSEN(BAD_REQUEST, "주문을 골라 주세요."),
+    CONFIRM_NOTHING_SELECTED(BAD_REQUEST, "확정할 입금을 골라 주세요."),
+    PRESET_NAME_REQUIRED(BAD_REQUEST, "설정 이름을 입력해 주세요."),
+    PRESET_NAME_TOO_LONG(BAD_REQUEST, "설정 이름은 100자까지 입력할 수 있습니다."),
+    COLUMN_NAME_TOO_LONG(BAD_REQUEST, "열 이름은 100자까지 입력할 수 있습니다."),
+    NAME_COLUMN_REQUIRED(BAD_REQUEST, "입금자명 열을 골라 주세요."),
+    AMOUNT_COLUMN_REQUIRED(BAD_REQUEST, "금액 열을 골라 주세요."),
+    COMMENT_SOURCE_REQUIRED(BAD_REQUEST, "댓글을 어디서 가져왔는지 골라 주세요."),
+    COMMENTS_MISSING(BAD_REQUEST, "저장할 댓글이 없습니다."),
+    COMMENT_AUTHOR_REQUIRED(BAD_REQUEST, "작성자를 입력해 주세요."),
+    COMMENT_CONTENT_MISSING(BAD_REQUEST, "댓글 내용이 없습니다."),
+    COMMENT_TEXT_MISSING(BAD_REQUEST, "붙여 넣은 댓글이 없습니다."),
+
     // ---- 스크린샷 (비전 AI) ----
     SCREENSHOT_UNREADABLE_CHARS(BAD_REQUEST, "읽지 못한 글자([?])가 남아 있습니다: %d번째 줄"),
     SCREENSHOT_NAME_TOO_LONG(BAD_REQUEST, "입금자명이 너무 깁니다 (200자까지): %d번째 줄"),
@@ -197,6 +265,18 @@ public enum ErrorCode {
 
     public HttpStatus status() {
         return status;
+    }
+
+    /** 입력값 검사 어노테이션의 message(이 enum 이름)로 찾는다. 이름이 없거나 틀리면 INVALID_INPUT */
+    public static ErrorCode fromName(String name) {
+        if (name == null) {
+            return INVALID_INPUT;
+        }
+        try {
+            return valueOf(name);
+        } catch (IllegalArgumentException e) {
+            return INVALID_INPUT;
+        }
     }
 
     /** 문구. 값이 있으면 %s·%d 자리를 채운다 */

@@ -15,7 +15,7 @@
 - 실행·테스트 방법은 README.md. 백엔드 `cd backend && ./mvnw test`, 프론트 `cd frontend && npm run typecheck`.
 - `main`에 직접 push하지 않는다. 작업 브랜치 → PR → 사용자 머지.
 - 비밀값(API 키 등)은 커밋하지 않는다.
-- 문구: 서버 오류는 `ErrorCode`, 입력값 검사는 어노테이션에 한국어로, 메일은 `MailText`, 화면 긴 문장은 `frontend/src/texts/` (docs/design.md "2026-10-20 문구 관리 방식").
+- 문구: 서버 오류·입력값 검사는 `ErrorCode` (검사 어노테이션 message 에 enum 이름), 메일은 `MailText`, 화면 긴 문장은 `frontend/src/texts/` (docs/design.md "2026-10-20 문구 관리 방식").
 
 ## 기술 스택 (확정)
 Java 21, Spring Boot 3.5.6, Maven(Wrapper), Spring Data JPA, Flyway, H2(개발)/PostgreSQL(운영), React(Vite+TS), 패키지 `com.depositcock`, 모노레포(`backend/`, `frontend/`).

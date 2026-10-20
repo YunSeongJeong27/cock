@@ -323,8 +323,11 @@
    - `throw new ApiException(ErrorCode.SOLD_OUT, 상품이름)` → 공통 처리기(ApiExceptionHandler)가 `{detail: 화면 문구, code: "SOLD_OUT"}` 로 응답. 프론트는 지금처럼 detail 을 보여 줌 (ApiError.code 로 코드도 읽을 수 있음)
    - 판매자가 정한 문구(멈춤 문구)·파일에서 찾은 안내처럼 밖에서 정해지는 문구는 `ApiException.withMessage(코드, 문구)`
    - 필터·인터셉터(CSRF·요청 제한·사용 제한 계정)도 같은 모양으로 응답 (ProblemWriter). 잘못된 JSON 은 INVALID_REQUEST_BODY
-2. 입력값 검사 → DTO 어노테이션에 한국어 문구를 직접 적음 (`@NotBlank(message = "휴대폰 번호를 입력해 주세요.")`). 어노테이션 값은 상수만 되므로 enum 을 못 씀. 응답 code 는 INVALID_INPUT, 영어 기본 문구·필드 이름은 화면에 안 나감
-   - message 를 빼먹은 검사 어노테이션이 있으면 테스트(ErrorResponseTest)에서 걸림
+2. 입력값 검사 → 이것도 `ErrorCode` enum 으로 (사용자 "어노테이션에 한국어 직접 말고 하기로 한 enum 으로", 처음엔 한국어 직접으로 했다가 바꿈)
+   - 어노테이션 message 에 enum 이름만 적음: `@NotBlank(message = "PHONE_REQUIRED")`. 처리기가 그 이름으로 `ErrorCode` 의 문구·code 를 꺼내 응답
+   - 어노테이션 값은 상수만 되므로 `ErrorCode.PHONE_REQUIRED` 를 직접 못 쓰고 이름을 글자로 적음 [사실]. 틀린 이름·빠진 message·400 이 아닌 코드는 ErrorResponseTest 가 잡음
+   - 한 가지만 틀리면 그 코드(예: PASSWORD_LENGTH), 여러 가지면 code INVALID_INPUT + 문구를 이어 붙임. 영어 기본 문구·필드 이름은 화면에 안 나감
+   - 뜻이 같은 기존 코드는 그대로 씀 (DEPOSITOR_NAME_REQUIRED, PHONE_INVALID, QUANTITY_REQUIRED 등). 최소·최대가 같이 있는 칸은 코드 하나 ("가격은 0원~1억 원으로 넣어 주세요.") [판단]
 3. 서버와 화면이 같이 쓰는 이름·문장 → 서버가 정해서 응답으로 보냄, 프론트에 같은 문장을 또 적지 않음
    - 공구 상태 이름 `statusLabel` (작성 중 / 주문 받는 중 / 마감 시각 지남 / 마감), 주문 상태 이름(원래도 서버), 입금 대조 상태·안내(원래도 서버)
    - 재고 알림 문장 `products[].stockAlert` (메일과 같은 문장), 그 아래 경고 `stockAlertWarning`, 멈춤 기본 문구 `defaultPauseMessage`

@@ -8,10 +8,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.depositcock.common.ErrorCode;
 import com.depositcock.support.IntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,17 +26,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 오류 응답 모양 (2026-10-20): detail = 화면에 보여줄 한국어 문구, code = ErrorCode 이름.
- * 입력값 검사 문구는 DTO 어노테이션에 한국어로 직접 적는다 (영어 기본 문구·필드 이름이 화면에 나가지 않게).
+ * 입력값 검사도 ErrorCode: 어노테이션 message 에 이름을 적고 처리기가 그 문구로 응답한다 (영어 기본 문구·필드 이름이 안 나가게).
  */
 class ErrorResponseTest extends IntegrationTest {
 
     @Test
-    void validationErrorsShowKoreanMessagesWithoutFieldNames() throws Exception {
+    void oneValidationErrorAnswersWithItsCode() throws Exception {
+        mvc.perform(withJson(post("/api/auth/signup"), Map.of("email", uniqueEmail(), "password", "short", "displayName", "공구장")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PASSWORD_LENGTH"))
+                .andExpect(jsonPath("$.detail").value(ErrorCode.PASSWORD_LENGTH.message()));
+    }
+
+    @Test
+    void severalValidationErrorsAreJoinedWithoutFieldNames() throws Exception {
         mvc.perform(withJson(post("/api/auth/signup"), Map.of("email", uniqueEmail(), "password", "short", "displayName", "")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
-                .andExpect(jsonPath("$.detail").value(allOf(containsString("비밀번호는 8~100자로 입력해 주세요."),
-                        containsString("판매자 이름을 입력해 주세요."), not(containsString("displayName")))));
+                .andExpect(jsonPath("$.detail").value(allOf(containsString(ErrorCode.PASSWORD_LENGTH.message()),
+                        containsString(ErrorCode.SELLER_NAME_REQUIRED.message()), not(containsString("displayName")))));
     }
 
     @Test
@@ -47,9 +57,9 @@ class ErrorResponseTest extends IntegrationTest {
                 .andExpect(jsonPath("$.code").value("LOGIN_FAILED"));
     }
 
-    /** 새 DTO 에 검사 어노테이션을 달고 message 를 빼먹으면 여기서 걸린다 */
+    /** 검사 어노테이션의 message 가 빠졌거나, 없는 ErrorCode 이름이거나, 400 이 아닌 코드면 여기서 걸린다 */
     @Test
-    void everyConstraintHasKoreanMessage() throws Exception {
+    void everyConstraintNamesAnErrorCode() throws Exception {
         List<String> missing = new ArrayList<>();
         int records = 0;
         for (Resource r : new PathMatchingResourcePatternResolver().getResources("classpath*:com/depositcock/**/*.class")) {
@@ -80,8 +90,9 @@ class ErrorResponseTest extends IntegrationTest {
                 continue;
             }
             String message = (String) a.annotationType().getMethod("message").invoke(a);
-            if (message.startsWith("{")) {
-                missing.add(where + " @" + a.annotationType().getSimpleName());
+            ErrorCode code = ErrorCode.fromName(message);
+            if (!code.name().equals(message) || code.status() != HttpStatus.BAD_REQUEST || code.message().contains("%")) {
+                missing.add(where + " @" + a.annotationType().getSimpleName() + " " + message);
             }
         }
     }

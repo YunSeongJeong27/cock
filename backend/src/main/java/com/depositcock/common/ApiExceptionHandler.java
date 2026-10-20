@@ -1,11 +1,10 @@
 package com.depositcock.common;
 
-import java.util.Objects;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -78,14 +77,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
                                                                   HttpHeaders headers, HttpStatusCode status,
                                                                   WebRequest request) {
-        // 문구는 요청 DTO 의 어노테이션에 적은 한국어 (2026-10-20). 영어 칸 이름은 보여주지 않고, 여러 칸이 틀리면 이어 붙인다
-        String detail = ex.getBindingResult().getAllErrors().stream()
-                .map(DefaultMessageSourceResolvable::getDefaultMessage)
-                .filter(Objects::nonNull)
+        // 어노테이션 message 에 적은 ErrorCode 이름으로 문구를 꺼낸다 (2026-10-20). 영어 칸 이름은 보여주지 않는다.
+        // 한 가지만 틀리면 그 코드, 여러 가지면 INVALID_INPUT 에 문구를 이어 붙인다
+        List<ErrorCode> codes = ex.getBindingResult().getAllErrors().stream()
+                .map(e -> ErrorCode.fromName(e.getDefaultMessage()))
                 .distinct()
-                .collect(Collectors.joining(" "));
-        return ResponseEntity.badRequest()
-                .body(problem(ErrorCode.INVALID_INPUT, detail.isBlank() ? ErrorCode.INVALID_INPUT.message() : detail));
+                .toList();
+        ErrorCode code = codes.size() == 1 ? codes.get(0) : ErrorCode.INVALID_INPUT;
+        String detail = codes.isEmpty() ? code.message()
+                : codes.stream().map(ErrorCode::message).collect(Collectors.joining(" "));
+        return ResponseEntity.badRequest().body(problem(code, detail));
     }
 
     /** 잘못된 JSON, 없는 선택지 값 등 (기본 응답은 영어라 바꾼다) */

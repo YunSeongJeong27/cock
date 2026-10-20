@@ -20,51 +20,51 @@ public final class OrderDtos {
 
     // ---------- 고객(공개) ----------
 
-    public record OrderItemRequest(@NotNull(message = "상품을 골라 주세요.") Long productId,
-                                   @Min(value = 0, message = "수량은 0개 이상이어야 합니다.")
-                                   @Max(value = 9999, message = "수량은 9,999개까지 넣을 수 있습니다.") int quantity) {
+    public record OrderItemRequest(@NotNull(message = "PRODUCT_NOT_CHOSEN") Long productId,
+                                   @Min(value = 0, message = "QUANTITY_RANGE")
+                                   @Max(value = 9999, message = "QUANTITY_RANGE") int quantity) {
     }
 
     public record PlaceOrderRequest(
-            @Valid @NotEmpty(message = "상품을 1개 이상 골라 주세요.") List<OrderItemRequest> items,
-            @NotBlank(message = "휴대폰 번호를 입력해 주세요.") @Size(max = 20, message = "휴대폰 번호가 너무 깁니다.") String phone,
-            @NotBlank(message = "입금자명을 입력해 주세요.") @Size(max = 50, message = "입금자명은 50자까지 입력할 수 있습니다.") String depositorName,
-            @Size(max = 50, message = "닉네임은 50자까지 입력할 수 있습니다.") String nickname,
-            @Size(max = 50, message = "동·호수는 50자까지 입력할 수 있습니다.") String unitAddress,
+            @Valid @NotEmpty(message = "QUANTITY_REQUIRED") List<OrderItemRequest> items,
+            @NotBlank(message = "PHONE_REQUIRED") @Size(max = 20, message = "PHONE_INVALID") String phone,
+            @NotBlank(message = "DEPOSITOR_NAME_REQUIRED") @Size(max = 50, message = "DEPOSITOR_NAME_TOO_LONG") String depositorName,
+            @Size(max = 50, message = "NICKNAME_TOO_LONG") String nickname,
+            @Size(max = 50, message = "UNIT_ADDRESS_TOO_LONG") String unitAddress,
             ReceiveMethod receiveMethod,
             Long pickupPointId,
             PaymentMethod paymentMethod,
-            @Size(max = 50, message = "받는 분 이름은 50자까지 입력할 수 있습니다.") String recipientName,
-            @Size(max = 20, message = "받는 분 연락처가 너무 깁니다.") String recipientPhone,
-            @Size(max = 10, message = "우편번호가 너무 깁니다.") String zipcode,
-            @Size(max = 300, message = "주소는 300자까지 입력할 수 있습니다.") String address,
-            @Size(max = 300, message = "상세주소는 300자까지 입력할 수 있습니다.") String addressDetail,
+            @Size(max = 50, message = "RECIPIENT_NAME_TOO_LONG") String recipientName,
+            @Size(max = 20, message = "RECIPIENT_PHONE_TOO_LONG") String recipientPhone,
+            @Size(max = 10, message = "ZIPCODE_TOO_LONG") String zipcode,
+            @Size(max = 300, message = "ADDRESS_TOO_LONG") String address,
+            @Size(max = 300, message = "ADDRESS_DETAIL_TOO_LONG") String addressDetail,
             /** 경고(같은 연락처의 기존 주문 등)를 확인하고 그래도 주문하는지 */
             boolean acknowledgeWarnings,
             /**
              * 경고에서 "이 내용으로 바뀝니다"라고 보여준 주문번호 (409 의 replaceOrderNo 를 그대로).
              * 그 사이에 바뀔 주문이 달라졌으면(입금 확정 등) 다시 경고한다
              */
-            @Min(value = 1, message = "주문번호가 올바르지 않습니다.") Integer replaceOrderNo) {
+            @Min(value = 1, message = "ORDER_NO_FORMAT") Integer replaceOrderNo) {
     }
 
     /** 내 주문 찾기: 휴대폰 번호 전체만 (2026-10-15 사용자 결정) */
-    public record IdentifyRequest(@NotBlank(message = "휴대폰 번호를 입력해 주세요.") String phone) {
+    public record IdentifyRequest(@NotBlank(message = "PHONE_REQUIRED") String phone) {
     }
 
     /** 주문 확정 전 바로 취소. orderNo 는 같은 정보의 주문이 여러 건일 때만 필요 */
-    public record CancelRequest(@Min(value = 1, message = "주문번호가 올바르지 않습니다.") Integer orderNo,
-                                @NotBlank(message = "휴대폰 번호를 입력해 주세요.") String phone,
-                                @NotBlank(message = "입금자명을 입력해 주세요.") String depositorName) {
+    public record CancelRequest(@Min(value = 1, message = "ORDER_NO_FORMAT") Integer orderNo,
+                                @NotBlank(message = "PHONE_REQUIRED") String phone,
+                                @NotBlank(message = "DEPOSITOR_NAME_REQUIRED") String depositorName) {
     }
 
     /** 환불 신청 (입금한 고객, 주문 확정 전후 언제든. 판매자가 확인 후 취소·환불). orderNo 는 주문이 여러 건일 때만 필요 */
     public record RefundRequest(
-            @Min(value = 1, message = "주문번호가 올바르지 않습니다.") Integer orderNo,
-            @NotBlank(message = "휴대폰 번호를 입력해 주세요.") String phone,
-            @NotBlank(message = "입금자명을 입력해 주세요.") String depositorName,
-            @NotBlank(message = "환불받을 은행을 입력해 주세요.") @Size(max = 30, message = "은행 이름은 30자까지 입력할 수 있습니다.") String bankName,
-            @NotBlank(message = "환불받을 계좌번호를 입력해 주세요.") @Size(max = 30, message = "계좌번호가 너무 깁니다.") String accountNumber) {
+            @Min(value = 1, message = "ORDER_NO_FORMAT") Integer orderNo,
+            @NotBlank(message = "PHONE_REQUIRED") String phone,
+            @NotBlank(message = "DEPOSITOR_NAME_REQUIRED") String depositorName,
+            @NotBlank(message = "REFUND_BANK_REQUIRED") @Size(max = 30, message = "BANK_NAME_TOO_LONG") String bankName,
+            @NotBlank(message = "REFUND_ACCOUNT_REQUIRED") @Size(max = 30, message = "ACCOUNT_NUMBER_TOO_LONG") String accountNumber) {
     }
 
     /**
@@ -246,18 +246,18 @@ public final class OrderDtos {
      * 휴대폰 번호(고객)는 바꿀 수 없다. 번호를 바꾸려면 취소 후 다시 주문.
      */
     public record SellerEditRequest(
-            @Valid @NotEmpty(message = "상품을 1개 이상 넣어 주세요.") List<OrderItemRequest> items,
+            @Valid @NotEmpty(message = "QUANTITY_REQUIRED_FOR_CHANGE") List<OrderItemRequest> items,
             ReceiveMethod receiveMethod,
             Long pickupPointId,
             PaymentMethod paymentMethod,
-            @Size(max = 50, message = "입금자명은 50자까지 입력할 수 있습니다.") String depositorName,
-            @Size(max = 200, message = "닉네임은 200자까지 입력할 수 있습니다.") String nickname,
-            @Size(max = 50, message = "동·호수는 50자까지 입력할 수 있습니다.") String unitAddress,
-            @Size(max = 50, message = "받는 분 이름은 50자까지 입력할 수 있습니다.") String recipientName,
-            @Size(max = 20, message = "받는 분 연락처가 너무 깁니다.") String recipientPhone,
-            @Size(max = 10, message = "우편번호가 너무 깁니다.") String zipcode,
-            @Size(max = 300, message = "주소는 300자까지 입력할 수 있습니다.") String address,
-            @Size(max = 300, message = "상세주소는 300자까지 입력할 수 있습니다.") String addressDetail) {
+            @Size(max = 50, message = "DEPOSITOR_NAME_TOO_LONG") String depositorName,
+            @Size(max = 200, message = "NICKNAME_TOO_LONG") String nickname,
+            @Size(max = 50, message = "UNIT_ADDRESS_TOO_LONG") String unitAddress,
+            @Size(max = 50, message = "RECIPIENT_NAME_TOO_LONG") String recipientName,
+            @Size(max = 20, message = "RECIPIENT_PHONE_TOO_LONG") String recipientPhone,
+            @Size(max = 10, message = "ZIPCODE_TOO_LONG") String zipcode,
+            @Size(max = 300, message = "ADDRESS_TOO_LONG") String address,
+            @Size(max = 300, message = "ADDRESS_DETAIL_TOO_LONG") String addressDetail) {
     }
 
     /** 입금 확정 1건. manual = 거래내역 없이 수동 확정, cancelledAt 이 있으면 취소된 확정 */
@@ -269,15 +269,15 @@ public final class OrderDtos {
     }
 
     /** 완료된 주문 삭제 (여러 건) */
-    public record DeleteOrdersRequest(@NotEmpty(message = "삭제할 주문을 골라 주세요.")
-                                      @Size(max = 1000, message = "한 번에 1,000건까지 삭제할 수 있습니다.")
-                                      List<@NotNull(message = "삭제할 주문을 골라 주세요.") Long> orderIds) {
+    public record DeleteOrdersRequest(@NotEmpty(message = "DELETE_NOTHING_SELECTED")
+                                      @Size(max = 1000, message = "DELETE_TOO_MANY")
+                                      List<@NotNull(message = "DELETE_NOTHING_SELECTED") Long> orderIds) {
     }
 
     public record DeleteOrdersResponse(int deletedCount) {
     }
 
-    public record ManualPaidRequest(@NotBlank(message = "입금자명을 입력해 주세요.") @Size(max = 100, message = "입금자명은 100자까지 입력할 수 있습니다.") String depositorName,
-                                    @Min(value = 0, message = "금액은 0원 이상이어야 합니다.") int amount) {
+    public record ManualPaidRequest(@NotBlank(message = "DEPOSITOR_NAME_REQUIRED") @Size(max = 100, message = "DEPOSITOR_NAME_TOO_LONG") String depositorName,
+                                    @Min(value = 0, message = "AMOUNT_MIN") int amount) {
     }
 }
