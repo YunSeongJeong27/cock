@@ -101,7 +101,13 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
     if (!name) return
     const amount = prompt('입금액', String(o.expectedAmount))
     if (!amount) return
-    post(`${o.id}/manual-paid`, { depositorName: name, amount: Number(amount.replace(/,/g, '')) })
+    // "3,800원"처럼 적어도 숫자만 읽는다. 전에는 "원"이 붙으면 숫자가 아니어서 0원으로 확정됐음 (2026-10-20 점검)
+    const value = Number(amount.replace(/[\s,원]/g, ''))
+    if (!Number.isInteger(value) || value < 0) {
+      setError(T.manualAmountInvalid)
+      return
+    }
+    post(`${o.id}/manual-paid`, { depositorName: name, amount: value })
   }
 
   const sameNick = orders.filter((o) => !o.finished && o.sameNicknameOrderNos.length > 0).length

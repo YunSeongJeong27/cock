@@ -6,7 +6,6 @@ import com.depositcock.seller.Seller;
 import com.depositcock.seller.SellerRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -34,7 +33,8 @@ public class SuspendedSellerInterceptor implements HandlerInterceptor {
         }
         Seller seller = sellerRepository.findById(CurrentSeller.id()).orElse(null);
         if (seller == null) {
-            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            // 탈퇴·삭제된 판매자의 남은 로그인 쿠키. 다른 오류와 같은 모양으로 응답 (전에는 본문 없는 401, 2026-10-20 점검)
+            ProblemWriter.write(response, ErrorCode.LOGIN_REQUIRED);
             return false;
         }
         if (seller.isSuspended()) {

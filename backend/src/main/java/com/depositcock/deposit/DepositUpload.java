@@ -18,6 +18,9 @@ import jakarta.persistence.Table;
 @Table(name = "deposit_upload")
 public class DepositUpload {
 
+    /** deposit_upload.file_name 칸 길이 */
+    static final int MAX_FILE_NAME = 300;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -40,7 +43,8 @@ public class DepositUpload {
     public DepositUpload(Long groupBuyId, DepositSource source, String fileName, LocalDateTime uploadedAt) {
         this.groupBuyId = groupBuyId;
         this.source = source;
-        this.fileName = fileName;
+        // 아주 긴 파일 이름은 잘라서 남긴다 (화면 표시용. 넘기면 업로드가 409 로 실패했음)
+        this.fileName = fileName == null || fileName.length() <= MAX_FILE_NAME ? fileName : fileName.substring(0, MAX_FILE_NAME);
         this.uploadedAt = uploadedAt;
     }
 

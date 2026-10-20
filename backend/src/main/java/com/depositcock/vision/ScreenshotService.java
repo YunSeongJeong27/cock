@@ -18,6 +18,7 @@ import com.depositcock.common.Notice;
 import com.depositcock.common.ExternalApiException;
 import com.depositcock.deposit.BankStatementReader;
 import com.depositcock.deposit.DepositLine;
+import com.depositcock.deposit.DepositRow;
 import com.depositcock.deposit.DepositService;
 import com.depositcock.deposit.DepositSource;
 import com.depositcock.groupbuy.GroupBuy;
@@ -115,10 +116,10 @@ public class ScreenshotService {
                 throw new ApiException(ErrorCode.SCREENSHOT_UNREADABLE_CHARS, no);
             }
             // DB 열 길이(deposit_row.depositor_name 200, datetime_text 100)를 넘으면 409 "이미 같은 데이터" 로 잘못 안내되므로 먼저 막는다
-            if (r.name().trim().length() > 200) {
+            if (r.name().trim().length() > DepositRow.MAX_DEPOSITOR_NAME) {
                 throw new ApiException(ErrorCode.SCREENSHOT_NAME_TOO_LONG, no);
             }
-            if (r.datetimeText() != null && r.datetimeText().trim().length() > 100) {
+            if (r.datetimeText() != null && r.datetimeText().trim().length() > DepositRow.MAX_DATETIME_TEXT) {
                 throw new ApiException(ErrorCode.SCREENSHOT_DATETIME_TOO_LONG, no);
             }
             lines.add(new DepositLine(no, r.name().trim(), r.amount(), blankToNull(r.datetimeText()),

@@ -26,7 +26,7 @@ public final class OrderDtos {
     }
 
     public record PlaceOrderRequest(
-            @Valid @NotEmpty(message = "QUANTITY_REQUIRED") List<OrderItemRequest> items,
+            @Valid @NotEmpty(message = "QUANTITY_REQUIRED") List<@NotNull(message = "PRODUCT_NOT_CHOSEN") OrderItemRequest> items,
             @NotBlank(message = "PHONE_REQUIRED") @Size(max = 20, message = "PHONE_INVALID") String phone,
             @NotBlank(message = "DEPOSITOR_NAME_REQUIRED") @Size(max = 50, message = "DEPOSITOR_NAME_TOO_LONG") String depositorName,
             @Size(max = 50, message = "NICKNAME_TOO_LONG") String nickname,
@@ -246,7 +246,7 @@ public final class OrderDtos {
      * 휴대폰 번호(고객)는 바꿀 수 없다. 번호를 바꾸려면 취소 후 다시 주문.
      */
     public record SellerEditRequest(
-            @Valid @NotEmpty(message = "QUANTITY_REQUIRED_FOR_CHANGE") List<OrderItemRequest> items,
+            @Valid @NotEmpty(message = "QUANTITY_REQUIRED_FOR_CHANGE") List<@NotNull(message = "PRODUCT_NOT_CHOSEN") OrderItemRequest> items,
             ReceiveMethod receiveMethod,
             Long pickupPointId,
             PaymentMethod paymentMethod,
@@ -277,7 +277,8 @@ public final class OrderDtos {
     public record DeleteOrdersResponse(int deletedCount) {
     }
 
+    /** amount 를 빼거나 숫자가 아니게 보내면 0원으로 확정되던 것을 막는다 (2026-10-20 점검) */
     public record ManualPaidRequest(@NotBlank(message = "DEPOSITOR_NAME_REQUIRED") @Size(max = 100, message = "DEPOSITOR_NAME_TOO_LONG") String depositorName,
-                                    @Min(value = 0, message = "AMOUNT_MIN") int amount) {
+                                    @NotNull(message = "AMOUNT_REQUIRED") @Min(value = 0, message = "AMOUNT_MIN") Integer amount) {
     }
 }

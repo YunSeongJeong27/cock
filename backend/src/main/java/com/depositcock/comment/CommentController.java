@@ -30,7 +30,7 @@ public class CommentController {
     }
 
     public record SaveRequest(@NotNull(message = "COMMENT_SOURCE_REQUIRED") CommentSource source,
-                              @NotNull(message = "COMMENTS_MISSING") List<CommentInput> comments) {
+                              @NotNull(message = "COMMENTS_MISSING") List<@NotNull(message = "INVALID_INPUT") CommentInput> comments) {
     }
 
     public record UpdateRequest(@NotBlank(message = "COMMENT_AUTHOR_REQUIRED") String authorName,

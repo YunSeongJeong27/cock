@@ -69,6 +69,7 @@ final class OrderUpdate {
         // 1) 상품 수량
         List<String> changes = new ArrayList<>(itemChanges(order, v.quantities(), products));
         Map<Long, OrderItem> current = currentItems(order);
+        List<Product> touched = new ArrayList<>();
         for (Long productId : productIds(current, v.quantities())) {
             OrderItem item = current.get(productId);
             int before = item == null ? 0 : item.getQuantity();
@@ -93,6 +94,7 @@ final class OrderUpdate {
             } else {
                 productRepository.decreaseSold(productId, before - after);
             }
+            touched.add(product);
             if (item == null) {
                 order.addItem(new OrderItem(order, product, after));
             } else if (after == 0) {
@@ -101,7 +103,8 @@ final class OrderUpdate {
                 item.changeQuantity(after);
             }
         }
-        products.values().forEach(p -> {
+        // 판매 수량이 바뀐 상품만 다시 읽는다 (전에는 공구의 모든 상품을 다시 읽었음, 2026-10-20 점검)
+        touched.forEach(p -> {
             em.refresh(p);
             stockAlerts.check(p);
         });

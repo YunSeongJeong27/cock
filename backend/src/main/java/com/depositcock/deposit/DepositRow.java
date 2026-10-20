@@ -13,6 +13,10 @@ import jakarta.persistence.Table;
 @Table(name = "deposit_row")
 public class DepositRow {
 
+    /** deposit_row.depositor_name·datetime_text 칸 길이 */
+    public static final int MAX_DEPOSITOR_NAME = 200;
+    public static final int MAX_DATETIME_TEXT = 100;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

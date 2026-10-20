@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.lang.Nullable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -108,6 +109,19 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                                                              HttpStatusCode statusCode, WebRequest request) {
         if (statusCode.is5xxServerError()) {
             log.error("서버 오류", ex);
+        }
+        // Spring 기본 예외(경로의 숫자 칸에 글자, 파일 칸 빠짐, 없는 주소, 지원 안 하는 메서드 등)도 다른 오류와 같은 모양
+        // {detail: 화면 문구, code} 로 보낸다. 전에는 "Failed to convert 'groupBuyId' ..." 같은 영어 문구가 code 없이 나갔음 (2026-10-20 점검)
+        // 우리가 던진 ErrorResponseException(경고 409 등)은 body 가 null 로 오고 예외 안에 code 가 든 본문이 있으므로 그대로 둔다
+        Object effective = body != null ? body : ex instanceof ErrorResponse response ? response.getBody() : null;
+        if (!(effective instanceof ProblemDetail p) || p.getProperties() == null || !p.getProperties().containsKey("code")) {
+            ErrorCode code = statusCode.is5xxServerError() ? ErrorCode.INTERNAL_ERROR
+                    : statusCode.value() == 404 ? ErrorCode.REQUEST_NOT_FOUND
+                    : statusCode.value() == 400 ? ErrorCode.INVALID_REQUEST_BODY
+                    : ErrorCode.REQUEST_NOT_SUPPORTED;
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(statusCode, code.message());
+            problem.setProperty("code", code.name());
+            body = problem;
         }
         return super.handleExceptionInternal(ex, body, headers, statusCode, request);
     }

@@ -72,7 +72,8 @@ public final class DepositDtos {
                               @NotNull(message = "ORDER_NOT_CHOSEN") Long orderId) {
     }
 
-    public record ConfirmRequest(@Valid @NotEmpty(message = "CONFIRM_NOTHING_SELECTED") List<ConfirmItem> items) {
+    public record ConfirmRequest(@Valid @NotEmpty(message = "CONFIRM_NOTHING_SELECTED")
+                                 List<@NotNull(message = "DEPOSIT_NOT_CHOSEN") ConfirmItem> items) {
     }
 
     public record ConfirmResponse(int confirmedCount, List<String> errors) {

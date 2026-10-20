@@ -17,6 +17,7 @@ export const sellerOrderText = {
   // 주문 처리
   changedReplyHead: '**변경했습니다.** 댓글 답글 예시 (고쳐서 복사해 쓰세요)',
   confirmUnconfirmPaid: '입금 확정을 취소할까요?',
+  manualAmountInvalid: '입금액은 숫자로 입력해 주세요. (예: 3800)',
   confirmCancel: (orderNo: number, paid: boolean) =>
     `${orderNo}번 주문을 취소할까요?${paid ? ' (입금 확정된 주문이라 환불 필요로 표시됩니다)' : ''}`,
   sameNicknameBanner: (count: number) =>

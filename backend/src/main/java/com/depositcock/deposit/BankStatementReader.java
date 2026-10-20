@@ -232,14 +232,16 @@ public class BankStatementReader {
                 if (row.stream().allMatch(String::isBlank)) {
                     continue;
                 }
-                String name = get(row, nameIdx).trim();
+                // DB 칸 길이를 넘는 값(메모 열을 이름 열로 고른 경우 등)은 잘라 담는다. 전에는 저장할 때
+                // "이미 같은 데이터가 있거나 동시에 저장" 오류(409)로 업로드 전체가 실패했음 (2026-10-20 점검)
+                String name = cut(get(row, nameIdx).trim(), DepositRow.MAX_DEPOSITOR_NAME);
                 Integer amount = parseAmount(get(row, amountIdx));
                 String type = typeIdx >= 0 ? get(row, typeIdx) : "";
                 if (name.isEmpty() || amount == null || amount <= 0 || excludedType(type)) {
                     skipped++;
                     continue;
                 }
-                String dateText = dateIdx >= 0 ? get(row, dateIdx).trim() : null;
+                String dateText = dateIdx >= 0 ? cut(get(row, dateIdx).trim(), DepositRow.MAX_DATETIME_TEXT) : null;
                 deposits.add(new DepositLine(i + 1, name, amount, blankToNull(dateText), parseDateTime(dateText)));
             }
             return new ParsedStatement(used, !manual, r + 1, rows.get(r), options, preview, deposits, skipped, null);
@@ -344,6 +346,10 @@ public class BankStatementReader {
     /** 다른 경로(스크린샷 등)에서 입금 시각 원문을 변환할 때 쓴다. */
     public static LocalDateTime parseDateTimeText(String raw) {
         return parseDateTime(raw);
+    }
+
+    private static String cut(String value, int max) {
+        return value.length() <= max ? value : value.substring(0, max);
     }
 
     private static boolean isBlank(String value) {

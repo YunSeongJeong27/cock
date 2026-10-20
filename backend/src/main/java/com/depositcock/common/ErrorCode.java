@@ -5,6 +5,7 @@ import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
+import static org.springframework.http.HttpStatus.METHOD_NOT_ALLOWED;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.HttpStatus.PAYLOAD_TOO_LARGE;
 import static org.springframework.http.HttpStatus.TOO_MANY_REQUESTS;
@@ -26,6 +27,8 @@ public enum ErrorCode {
     // ---- 공통 ----
     INVALID_INPUT(BAD_REQUEST, "입력값을 확인해 주세요."),
     INVALID_REQUEST_BODY(BAD_REQUEST, "요청 내용을 읽을 수 없습니다. 새로고침한 뒤 다시 시도해 주세요."),
+    REQUEST_NOT_FOUND(NOT_FOUND, "요청한 주소를 찾을 수 없습니다. 주소를 확인해 주세요."),
+    REQUEST_NOT_SUPPORTED(METHOD_NOT_ALLOWED, "지원하지 않는 요청입니다. 새로고침한 뒤 다시 시도해 주세요."),
     UPLOAD_TOO_LARGE(PAYLOAD_TOO_LARGE, "파일은 1개당 10MB, 한 번에 50MB 까지 올릴 수 있습니다."),
     CONCURRENT_UPDATE(CONFLICT, "다른 곳에서 같은 내용을 먼저 바꿨습니다. 새로고침한 뒤 다시 시도해 주세요."),
     DATA_CONFLICT(CONFLICT, "저장하지 못했습니다. 이미 같은 데이터가 있거나 동시에 저장되었습니다. 새로고침한 뒤 다시 시도해 주세요."),
@@ -164,6 +167,7 @@ public enum ErrorCode {
     COMMENT_FIX_UNREADABLE(BAD_REQUEST, "읽지 못한 글자([?])를 고친 뒤 저장해 주세요."),
     COMMENT_NOT_FOUND(NOT_FOUND, "댓글을 찾을 수 없습니다."),
     COMMENT_QUANTITY_INVALID(BAD_REQUEST, "수량을 확인해 주세요."),
+    COMMENT_ORDER_AMOUNT_TOO_LARGE(BAD_REQUEST, "%s 님의 주문 금액이 1억 원을 넘습니다. 댓글 수량을 확인해 주세요."),
     COMMENT_CHANNEL_LINK_ONLY(BAD_REQUEST, "'주문 링크만' 쓰는 공구입니다. 댓글 주문도 받으려면 공구 수정에서 주문 받는 방법을 "
             + "'주문 링크 + 댓글'로 바꿔 주세요."),
     COMMENT_MULTI_PRODUCT(BAD_REQUEST, "상품이 여러 개인 공구는 아직 댓글 주문을 받을 수 없습니다 "
@@ -222,6 +226,7 @@ public enum ErrorCode {
     REFUND_ACCOUNT_REQUIRED(BAD_REQUEST, "환불받을 계좌번호를 입력해 주세요."),
     DELETE_TOO_MANY(BAD_REQUEST, "한 번에 1,000건까지 삭제할 수 있습니다."),
     AMOUNT_MIN(BAD_REQUEST, "금액은 0원 이상이어야 합니다."),
+    AMOUNT_REQUIRED(BAD_REQUEST, "입금액을 숫자로 입력해 주세요."),
     DEPOSIT_NOT_CHOSEN(BAD_REQUEST, "입금을 골라 주세요."),
     ORDER_NOT_CHOSEN(BAD_REQUEST, "주문을 골라 주세요."),
     CONFIRM_NOTHING_SELECTED(BAD_REQUEST, "확정할 입금을 골라 주세요."),

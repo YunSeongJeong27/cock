@@ -7,6 +7,7 @@ import com.depositcock.security.CurrentSeller;
 import com.depositcock.vision.ScreenshotService.CommentExtractResponse;
 import com.depositcock.vision.ScreenshotService.DepositExtractResponse;
 import com.depositcock.vision.ScreenshotService.SaveRow;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,7 +39,8 @@ public class ScreenshotController {
         return new CaptureStatus(extractor.available(), usageService.usage(CurrentSeller.id()));
     }
 
-    public record SaveRequest(@NotNull(message = "SCREENSHOT_NOTHING_TO_SAVE") List<SaveRow> rows) {
+    public record SaveRequest(@NotNull(message = "SCREENSHOT_NOTHING_TO_SAVE")
+                              List<@NotNull(message = "INVALID_INPUT") SaveRow> rows) {
     }
 
     @PostMapping("/api/seller/group-buys/{groupBuyId}/deposits/screenshots/extract")
@@ -48,7 +50,7 @@ public class ScreenshotController {
     }
 
     @PostMapping("/api/seller/group-buys/{groupBuyId}/deposits/screenshots/save")
-    public DepositService.SaveResult saveDeposits(@PathVariable Long groupBuyId, @RequestBody SaveRequest request) {
+    public DepositService.SaveResult saveDeposits(@PathVariable Long groupBuyId, @Valid @RequestBody SaveRequest request) {
         return service.saveDeposits(CurrentSeller.id(), groupBuyId, request.rows());
     }
 

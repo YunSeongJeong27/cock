@@ -54,8 +54,8 @@ public final class GroupBuyDtos {
             boolean unitAddressFieldEnabled,
             @Size(max = 500, message = "KAKAO_LINK_TOO_LONG") String kakaoInquiryUrl,
             @Size(max = 500, message = "ADMIN_NAMES_TOO_LONG") String adminNames,
-            @Valid @NotNull(message = "PRODUCTS_MISSING") List<ProductRequest> products,
-            @Valid @NotNull(message = "PICKUP_POINTS_MISSING") List<PickupPointRequest> pickupPoints) {
+            @Valid @NotNull(message = "PRODUCTS_MISSING") List<@NotNull(message = "PRODUCT_NAME_REQUIRED") ProductRequest> products,
+            @Valid @NotNull(message = "PICKUP_POINTS_MISSING") List<@NotNull(message = "PICKUP_POINT_NAME_REQUIRED") PickupPointRequest> pickupPoints) {
     }
 
     /** 판매자용. remaining 은 재고보다 더 주문되면 음수 (초과 수량) */

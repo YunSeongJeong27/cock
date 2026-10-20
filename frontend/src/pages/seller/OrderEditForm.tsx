@@ -32,12 +32,19 @@ export default function OrderEditForm({ groupBuy, order, onSaved, onClose }: Pro
   const [busy, setBusy] = useState(false)
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }))
 
-  // 서버(OrderRules)와 같은 규칙: 선택지가 하나뿐이면 그것으로 정해진다
-  const bothReceive = groupBuy.pickupEnabled && groupBuy.deliveryEnabled
-  const receive: ReceiveMethod = bothReceive ? form.receiveMethod : groupBuy.pickupEnabled ? 'PICKUP' : 'DELIVERY'
-  const bothPayment = groupBuy.pickupPrepayEnabled && groupBuy.pickupOnsiteEnabled
+  // 서버(SellerOrderService.edit)와 같은 규칙: 공구에서 켠 방법 + 이 주문의 지금 방법 중에서 고르고, 하나뿐이면 그것.
+  // 공구에서 그 방법을 꺼도(예: 픽업 끄고 배송만) 이미 받은 주문은 같은 방법 그대로 고칠 수 있다 (2026-10-19).
+  // 전에는 공구 설정만 보고 꺼진 방법을 바꿔 보내서, 픽업 주문을 고치려면 배송지를 넣어야 했음 (2026-10-20 점검)
+  const receiveOptions = (['PICKUP', 'DELIVERY'] as ReceiveMethod[]).filter((m) => m === order.receiveMethod
+    || (m === 'PICKUP' ? groupBuy.pickupEnabled : groupBuy.deliveryEnabled))
+  const bothReceive = receiveOptions.length > 1
+  const receive: ReceiveMethod = bothReceive ? form.receiveMethod : receiveOptions[0]
+  // 결제 방식도 수령 방법을 그대로 두면 지금 방식을 그대로 둘 수 있다 (서버도 둘 다 그대로면 공구 설정을 보지 않음)
+  const paymentOptions = (['PREPAID', 'ONSITE'] as PaymentMethod[]).filter((m) => (receive === order.receiveMethod && m === order.paymentMethod)
+    || (m === 'PREPAID' ? groupBuy.pickupPrepayEnabled : groupBuy.pickupOnsiteEnabled))
+  const bothPayment = paymentOptions.length > 1
   const payment: PaymentMethod = receive === 'DELIVERY' ? 'PREPAID'
-    : bothPayment ? form.paymentMethod : groupBuy.pickupPrepayEnabled ? 'PREPAID' : 'ONSITE'
+    : paymentOptions.includes(form.paymentMethod) && bothPayment ? form.paymentMethod : paymentOptions[0] ?? 'ONSITE'
 
   // 원래 있던 상품은 주문 당시 단가, 새로 넣는 상품은 지금 단가 (서버와 같음)
   const rows = useMemo(() => groupBuy.products.map((p) => {

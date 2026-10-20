@@ -91,7 +91,7 @@ public class PublicOrderService {
 
     /** 공개 화면 결과 + 쿠키에 새로 넣을 토큰(있으면) */
     /** 주문 1건 금액 상한 (int 넘침 방지). 공구 주문으로 1억원은 넘지 않는다고 본다 [판단] */
-    static final long MAX_ORDER_AMOUNT = 100_000_000L;
+    public static final long MAX_ORDER_AMOUNT = 100_000_000L;
 
     public record WithCookie<T>(T body, String cookieToken) {
     }
@@ -303,18 +303,13 @@ public class PublicOrderService {
         if (phone == null) {
             throw new ApiException(ErrorCode.PHONE_FULL_REQUIRED);
         }
-        List<Long> customerIds = orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()).stream()
-                .filter(o -> o.getSource() == OrderSource.FORM)
-                .filter(o -> phone.equals(o.getPhone()))
-                .map(CustomerOrder::getCustomerId)
-                .distinct()
-                .toList();
-        if (customerIds.isEmpty()) {
-            throw new ApiException(ErrorCode.ORDER_NOT_FOUND_BY_PHONE);
-        }
+        // 휴대폰 번호 = 판매자별 고객 하나. 이 공구에 그 고객의 주문이 있는지만 본다
+        // (전에는 공구의 주문을 전부 읽어서 비교했음, 2026-10-20 점검)
+        Long customerId = customerOrdersByPhone(groupBuy, phone).stream().map(CustomerOrder::getCustomerId).findFirst()
+                .orElseThrow(() -> new ApiException(ErrorCode.ORDER_NOT_FOUND_BY_PHONE));
         // 본인 확인을 거친 기기는 이 고객의 주문 상태를 볼 수 있다. 개인정보(휴대폰 전체·동호수·배송지) 자동 채움은
         // 그 기기에서 넣은 주문에서만 가져오므로, 다른 기기 주문의 개인정보는 여기서도 나가지 않는다.
-        String newCookie = rememberDevice(groupBuy, cookieToken, customerIds.get(0), true, now);
+        String newCookie = rememberDevice(groupBuy, cookieToken, customerId, true, now);
         CustomerDevice device = deviceRepository.findByCookieTokenAndGroupBuyId(
                 newCookie != null ? newCookie : cookieToken, groupBuy.getId()).orElseThrow();
         return new WithCookie<>(toPublic(groupBuy, device, now), newCookie);
@@ -418,14 +413,20 @@ public class PublicOrderService {
     private List<CustomerOrder> matchByPhoneAndName(GroupBuy groupBuy, String rawPhone, String rawName) {
         String phone = PhoneNumbers.normalize(rawPhone);
         String name = squash(rawName);
-        List<CustomerOrder> matches = orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()).stream()
-                .filter(o -> phone != null && phone.equals(o.getPhone()))
+        List<CustomerOrder> matches = phone == null ? List.of() : customerOrdersByPhone(groupBuy, phone).stream()
                 .filter(o -> name.equals(squash(o.getDepositorName())))
                 .toList();
         if (matches.isEmpty()) {
             throw new ApiException(ErrorCode.ORDER_NOT_FOUND_BY_PHONE_NAME);
         }
         return matches;
+    }
+
+    /** 이 공구에서 이 휴대폰 번호(정규화한 값)로 넣은 주문. 댓글 고객은 휴대폰 번호가 없으므로 주문서 주문만 나온다 */
+    private List<CustomerOrder> customerOrdersByPhone(GroupBuy groupBuy, String phone) {
+        return customerRepository.findBySellerIdAndPhone(groupBuy.getSeller().getId(), phone)
+                .map(c -> orderRepository.findByGroupBuyIdAndCustomer_IdOrderByOrderNoAsc(groupBuy.getId(), c.getId()))
+                .orElse(List.of());
     }
 
     /** 고른 주문번호의 주문, 아니면 조건에 맞는 주문이 하나일 때 그 주문. 여러 건이면 409 + 주문 목록(orders) */

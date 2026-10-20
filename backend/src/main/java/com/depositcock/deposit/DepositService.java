@@ -122,20 +122,25 @@ public class DepositService {
     public SaveResult saveDeposits(Long groupBuyId, DepositSource source, String fileName, List<DepositLine> lines) {
         groupBuyService.lockById(groupBuyId); // 같은 파일을 동시에 두 번 올려도 중복 검사가 맞게
         Map<String, Integer> existing = existingCounts(groupBuyId);
-        DepositUpload upload = uploadRepository.save(new DepositUpload(groupBuyId, source, fileName, LocalDateTime.now(clock)));
-        int saved = 0;
+        List<DepositLine> fresh = new ArrayList<>();
         int duplicates = 0;
         for (DepositLine line : lines) {
-            DepositRow row = new DepositRow(upload.getId(), line.rowNo(), line.name(), line.amount(), line.dateText(),
-                    line.depositedAt());
-            if (consume(existing, row.dedupeKey())) {
+            if (consume(existing, DepositRow.dedupeKey(line.name(), line.amount(), line.dateText()))) {
                 duplicates++;
-                continue;
+            } else {
+                fresh.add(line);
             }
-            rowRepository.save(row);
-            saved++;
         }
-        return new SaveResult(upload.getId(), saved, duplicates);
+        // 새 입금이 없으면(같은 파일을 다시 올림 등) 업로드 기록을 만들지 않는다. 전에는 "입금 0건" 파일이 목록에 쌓였음 (2026-10-20 점검)
+        if (fresh.isEmpty()) {
+            return new SaveResult(null, 0, duplicates);
+        }
+        DepositUpload upload = uploadRepository.save(new DepositUpload(groupBuyId, source, fileName, LocalDateTime.now(clock)));
+        for (DepositLine line : fresh) {
+            rowRepository.save(new DepositRow(upload.getId(), line.rowNo(), line.name(), line.amount(), line.dateText(),
+                    line.depositedAt()));
+        }
+        return new SaveResult(upload.getId(), fresh.size(), duplicates);
     }
 
     private Map<String, Integer> existingCounts(Long groupBuyId) {
@@ -157,8 +162,11 @@ public class DepositService {
     public List<UploadSummary> uploads(Long sellerId, Long groupBuyId) {
         GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
         Set<Long> usedRows = usedRowIds(groupBuy.getId());
+        // 입금 줄은 한 번에 읽어 업로드별로 나눈다 (전에는 업로드마다 따로 읽었음, 2026-10-20 점검)
+        Map<Long, List<DepositRow>> rowsByUpload = rowRepository.findByGroupBuyId(groupBuy.getId()).stream()
+                .collect(Collectors.groupingBy(DepositRow::getUploadId));
         return uploadRepository.findByGroupBuyIdOrderByIdDesc(groupBuy.getId()).stream().map(u -> {
-            List<DepositRow> rows = rowRepository.findByUploadId(u.getId());
+            List<DepositRow> rows = rowsByUpload.getOrDefault(u.getId(), List.of());
             int used = (int) rows.stream().filter(r -> usedRows.contains(r.getId())).count();
             return new UploadSummary(u.getId(), u.getSource(), u.getFileName(), u.getUploadedAt(), rows.size(), used);
         }).toList();

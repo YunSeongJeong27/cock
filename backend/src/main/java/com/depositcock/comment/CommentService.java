@@ -29,6 +29,7 @@ import com.depositcock.order.Nicknames;
 import com.depositcock.order.OrderItem;
 import com.depositcock.order.OrderSource;
 import com.depositcock.order.PaymentMethod;
+import com.depositcock.order.PublicOrderService;
 import com.depositcock.order.ReceiveMethod;
 import com.depositcock.seller.FeatureAccess;
 import jakarta.persistence.EntityManager;
@@ -229,7 +230,8 @@ public class CommentService {
         if (authorName.contains("[?]") || content.contains("[?]")) {
             throw new ApiException(ErrorCode.COMMENT_FIX_UNREADABLE);
         }
-        comment.update(authorName.trim(), content.trim(), manualQuantity);
+        // 저장할 때와 같이 칸 길이에 맞춰 자른다 (넘기면 409 "이미 같은 데이터" 로 잘못 안내됐음, 2026-10-20 점검)
+        comment.update(truncate(authorName.trim(), 200), truncate(content.trim(), 2000), manualQuantity);
     }
 
     @Transactional
@@ -282,6 +284,11 @@ public class CommentService {
             if (t.quantity() <= 0) {
                 continue; // 확인 필요만 있고 수량 미정인 고객은 판매자가 수량을 정한 뒤 다시 반영
             }
+            // 주문서 주문과 같은 금액 상한. 전에는 int 로 곱해서 넘치면 금액이 음수로 저장됐음 (2026-10-20 점검)
+            long amount = (long) product.getUnitPrice() * t.quantity();
+            if (amount > PublicOrderService.MAX_ORDER_AMOUNT) {
+                throw new ApiException(ErrorCode.COMMENT_ORDER_AMOUNT_TOO_LARGE, t.authorName().trim());
+            }
             // 댓글 고객은 휴대폰을 모르므로 댓글 닉네임으로 알아본다
             Customer customer = customers.byCommentNickname(groupBuy.getSeller().getId(), t.authorName().trim(), now);
             CustomerOrder order = new CustomerOrder(groupBuy, groupBuy.nextOrderNo(maxOrderNo), OrderSource.COMMENT, customer,
@@ -289,7 +296,7 @@ public class CommentService {
             order.fillCustomer(null, t.authorName(), null);
             order.fillReceive(receive, null, payment);
             order.addItem(new OrderItem(order, product, t.quantity()));
-            order.fillAmounts(product.getUnitPrice() * t.quantity(), 0);
+            order.fillAmounts((int) amount, 0);
             orderRepository.save(order);
             productRepository.increaseSold(product.getId(), t.quantity());
             created++;
