@@ -110,7 +110,8 @@ final class OrderUpdate {
         });
 
         // 2) 고객이 적은 값
-        if (v.receive() != order.getReceiveMethod() || v.point() != order.getPickupPoint()) {
+        // 픽업 지점은 id 로 비교 (객체 비교는 지연 로딩 프록시와 실제 객체가 다르게 나올 수 있음)
+        if (v.receive() != order.getReceiveMethod() || !Objects.equals(pointId(v.point()), pointId(order.getPickupPoint()))) {
             changes.add("수령 " + receiveLabel(order.getReceiveMethod(), order.getPickupPoint()) + "→"
                     + receiveLabel(v.receive(), v.point()));
         }
@@ -187,6 +188,10 @@ final class OrderUpdate {
         if (!Objects.equals(before, after)) {
             changes.add(label + " " + (before == null ? "(없음)" : before) + "→" + (after == null ? "(없음)" : after));
         }
+    }
+
+    private static Long pointId(PickupPoint point) {
+        return point == null ? null : point.getId();
     }
 
     private static String receiveLabel(ReceiveMethod method, PickupPoint point) {

@@ -44,6 +44,7 @@ public enum ErrorCode {
     WRONG_PASSWORD(BAD_REQUEST, "비밀번호가 맞지 않습니다."),
     SELLER_NOT_FOUND(NOT_FOUND, "판매자를 찾을 수 없습니다."),
     SELLER_SUSPENDED(FORBIDDEN, "관리자가 사용을 제한한 계정입니다. 조회만 할 수 있습니다."),
+    ADMIN_ONLY(FORBIDDEN, "관리자만 쓸 수 있는 기능입니다."),
     ADMIN_CANNOT_SUSPEND(BAD_REQUEST, "관리자 계정은 사용 제한할 수 없습니다."),
     ADMIN_CANNOT_DELETE(BAD_REQUEST, "관리자 계정은 삭제할 수 없습니다."),
     ADMIN_CANNOT_WITHDRAW(BAD_REQUEST, "관리자 계정은 탈퇴할 수 없습니다."),

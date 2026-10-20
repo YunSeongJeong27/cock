@@ -102,8 +102,10 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
     const amount = prompt('입금액', String(o.expectedAmount))
     if (!amount) return
     // "3,800원"처럼 적어도 숫자만 읽는다. 전에는 "원"이 붙으면 숫자가 아니어서 0원으로 확정됐음 (2026-10-20 점검)
-    const value = Number(amount.replace(/[\s,원]/g, ''))
-    if (!Number.isInteger(value) || value < 0) {
+    // 숫자가 하나도 없으면("원"만 적음 등) 빈 글자가 0원이 되지 않게 숫자만 남았는지 본다
+    const digits = amount.replace(/[\s,원]/g, '')
+    const value = Number(digits)
+    if (!/^\d+$/.test(digits) || !Number.isSafeInteger(value)) {
       setError(T.manualAmountInvalid)
       return
     }

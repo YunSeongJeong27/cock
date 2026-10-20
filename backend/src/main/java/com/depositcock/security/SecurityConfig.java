@@ -7,12 +7,13 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 import com.depositcock.common.AppProperties;
+import com.depositcock.common.ErrorCode;
+import com.depositcock.common.ProblemWriter;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -26,7 +27,8 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.access.AccessDeniedHandler;
 
 /**
  * 판매자 로그인: JWT 를 httpOnly 쿠키(DC_TOKEN)에 담는다 (개발 전 인터뷰 결과 5번).
@@ -36,6 +38,15 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 public class SecurityConfig {
 
     public static final String TOKEN_COOKIE = "DC_TOKEN";
+
+    /**
+     * 로그인이 없거나 만료된 쿠키(401), 관리자 아닌 판매자의 관리자 주소(403)도 다른 오류와 같은 모양 {detail, code} 으로.
+     * 전에는 본문 없이 상태만 나갔음 (2026-10-20 점검 검토)
+     */
+    private static final AuthenticationEntryPoint LOGIN_REQUIRED =
+            (request, response, e) -> ProblemWriter.write(response, ErrorCode.LOGIN_REQUIRED);
+    private static final AccessDeniedHandler ADMIN_ONLY =
+            (request, response, e) -> ProblemWriter.write(response, ErrorCode.ADMIN_ONLY);
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -51,8 +62,9 @@ public class SecurityConfig {
                 .oauth2ResourceServer(oauth -> oauth
                         .bearerTokenResolver(cookieTokenResolver())
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
-                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
+                        .authenticationEntryPoint(LOGIN_REQUIRED)
+                        .accessDeniedHandler(ADMIN_ONLY))
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(LOGIN_REQUIRED).accessDeniedHandler(ADMIN_ONLY));
         return http.build();
     }
 
