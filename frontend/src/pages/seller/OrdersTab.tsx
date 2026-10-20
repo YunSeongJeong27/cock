@@ -113,21 +113,28 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
 
   /**
    * 환불받을 계좌 (복사 버튼). 키가 바뀌어 못 읽으면 안내.
-   * 고객 환불 신청은 예금주가 입금자명과 같아야 받지만(2026-10-19), 적힌 예금주는 확인할 수 없는 값이라
-   * 송금할 때 은행 앱에 뜨는 받는 분 이름을 확인하라고 항상 안내한다. 다르면(전에 받은 신청 등) 빨간 경고도
+   * 고객 환불 신청은 예금주가 주문서 입금자명과 같아야 받는다(2026-10-19). 그 이름은 고객이 적은 값이라:
+   * - 입금 확정 뒤(대조·수동 확정)에는 실제 입금된 이름(통장 기록)과 예금주를 비교해 다르면 빨간 표시 (2026-10-20 사용자 요청)
+   * - 송금할 때 은행 앱에 뜨는 받는 분 이름을 확인하라고 항상 안내 (계좌의 진짜 주인은 그때만 알 수 있음)
    */
-  const refundAccount = (o: SellerOrder) => (
-    <>
-      <div className="row">
-        <span>환불 계좌: <b>{o.refundBank} {o.refundAccount ?? '(읽을 수 없음)'}</b> ({o.refundHolder})</span>
-        {o.refundAccount && <CopyButton text={o.refundAccount} label="계좌 복사" />}
-      </div>
-      {squash(o.refundHolder) !== squash(o.depositorName) && (
-        <div style={{ color: 'var(--danger)' }}>⚠ 예금주가 입금자명({o.depositorName})과 다릅니다.</div>
-      )}
-      <div style={{ color: 'var(--warn)' }}>보낼 때 은행 앱에 뜨는 받는 분 이름이 입금자명({o.depositorName})과 같은지 확인하세요.</div>
-    </>
-  )
+  const refundAccount = (o: SellerOrder) => {
+    const paidName = o.paid ? o.paidDepositorName : null
+    const compareName = paidName ?? o.depositorName
+    return (
+      <>
+        <div className="row">
+          <span>환불 계좌: <b>{o.refundBank} {o.refundAccount ?? '(읽을 수 없음)'}</b> ({o.refundHolder})</span>
+          {o.refundAccount && <CopyButton text={o.refundAccount} label="계좌 복사" />}
+        </div>
+        {squash(o.refundHolder) !== squash(compareName) && (
+          <div style={{ color: 'var(--danger)' }}>
+            ⚠ 예금주({o.refundHolder})가 {paidName ? `실제 입금된 이름(${paidName})` : `입금자명(${o.depositorName})`}과 다릅니다.
+          </div>
+        )}
+        <div style={{ color: 'var(--warn)' }}>보낼 때 은행 앱에 뜨는 받는 분 이름이 {paidName ? `실제 입금된 이름(${paidName})` : `입금자명(${o.depositorName})`}과 같은지 확인하세요.</div>
+      </>
+    )
+  }
 
   /** 상세: 시각·배송지·입금 이력·변경 이력 + 버튼 (그리드·카드 공통) */
   function detail(o: SellerOrder): ReactNode {
