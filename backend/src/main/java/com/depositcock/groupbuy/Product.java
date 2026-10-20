@@ -10,9 +10,14 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "product")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Product {
 
     @Id
@@ -57,10 +62,8 @@ public class Product {
     private int sortOrder;
 
     @Version
+    @Getter(AccessLevel.NONE)
     private long version;
-
-    protected Product() {
-    }
 
     public Product(GroupBuy groupBuy, String name, int unitPrice, Integer stockLimit, Integer perOrderLimit, int sortOrder,
                    Integer stockAlertThreshold, boolean blockWhenSoldOut) {
@@ -85,10 +88,6 @@ public class Product {
         this.blockWhenSoldOut = blockWhenSoldOut;
     }
 
-    public boolean isBlockWhenSoldOut() {
-        return blockWhenSoldOut;
-    }
-
     /** 품절로 막는 중인지: "다 팔리면 품절"을 켰고 준비 수량에 도달함 */
     public boolean isSoldOut() {
         return blockWhenSoldOut && stockLimit != null && sold >= stockLimit;
@@ -109,47 +108,7 @@ public class Product {
         return remaining == null || remaining < 1 ? null : remaining;
     }
 
-    public Integer getStockAlertThreshold() {
-        return stockAlertThreshold;
-    }
-
-    public boolean isStockAlertSent() {
-        return stockAlertSent;
-    }
-
     void markStockAlertSent(boolean sent) {
         this.stockAlertSent = sent;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public GroupBuy getGroupBuy() {
-        return groupBuy;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public int getUnitPrice() {
-        return unitPrice;
-    }
-
-    public Integer getStockLimit() {
-        return stockLimit;
-    }
-
-    public int getSold() {
-        return sold;
-    }
-
-    public Integer getPerOrderLimit() {
-        return perOrderLimit;
-    }
-
-    public int getSortOrder() {
-        return sortOrder;
     }
 }

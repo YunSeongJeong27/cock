@@ -317,6 +317,17 @@
 - 준비 수량은 등록 후에도 "공구 수정"에서 언제든 바꿀 수 있음 (원래도 됐음). 이제는 이미 주문된 수량보다 작게도 바꿀 수 있음 (넘친 만큼 초과로 보임)
 - DB: product.stock_alert_threshold, product.stock_alert_sent (첫 배포 전이라 V1). 로컬 DB 다시 지워야 함
 
+### 2026-10-20 Lombok 사용 (사용자 결정) — 아래 절들·원문 "기술 스택"보다 우선
+- 배경: 처음 설계 문서의 확정 기술 스택 목록에 Lombok 이 빠져 있어서 1차 개발 때 넣지 않았고, 그대로 getter·생성자를 손으로 써 왔음. 안 쓰기로 정한 기록은 없었음 [사실]. 사용자가 "롬복을 쓰면 좋은 부분은 전부 롬복으로" 결정 [결정]
+- 적용한 것 [사실]
+  - 엔티티 16개: `@Getter` + `@NoArgsConstructor(access = AccessLevel.PROTECTED)` (JPA 용 빈 생성자). 손으로 쓴 단순 getter 166개 삭제. getter 가 없던 내부 필드 6개(GroupBuy.lastOrderNo, Product.version, DepositConfirmation.activeOrderId·activeDepositRowId, OrderChange.order, Seller.notifications)는 `@Getter(AccessLevel.NONE)` 로 막아 밖에서 보이는 메서드는 전과 같음
+  - 엔티티에 `@Setter`·`@Data`·`@EqualsAndHashCode`·`@AllArgsConstructor` 는 쓰지 않음 (값은 지금처럼 이름 있는 메서드로만 바꿈: `cancel()`, `markPickedUp()` 등). 계산하는 getter(`getPhone()`, `getPaidAt()` 등)는 그대로 손으로 씀
+  - 생성자 주입만 하는 서비스·컨트롤러·컴포넌트 32개: `@RequiredArgsConstructor` (final 필드 생성자)
+  - 생성자·getter 만 있는 enum 8개(ErrorCode, Notice, MailText 등): `@RequiredArgsConstructor`, `getLabel()`·`isDefaultOn()` 은 `@Getter`. `label()`·`status()`·`text()` 처럼 get 이 안 붙은 메서드는 이름이 바뀌므로 그대로 둠
+- 그대로 둔 것 [판단]: 요청·응답 DTO 는 record 그대로 (record 가 이미 생성자·접근자를 만들어 Lombok 이 필요 없음), 생성자에 로직이 있는 클래스(`@Value` 주입하는 SellerMail, 키를 만드는 DataCipher, VisionConfig 등)·예외 클래스, private 생성자만 있는 도우미 클래스(Lombok `@UtilityClass` 는 실험 기능이라 안 씀)
+- 설정: `backend/pom.xml` 에 lombok(버전은 Spring Boot 가 관리, 1.18.40), 컴파일러 annotationProcessorPaths, 실행 jar 에서는 뺌. `backend/lombok.config` (위 폴더 설정 안 읽음, `@Generated` 붙임)
+- 내 맥북 IntelliJ: Lombok 플러그인은 기본 포함. 처음 열 때 "Enable annotation processing" 안내가 뜨면 켠다 [사실: IntelliJ 2020.3 이후 기본 포함. 사용자 판(Community/Ultimate)은 미확인]
+
 ### 2026-10-20 전체 점검 2차 (사용자 요청: 이상한 판매자·고객 가정, 디버깅, 고치고 테스트) — 자세한 기록 `docs/점검기록-2026-10-20.md`
 - 결정은 바뀐 것 없음. 고친 것 [사실, 테스트 `FullAuditFixesTest` 8개 + 브라우저 시나리오 4개]
   - 목록 안 `null`(고객 주문 `items:[null]` 등 6곳)·스크린샷 입금 저장 `@Valid` 누락 → 500 이던 것을 400 으로
@@ -651,6 +662,7 @@
 ### 설정
 - `application.yml`(공통), `application-local.yml`(맥북, H2), `application-prod.yml`(운영, PostgreSQL) 프로필 분리 [제안]
 - 앱 고유 설정 값은 `@ConfigurationProperties` record로 묶어서 주입 [제안]
+- 반복 코드는 Lombok: 엔티티 `@Getter`·`@NoArgsConstructor(PROTECTED)`, 서비스 `@RequiredArgsConstructor`. 엔티티에 `@Setter`·`@Data` 금지. DTO 는 record (2026-10-20 사용자 결정, 위 "Lombok 사용") [결정]
 - API 키·비밀번호 등 비밀값은 환경변수로만. 깃허브에 올리지 않는다 [결정]
 
 ### 사용자 환경 (내 맥북)

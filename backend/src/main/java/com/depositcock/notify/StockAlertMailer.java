@@ -3,6 +3,7 @@ package com.depositcock.notify;
 import com.depositcock.common.Notice;
 import com.depositcock.groupbuy.StockAlerts;
 import com.depositcock.groupbuy.StockAlerts.StockAlertEvent;
+import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -14,13 +15,10 @@ import org.springframework.web.util.HtmlUtils;
  * 주문 응답이 메일 때문에 늦어지지 않게 따로(비동기) 보낸다.
  */
 @Component
+@RequiredArgsConstructor
 public class StockAlertMailer {
 
     private final SellerMail mail;
-
-    public StockAlertMailer(SellerMail mail) {
-        this.mail = mail;
-    }
 
     /** 알림 제목·첫 줄 (판매자 화면 알림 칸과 같은 문장) */
     static String headline(StockAlertEvent e) {

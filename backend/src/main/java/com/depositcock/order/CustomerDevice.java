@@ -8,12 +8,17 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /**
  * 쿠키 토큰 → 고객 키. 공구 단위로 따로 기억한다 (다른 공구에서는 새 고객).
  */
 @Entity
 @Table(name = "customer_device")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CustomerDevice {
 
     @Id
@@ -43,9 +48,6 @@ public class CustomerDevice {
     @Column(nullable = false)
     private boolean identified;
 
-    protected CustomerDevice() {
-    }
-
     public CustomerDevice(Long groupBuyId, String cookieToken, Long customerId, boolean identified,
                           LocalDateTime now) {
         this.groupBuyId = groupBuyId;
@@ -68,33 +70,5 @@ public class CustomerDevice {
         }
         this.customerId = customerId;
         this.lastSeenAt = now;
-    }
-
-    public boolean isIdentified() {
-        return identified;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public Long getGroupBuyId() {
-        return groupBuyId;
-    }
-
-    public String getCookieToken() {
-        return cookieToken;
-    }
-
-    public Long getCustomerId() {
-        return customerId;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public LocalDateTime getLastSeenAt() {
-        return lastSeenAt;
     }
 }

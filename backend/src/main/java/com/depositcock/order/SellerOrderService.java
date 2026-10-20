@@ -20,6 +20,7 @@ import com.depositcock.order.OrderDtos.OrderItemRequest;
 import com.depositcock.order.OrderDtos.SellerEditRequest;
 import com.depositcock.order.OrderDtos.SellerOrder;
 import jakarta.persistence.EntityManager;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class SellerOrderService {
 
     private final GroupBuyService groupBuyService;
@@ -37,18 +39,6 @@ public class SellerOrderService {
     private final Clock clock;
     private final StockAlerts stockAlerts;
     private final DataCipher cipher;
-
-    public SellerOrderService(GroupBuyService groupBuyService, CustomerOrderRepository orderRepository,
-                              ProductRepository productRepository, EntityManager entityManager, Clock clock, StockAlerts stockAlerts,
-                              DataCipher cipher) {
-        this.cipher = cipher;
-        this.stockAlerts = stockAlerts;
-        this.entityManager = entityManager;
-        this.groupBuyService = groupBuyService;
-        this.orderRepository = orderRepository;
-        this.productRepository = productRepository;
-        this.clock = clock;
-    }
 
     public List<SellerOrder> list(Long sellerId, Long groupBuyId) {
         GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);

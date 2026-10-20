@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,17 +17,13 @@ import org.springframework.transaction.annotation.Transactional;
  * 주문 링크·입금 대조 등 나머지 기능은 이 설정과 상관없이 쓴다.
  */
 @Service
+@RequiredArgsConstructor
 public class FeatureAccess {
 
     static final String COMMENT_FEATURE_OPEN = "comment_feature_open";
 
     private final JdbcTemplate jdbc;
     private final SellerRepository sellerRepository;
-
-    public FeatureAccess(JdbcTemplate jdbc, SellerRepository sellerRepository) {
-        this.jdbc = jdbc;
-        this.sellerRepository = sellerRepository;
-    }
 
     /** 댓글 주문 기능을 모든 판매자에게 열었는지 */
     public boolean commentFeatureOpen() {

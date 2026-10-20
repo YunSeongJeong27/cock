@@ -1,9 +1,12 @@
 package com.depositcock.notify;
 
+import lombok.RequiredArgsConstructor;
+
 /**
  * 판매자 알림 메일 문구 (2026-10-20). 제목은 첫 줄과 같고 앞에 SUBJECT_PREFIX 가 붙는다.
  * 값이 들어가는 문장은 %s·%d 자리에 순서대로 넣는다.
  */
+@RequiredArgsConstructor
 public enum MailText {
 
     SUBJECT_PREFIX("[입금콕] "),
@@ -23,10 +26,6 @@ public enum MailText {
     AUTO_CLOSED_AT("마감 시각: %s");
 
     private final String format;
-
-    MailText(String format) {
-        this.format = format;
-    }
 
     public String text(Object... args) {
         return args.length == 0 ? format : String.format(format, args);

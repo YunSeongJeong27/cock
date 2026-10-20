@@ -9,6 +9,7 @@ import com.depositcock.seller.SellerDtos.AdminSellerRow;
 import com.depositcock.seller.SellerDtos.AdminSettings;
 import com.depositcock.seller.SellerDtos.AdminUpdateRequest;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,17 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
  * 슈퍼 관리자(윤성) 전용: 판매자 목록, 플랜·유료 만료일·사용 제한·댓글 기능 허용 변경, 탈퇴 처리, 서비스 전체 설정.
  */
 @RestController
+@RequiredArgsConstructor
 public class AdminController {
 
     private final SellerService sellerService;
     private final FeatureAccess featureAccess;
     private final Clock clock;
-
-    public AdminController(SellerService sellerService, FeatureAccess featureAccess, Clock clock) {
-        this.sellerService = sellerService;
-        this.featureAccess = featureAccess;
-        this.clock = clock;
-    }
 
     @GetMapping("/api/admin/settings")
     public AdminSettings settings() {

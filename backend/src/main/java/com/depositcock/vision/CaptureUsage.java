@@ -8,10 +8,15 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /** 판매자별·날짜별 비전 AI 로 보낸 캡처 장수 */
 @Entity
 @Table(name = "capture_usage")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CaptureUsage {
 
     @Id
@@ -27,9 +32,6 @@ public class CaptureUsage {
     @Column(nullable = false)
     private int imageCount;
 
-    protected CaptureUsage() {
-    }
-
     public CaptureUsage(Long sellerId, LocalDate usageDate) {
         this.sellerId = sellerId;
         this.usageDate = usageDate;
@@ -37,21 +39,5 @@ public class CaptureUsage {
 
     public void add(int count) {
         this.imageCount += count;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public Long getSellerId() {
-        return sellerId;
-    }
-
-    public LocalDate getUsageDate() {
-        return usageDate;
-    }
-
-    public int getImageCount() {
-        return imageCount;
     }
 }

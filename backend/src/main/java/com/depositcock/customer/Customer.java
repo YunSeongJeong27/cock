@@ -9,6 +9,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /**
  * 판매자별 고객. 주문서 고객은 휴대폰 번호로, 댓글로만 주문한 고객은 댓글 닉네임으로 알아본다 (둘 중 하나만 값).
@@ -17,6 +20,8 @@ import jakarta.persistence.Table;
  */
 @Entity
 @Table(name = "customer")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Customer {
 
     @Id
@@ -34,9 +39,6 @@ public class Customer {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
-
-    protected Customer() {
-    }
 
     private Customer(Long sellerId, String phone, String commentNickname, LocalDateTime now) {
         this.sellerId = sellerId;
@@ -56,25 +58,5 @@ public class Customer {
     /** 화면 표시용: "휴대폰 010-1234-5678" 또는 "닉네임 꼭지맘" */
     public String label() {
         return phone != null ? "휴대폰 " + PhoneNumbers.format(phone) : "닉네임 " + commentNickname;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public Long getSellerId() {
-        return sellerId;
-    }
-
-    public String getPhone() {
-        return phone;
-    }
-
-    public String getCommentNickname() {
-        return commentNickname;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
     }
 }

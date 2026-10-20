@@ -8,6 +8,7 @@ import com.depositcock.common.ErrorCode;
 import com.depositcock.common.AppProperties;
 import com.depositcock.seller.Seller;
 import com.depositcock.seller.SellerRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -18,20 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
  * 날짜는 Asia/Seoul 기준. AI 호출 전에 장수를 먼저 차감(예약)한다 — 호출이 실패해도 비용이 들 수 있어서 되돌리지 않는다.
  */
 @Service
+@RequiredArgsConstructor
 public class CaptureUsageService {
 
     private final CaptureUsageRepository usageRepository;
     private final SellerRepository sellerRepository;
     private final AppProperties properties;
     private final Clock clock;
-
-    public CaptureUsageService(CaptureUsageRepository usageRepository, SellerRepository sellerRepository,
-                               AppProperties properties, Clock clock) {
-        this.usageRepository = usageRepository;
-        this.sellerRepository = sellerRepository;
-        this.properties = properties;
-        this.clock = clock;
-    }
 
     public record Usage(int usedToday, int usedThisMonth, int dailyLimit, int remainingToday, boolean customLimit) {
     }

@@ -1,6 +1,7 @@
 package com.depositcock.notify;
 
 import com.depositcock.notify.SellerNotices.SellerNoticeEvent;
+import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -9,13 +10,10 @@ import org.springframework.web.util.HtmlUtils;
 
 /** 주문·환불 신청·마감 알림 메일 (2026-10-19). 응답이 늦어지지 않게 따로(비동기) 보낸다. 이스케이프는 <>&"' 만 (한글·· 그대로) */
 @Component
+@RequiredArgsConstructor
 public class SellerNoticeMailer {
 
     private final SellerMail mail;
-
-    public SellerNoticeMailer(SellerMail mail) {
-        this.mail = mail;
-    }
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

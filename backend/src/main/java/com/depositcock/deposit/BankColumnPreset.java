@@ -8,12 +8,17 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /**
  * 판매자가 저장한 은행별 열 이름 (예: "신협" → 이름 열 "기재내용", 금액 열 "입금액").
  */
 @Entity
 @Table(name = "bank_column_preset")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class BankColumnPreset {
 
     @Id
@@ -39,9 +44,6 @@ public class BankColumnPreset {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    protected BankColumnPreset() {
-    }
-
     public BankColumnPreset(Long sellerId, String name, ColumnMapping mapping, LocalDateTime createdAt) {
         this.sellerId = sellerId;
         this.name = name;
@@ -58,37 +60,5 @@ public class BankColumnPreset {
 
     public ColumnMapping toMapping() {
         return new ColumnMapping(dateColumn, nameColumn, amountColumn, typeColumn);
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public Long getSellerId() {
-        return sellerId;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getDateColumn() {
-        return dateColumn;
-    }
-
-    public String getNameColumn() {
-        return nameColumn;
-    }
-
-    public String getAmountColumn() {
-        return amountColumn;
-    }
-
-    public String getTypeColumn() {
-        return typeColumn;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
     }
 }

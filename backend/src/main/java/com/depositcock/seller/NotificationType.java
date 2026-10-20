@@ -1,11 +1,16 @@
 package com.depositcock.seller;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
 /**
  * 판매자 알림 종류 (2026-10-19 사용자 요청: 알림마다 판매자가 켜고 끈다). 판매자가 정하지 않은 알림은 defaultOn 을 따른다.
  * 기본으로 켜 두는 것: 판매자가 바로 처리해야 하는 메일(재고, 환불 신청)과 화면 알림(비용 없음) [제안].
  * 주문마다 오는 메일은 꺼 둔다. 메일은 처음에 Gmail 한 계정(하루 약 500명 한도, 공식 수치 미확인)을 판매자 모두가 나눠 쓰므로,
  * 주문마다 보내면 한도가 차서 재고·환불 메일까지 못 보낼 수 있다.
  */
+@Getter
+@RequiredArgsConstructor
 public enum NotificationType {
 
     /** 남은 수량이 알림 기준 이하가 됨 (2026-10-16) */
@@ -28,12 +33,4 @@ public enum NotificationType {
     SCREEN_SAME_NICKNAME(true);
 
     private final boolean defaultOn;
-
-    NotificationType(boolean defaultOn) {
-        this.defaultOn = defaultOn;
-    }
-
-    public boolean isDefaultOn() {
-        return defaultOn;
-    }
 }

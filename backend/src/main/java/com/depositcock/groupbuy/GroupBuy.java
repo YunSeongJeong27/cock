@@ -9,6 +9,9 @@ import java.util.List;
 import com.depositcock.common.Notice;
 import com.depositcock.seller.Seller;
 import jakarta.persistence.CascadeType;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.DynamicUpdate;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,6 +29,8 @@ import jakarta.persistence.Table;
 @Entity
 @DynamicUpdate
 @Table(name = "group_buy")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class GroupBuy {
 
     @Id
@@ -102,6 +107,7 @@ public class GroupBuy {
 
     /** 마지막으로 준 주문번호. 판매자가 주문을 지워도 번호를 다시 쓰지 않게 (2026-10-19) */
     @Column(nullable = false)
+    @Getter(AccessLevel.NONE)
     private int lastOrderNo;
 
     @Column(nullable = false)
@@ -115,9 +121,6 @@ public class GroupBuy {
 
     @OneToMany(mappedBy = "groupBuy", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PickupPoint> pickupPoints = new ArrayList<>();
-
-    protected GroupBuy() {
-    }
 
     public GroupBuy(Seller seller, String publicToken, LocalDateTime now) {
         this.seller = seller;
@@ -173,21 +176,9 @@ public class GroupBuy {
         return lastOrderNo;
     }
 
-    public boolean isPaused() {
-        return paused;
-    }
-
-    public String getPauseMessage() {
-        return pauseMessage;
-    }
-
     /** 고객 화면에 보일 문구 */
     public String effectivePauseMessage() {
         return pauseMessage == null ? Notice.PAUSE_DEFAULT.text() : pauseMessage;
-    }
-
-    public String getPauseLinkUrl() {
-        return pauseLinkUrl;
     }
 
     /** 화면에 보일 상태 이름 */
@@ -222,74 +213,6 @@ public class GroupBuy {
                 PickupPoint::getId, Comparator.nullsLast(Comparator.naturalOrder()))).toList();
     }
 
-    public Long getId() {
-        return id;
-    }
-
-    public Seller getSeller() {
-        return seller;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public String getPublicToken() {
-        return publicToken;
-    }
-
-    public GroupBuyStatus getStatus() {
-        return status;
-    }
-
-    public LocalDateTime getCloseAt() {
-        return closeAt;
-    }
-
-    public String getBankName() {
-        return bankName;
-    }
-
-    public String getAccountNumber() {
-        return accountNumber;
-    }
-
-    public String getAccountHolder() {
-        return accountHolder;
-    }
-
-    public boolean isPickupEnabled() {
-        return pickupEnabled;
-    }
-
-    public boolean isPickupPrepayEnabled() {
-        return pickupPrepayEnabled;
-    }
-
-    public boolean isPickupOnsiteEnabled() {
-        return pickupOnsiteEnabled;
-    }
-
-    public boolean isDeliveryEnabled() {
-        return deliveryEnabled;
-    }
-
-    public ShippingFeeType getShippingFeeType() {
-        return shippingFeeType;
-    }
-
-    public int getShippingFee() {
-        return shippingFee;
-    }
-
-    public OrderChannel getOrderChannel() {
-        return orderChannel;
-    }
-
     /** 고객 주문서의 닉네임 필수 여부 (칸은 항상 보이고, 링크만 쓰는 공구에서는 선택) */
     public boolean isNicknameRequired() {
         return orderChannel == OrderChannel.LINK_AND_COMMENT;
@@ -297,33 +220,5 @@ public class GroupBuy {
 
     public boolean isCommentOrdersEnabled() {
         return orderChannel == OrderChannel.LINK_AND_COMMENT;
-    }
-
-    public boolean isUnitAddressFieldEnabled() {
-        return unitAddressFieldEnabled;
-    }
-
-    public String getKakaoInquiryUrl() {
-        return kakaoInquiryUrl;
-    }
-
-    public String getAdminNames() {
-        return adminNames;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public List<Product> getProducts() {
-        return products;
-    }
-
-    public List<PickupPoint> getPickupPoints() {
-        return pickupPoints;
     }
 }

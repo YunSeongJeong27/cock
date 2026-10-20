@@ -11,23 +11,18 @@ import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.GroupBuyService;
 import com.depositcock.order.CustomerOrder;
 import com.depositcock.order.CustomerOrderRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class ExportService {
 
     private final GroupBuyService groupBuyService;
     private final CustomerOrderRepository orderRepository;
     private final OrderSheetExcelWriter excelWriter;
-
-    public ExportService(GroupBuyService groupBuyService, CustomerOrderRepository orderRepository,
-                         OrderSheetExcelWriter excelWriter) {
-        this.groupBuyService = groupBuyService;
-        this.orderRepository = orderRepository;
-        this.excelWriter = excelWriter;
-    }
 
     public record ExcelFile(String fileName, byte[] content) {
     }

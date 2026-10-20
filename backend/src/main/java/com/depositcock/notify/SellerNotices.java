@@ -5,6 +5,7 @@ import java.util.List;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.seller.NotificationType;
 import com.depositcock.seller.Seller;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
  * (요청이 실패해 롤백되면 보내지 않음, SellerNoticeMailer). 재고 알림은 StockAlerts 가 따로 낸다.
  */
 @Service
+@RequiredArgsConstructor
 public class SellerNotices {
 
     /** 메일 한 통. lines 는 본문 줄 (HTML 이스케이프는 보낼 때) */
@@ -21,10 +23,6 @@ public class SellerNotices {
     }
 
     private final ApplicationEventPublisher events;
-
-    public SellerNotices(ApplicationEventPublisher events) {
-        this.events = events;
-    }
 
     public void notify(GroupBuy groupBuy, NotificationType type, String headline, List<String> lines) {
         Seller seller = groupBuy.getSeller();

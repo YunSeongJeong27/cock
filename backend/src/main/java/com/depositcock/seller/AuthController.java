@@ -12,6 +12,7 @@ import com.depositcock.seller.SellerDtos.UpdateNotificationsRequest;
 import com.depositcock.seller.SellerDtos.UpdateProfileRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -19,19 +20,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@RequiredArgsConstructor
 public class AuthController {
 
     private final SellerService sellerService;
     private final TokenService tokenService;
     private final Clock clock;
     private final FeatureAccess featureAccess;
-
-    public AuthController(SellerService sellerService, TokenService tokenService, Clock clock, FeatureAccess featureAccess) {
-        this.sellerService = sellerService;
-        this.tokenService = tokenService;
-        this.clock = clock;
-        this.featureAccess = featureAccess;
-    }
 
     @PostMapping("/api/auth/signup")
     public MeResponse signup(@Valid @RequestBody SignupRequest request, HttpServletResponse response) {

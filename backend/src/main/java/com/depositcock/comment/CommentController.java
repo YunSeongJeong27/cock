@@ -9,6 +9,7 @@ import com.depositcock.security.CurrentSeller;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,13 +22,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/seller/group-buys/{groupBuyId}/comments")
+@RequiredArgsConstructor
 public class CommentController {
 
     private final CommentService service;
-
-    public CommentController(CommentService service) {
-        this.service = service;
-    }
 
     public record SaveRequest(@NotNull(message = "COMMENT_SOURCE_REQUIRED") CommentSource source,
                               @NotNull(message = "COMMENTS_MISSING") List<@NotNull(message = "INVALID_INPUT") CommentInput> comments) {

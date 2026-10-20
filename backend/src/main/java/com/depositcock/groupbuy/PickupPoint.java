@@ -9,9 +9,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "pickup_point")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PickupPoint {
 
     @Id
@@ -30,9 +35,6 @@ public class PickupPoint {
     @Column(nullable = false)
     private int sortOrder;
 
-    protected PickupPoint() {
-    }
-
     public PickupPoint(GroupBuy groupBuy, String name, String info, int sortOrder) {
         this.groupBuy = groupBuy;
         this.name = name;
@@ -44,25 +46,5 @@ public class PickupPoint {
         this.name = name;
         this.info = info;
         this.sortOrder = sortOrder;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public GroupBuy getGroupBuy() {
-        return groupBuy;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getInfo() {
-        return info;
-    }
-
-    public int getSortOrder() {
-        return sortOrder;
     }
 }

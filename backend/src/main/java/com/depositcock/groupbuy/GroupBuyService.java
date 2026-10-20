@@ -26,12 +26,14 @@ import com.depositcock.seller.Seller;
 import com.depositcock.seller.FeatureAccess;
 import com.depositcock.seller.SellerRepository;
 import jakarta.persistence.EntityManager;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class GroupBuyService {
 
     private final GroupBuyRepository groupBuyRepository;
@@ -43,20 +45,6 @@ public class GroupBuyService {
     private final Clock clock;
     private final FeatureAccess featureAccess;
     private final StockAlerts stockAlerts;
-
-    public GroupBuyService(GroupBuyRepository groupBuyRepository, SellerRepository sellerRepository,
-                           CustomerOrderRepository orderRepository, EntityManager entityManager, AliasBook aliasBook,
-                           Customers customers, Clock clock, FeatureAccess featureAccess, StockAlerts stockAlerts) {
-        this.stockAlerts = stockAlerts;
-        this.featureAccess = featureAccess;
-        this.aliasBook = aliasBook;
-        this.customers = customers;
-        this.groupBuyRepository = groupBuyRepository;
-        this.sellerRepository = sellerRepository;
-        this.orderRepository = orderRepository;
-        this.entityManager = entityManager;
-        this.clock = clock;
-    }
 
     /**
      * 내 공구를 찾아 잠근다 (공구 행 SELECT ... FOR UPDATE).

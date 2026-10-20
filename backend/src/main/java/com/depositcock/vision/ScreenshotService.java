@@ -24,6 +24,7 @@ import com.depositcock.deposit.DepositSource;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.GroupBuyService;
 import com.depositcock.vision.OverlapDeduplicator.Item;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -32,6 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
  * 원본 이미지는 이 메서드 안에서만 쓰고 저장하지 않는다 (추출 직후 버림).
  */
 @Service
+@RequiredArgsConstructor
 public class ScreenshotService {
 
     private static final Set<String> IMAGE_TYPES = Set.of("image/png", "image/jpeg", "image/gif", "image/webp");
@@ -42,15 +44,6 @@ public class ScreenshotService {
     private final DepositService depositService;
     private final CaptureUsageService usageService;
     private final CommentService commentService;
-
-    public ScreenshotService(VisionExtractor extractor, GroupBuyService groupBuyService, DepositService depositService,
-                             CaptureUsageService usageService, CommentService commentService) {
-        this.extractor = extractor;
-        this.groupBuyService = groupBuyService;
-        this.depositService = depositService;
-        this.usageService = usageService;
-        this.commentService = commentService;
-    }
 
     public record DepositDraft(String name, long amount, String datetime, String type, boolean duplicateSuspected,
                                int imageIndex) {

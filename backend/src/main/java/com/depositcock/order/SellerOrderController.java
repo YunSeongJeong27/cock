@@ -6,6 +6,7 @@ import com.depositcock.order.OrderDtos.PickedUpRequest;
 import com.depositcock.order.OrderDtos.SellerOrder;
 import com.depositcock.security.CurrentSeller;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,15 +17,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/seller/group-buys/{groupBuyId}/orders")
+@RequiredArgsConstructor
 public class SellerOrderController {
 
     private final SellerOrderService service;
     private final OrderDeletion deletion;
-
-    public SellerOrderController(SellerOrderService service, OrderDeletion deletion) {
-        this.service = service;
-        this.deletion = deletion;
-    }
 
     /** 완료된 주문 여러 건 삭제 (2026-10-19) */
     @PostMapping("/delete")

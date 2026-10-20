@@ -8,6 +8,7 @@ import java.util.List;
 import com.depositcock.notify.MailText;
 import com.depositcock.notify.SellerNotices;
 import com.depositcock.seller.NotificationType;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 판매자가 알림 설정에서 켰으면 마감 메일을 보낸다 (2026-10-19, 기본 꺼짐).
  */
 @Component
+@RequiredArgsConstructor
 public class AutoCloseScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(AutoCloseScheduler.class);
@@ -28,12 +30,6 @@ public class AutoCloseScheduler {
     private final GroupBuyRepository groupBuyRepository;
     private final Clock clock;
     private final SellerNotices notices;
-
-    public AutoCloseScheduler(GroupBuyRepository groupBuyRepository, Clock clock, SellerNotices notices) {
-        this.groupBuyRepository = groupBuyRepository;
-        this.clock = clock;
-        this.notices = notices;
-    }
 
     @Scheduled(fixedDelay = 60_000, initialDelay = 10_000)
     @Transactional

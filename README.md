@@ -25,7 +25,7 @@
 
 | 영역 | 기술 |
 |---|---|
-| Backend | Java 21, Spring Boot 3.5.6, Spring Data JPA, Flyway, Spring Security(JWT, httpOnly 쿠키), Apache POI, Maven Wrapper |
+| Backend | Java 21, Spring Boot 3.5.6, Spring Data JPA, Lombok, Flyway, Spring Security(JWT, httpOnly 쿠키), Apache POI, Maven Wrapper |
 | Frontend | React 18, Vite, TypeScript, React Router |
 | DB | H2 (개발, PostgreSQL 호환 모드), PostgreSQL (운영) |
 | 비전 AI | Spring AI 1.1.8 (Anthropic, 네이티브 구조화 출력), `VisionExtractor` 인터페이스, 기본 꺼짐 |

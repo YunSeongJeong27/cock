@@ -10,6 +10,7 @@ import com.depositcock.order.CustomerOrder;
 import com.depositcock.order.CustomerOrderRepository;
 import com.depositcock.order.DepositConfirmation;
 import com.depositcock.order.PaidAliasChange;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -18,15 +19,11 @@ import org.springframework.stereotype.Component;
  * 확정 취소·공구 삭제 때 그 확정이 한 것만 되돌린다.
  */
 @Component
+@RequiredArgsConstructor
 public class AliasBook {
 
     private final DepositorAliasRepository aliasRepository;
     private final CustomerOrderRepository orderRepository;
-
-    public AliasBook(DepositorAliasRepository aliasRepository, CustomerOrderRepository orderRepository) {
-        this.aliasRepository = aliasRepository;
-        this.orderRepository = orderRepository;
-    }
 
     /** 입금자명 → 고객 별칭을 저장하고, 새로 만들었는지·바꿨는지를 그 확정 기록에 남긴다 */
     public void record(Long sellerId, CustomerOrder order, DepositConfirmation confirmation, LocalDateTime now) {

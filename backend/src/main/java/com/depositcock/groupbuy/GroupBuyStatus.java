@@ -1,6 +1,9 @@
 package com.depositcock.groupbuy;
 
+import lombok.RequiredArgsConstructor;
+
 /** 공구 상태. 화면에 보일 이름은 서버가 정해서 statusLabel 로 보낸다 (2026-10-20) */
+@RequiredArgsConstructor
 public enum GroupBuyStatus {
     DRAFT("작성 중"),
     OPEN("주문 받는 중"),
@@ -10,10 +13,6 @@ public enum GroupBuyStatus {
     static final String CLOSE_AT_PASSED_LABEL = "마감 시각 지남";
 
     private final String label;
-
-    GroupBuyStatus(String label) {
-        this.label = label;
-    }
 
     public String label() {
         return label;

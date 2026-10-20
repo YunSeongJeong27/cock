@@ -3,6 +3,7 @@ package com.depositcock.customer;
 import java.time.LocalDateTime;
 
 import com.depositcock.seller.SellerRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,15 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
  * 다시 찾아본다 (잠금 순서는 공구 → 판매자로 고정).
  */
 @Component
+@RequiredArgsConstructor
 public class Customers {
 
     private final CustomerRepository repository;
     private final SellerRepository sellerRepository;
-
-    public Customers(CustomerRepository repository, SellerRepository sellerRepository) {
-        this.repository = repository;
-        this.sellerRepository = sellerRepository;
-    }
 
     @Transactional(propagation = Propagation.MANDATORY)
     public Customer byPhone(Long sellerId, String normalizedPhone, LocalDateTime now) {

@@ -33,6 +33,7 @@ import com.depositcock.order.PublicOrderService;
 import com.depositcock.order.ReceiveMethod;
 import com.depositcock.seller.FeatureAccess;
 import jakarta.persistence.EntityManager;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class CommentService {
 
     private final GroupBuyService groupBuyService;
@@ -53,22 +55,6 @@ public class CommentService {
     private final Clock clock;
     private final FeatureAccess featureAccess;
     private final StockAlerts stockAlerts;
-
-    public CommentService(GroupBuyService groupBuyService, GroupBuyRepository groupBuyRepository,
-                          ImportedCommentRepository commentRepository, CustomerOrderRepository orderRepository,
-                          ProductRepository productRepository, Customers customers, EntityManager entityManager,
-                          Clock clock, FeatureAccess featureAccess, StockAlerts stockAlerts) {
-        this.stockAlerts = stockAlerts;
-        this.featureAccess = featureAccess;
-        this.customers = customers;
-        this.groupBuyService = groupBuyService;
-        this.groupBuyRepository = groupBuyRepository;
-        this.commentRepository = commentRepository;
-        this.orderRepository = orderRepository;
-        this.productRepository = productRepository;
-        this.entityManager = entityManager;
-        this.clock = clock;
-    }
 
     public record CommentInput(String author, String content, boolean duplicateSuspected) {
     }
