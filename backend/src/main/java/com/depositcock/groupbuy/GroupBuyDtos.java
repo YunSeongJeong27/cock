@@ -59,8 +59,10 @@ public final class GroupBuyDtos {
             @Valid @NotNull(message = "PICKUP_POINTS_MISSING") List<@NotNull(message = "PICKUP_POINT_NAME_REQUIRED") PickupPointRequest> pickupPoints) {
     }
 
-    /** 판매자용. remaining 은 재고보다 더 주문되면 음수 (초과 수량) */
-    /** stockAlert: 판매자 화면 알림 칸 문장 (남은 수량이 알림 기준 이하이거나 준비 수량 초과일 때만, 아니면 null) */
+    /**
+     * 판매자용. remaining 은 재고보다 더 주문되면 음수 (초과 수량).
+     * stockAlert: 판매자 화면 알림 칸 문장 (남은 수량이 알림 기준 이하이거나 준비 수량 초과일 때만, 아니면 null)
+     */
     @Builder
     public record ProductResponse(Long id, String name, int unitPrice, Integer stockLimit, int sold,
                                   Integer remaining, Integer perOrderLimit, Integer stockAlertThreshold,

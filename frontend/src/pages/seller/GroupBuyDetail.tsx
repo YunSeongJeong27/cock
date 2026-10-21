@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { api, dateTime, errorMessage, won } from '../../api'
+import { api, dateTime, errorMessage, storageGet, storageSet, won } from '../../api'
 import { useAuth } from '../../auth'
 import { CopyButton, ErrorBox, Stat, StatusBadge } from '../../components/Ui'
 import { groupBuyText as T } from '../../texts/groupBuy'
@@ -20,7 +20,7 @@ export default function GroupBuyDetail() {
   const [groupBuy, setGroupBuy] = useState<GroupBuy | null>(null)
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
   const [orders, setOrders] = useState<SellerOrder[]>([])
-  const [tab, setTab] = useState<Tab>(() => (localStorageGet('dc_tab') as Tab) || 'orders')
+  const [tab, setTab] = useState<Tab>(() => (storageGet('dc_tab') as Tab) || 'orders')
   const [error, setError] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
@@ -44,7 +44,7 @@ export default function GroupBuyDetail() {
 
   function changeTab(t: Tab) {
     setTab(t)
-    localStorageSet('dc_tab', t)
+    storageSet('dc_tab', t)
   }
 
   async function action(path: string, confirmText?: string) {
@@ -141,22 +141,6 @@ export default function GroupBuyDetail() {
       {shownTab === 'comments' && <CommentsTab groupBuy={groupBuy} reload={reload} />}
     </div>
   )
-}
-
-function localStorageGet(key: string): string | null {
-  try {
-    return localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-
-function localStorageSet(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value)
-  } catch {
-    // 저장 못 해도 화면은 동작한다
-  }
 }
 
 /**

@@ -169,7 +169,7 @@ export interface SellerOrder {
   refundAccount: string | null
   duplicateContact: boolean
   orderedAt: string
-  /** 마지막으로 바뀐 시각 (입금 신고·확정·수령·취소·판매자 변경 등) */
+  /** 마지막으로 바뀐 시각 (입금 확정·수령·취소·환불 신청·주문 변경 등) */
   updatedAt: string
   cancelledAt: string | null
   /** 입금 확정 이력 (취소된 확정 포함, 오래된 순) */

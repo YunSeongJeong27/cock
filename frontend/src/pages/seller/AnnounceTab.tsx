@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, dateTime, errorMessage } from '../../api'
+import { api, dateTime, errorMessage, storageGet, storageSet } from '../../api'
 import { CopyButton, ErrorBox } from '../../components/Ui'
 import { groupBuyText as T } from '../../texts/groupBuy'
 import type { GroupBuy } from '../../types'
@@ -18,9 +18,9 @@ export default function AnnounceTab({ groupBuy }: { groupBuy: GroupBuy }) {
   const storageKey = `dc_tagged_${groupBuy.id}`
   const [tagged, setTagged] = useState<Record<number, boolean>>(() => {
     try {
-      return JSON.parse(localStorage.getItem(storageKey) ?? '{}')
+      return JSON.parse(storageGet(storageKey) ?? '{}')
     } catch {
-      return {}
+      return {} // 저장된 값이 깨졌으면 처음부터
     }
   })
 
@@ -32,11 +32,7 @@ export default function AnnounceTab({ groupBuy }: { groupBuy: GroupBuy }) {
   function toggle(id: number) {
     const next = { ...tagged, [id]: !tagged[id] }
     setTagged(next)
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(next))
-    } catch {
-      // 저장 못 해도 화면은 동작
-    }
+    storageSet(storageKey, JSON.stringify(next))
   }
 
   return (

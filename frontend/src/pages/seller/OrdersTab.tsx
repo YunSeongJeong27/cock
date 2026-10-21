@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
-import { api, dateTime, errorMessage, maskPhone, refundPending, shortTime, squash, won } from '../../api'
+import { api, dateTime, errorMessage, itemsText, maskPhone, receiveText, refundPending, shortTime, squash, won } from '../../api'
 import { useAuth } from '../../auth'
 import { CopyButton, ErrorBox, Rich, StatusBadge, useIsMobile } from '../../components/Ui'
 import { sellerOrderText as T } from '../../texts/sellerOrders'
@@ -39,6 +39,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
   const [editing, setEditing] = useState<number | null>(null)
   /** 변경 저장 직후 댓글에 남길 답글 (판매자가 고쳐서 복사) */
   const [reply, setReply] = useState<{ orderId: number; text: string } | null>(null)
+  const { me } = useAuth()
 
   const shown = useMemo(() => {
     const list = orders.filter((o) => {
@@ -63,14 +64,17 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
     })
   }, [orders, filter, query, sort])
 
-  async function post(path: string, body?: unknown, confirmText?: string) {
-    if (confirmText && !confirm(confirmText)) return
+  /** 주문 API 호출 후 다시 읽기. 확인창에서 취소했거나 실패하면 false */
+  async function post(path: string, body?: unknown, confirmText?: string): Promise<boolean> {
+    if (confirmText && !confirm(confirmText)) return false
     setError(null)
     try {
       await api.post(`/api/seller/group-buys/${groupBuy.id}/orders/${path}`, body)
       reload()
+      return true
     } catch (e) {
       setError(errorMessage(e))
+      return false
     }
   }
 
@@ -110,7 +114,6 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
   const refundRequests = orders.filter(refundPending).length
   const finishedCount = orders.filter((o) => o.finished).length
   // 판매자 알림 설정 (2026-10-19). 꺼도 필터·주문 줄 표시는 그대로
-  const { me } = useAuth()
   const showRefundBanner = me?.notifications.SCREEN_REFUND_REQUEST !== false
   const showNickBanner = me?.notifications.SCREEN_SAME_NICKNAME !== false
 
@@ -227,14 +230,8 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
       onChange={(e) => { const next = new Set(checked); if (e.target.checked) next.add(o.id); else next.delete(o.id); setChecked(next) }} />
   }
   async function deleteChecked() {
-    if (!confirm(T.confirmDelete(checkedShown.length))) return
-    setError(null)
-    try {
-      await api.post(`/api/seller/group-buys/${groupBuy.id}/orders/delete`, { orderIds: checkedShown.map((o) => o.id) })
+    if (await post('delete', { orderIds: checkedShown.map((o) => o.id) }, T.confirmDelete(checkedShown.length))) {
       setChecked(new Set())
-      reload()
-    } catch (e) {
-      setError(errorMessage(e))
     }
   }
 
@@ -273,7 +270,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
                 <td>{o.phone ? maskPhone(o.phone) : <span className="muted">-</span>}</td>
                 {products.map((p) => <td key={p.id} className="num">{qtyOf(o, p.id) || ''}</td>)}
                 <td className="num">{won(o.expectedAmount)}</td>
-                <td>{o.paymentMethod === 'PREPAID' ? '선입금' : '현장결제'}<span className="sub">{o.receiveMethod === 'DELIVERY' ? '배송' : `픽업${o.pickupPointName ? ' · ' + o.pickupPointName : ''}`}</span></td>
+                <td>{o.paymentMethod === 'PREPAID' ? '선입금' : '현장결제'}<span className="sub">{receiveText(o)}</span></td>
                 <td>{deposit(o)}</td>
                 <td>
                   <StatusBadge status={o.status} label={o.statusLabel} />
@@ -320,10 +317,10 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
                   {o.source === 'COMMENT' && <span className="chip">댓글</span>}
                   {o.changes.length > 0 && <span className="chip">변경됨</span>}
                 </td>
-                <td className="small" data-label="상품">{o.items.map((i) => `${i.productName} ${i.quantity}`).join(', ')}</td>
+                <td className="small" data-label="상품">{itemsText(o.items)}</td>
                 <td data-label="금액">{won(o.expectedAmount)}</td>
                 <td className="small" data-label="결제">
-                  {o.paymentMethod === 'PREPAID' ? '선입금' : '현장결제'} · {o.receiveMethod === 'DELIVERY' ? '배송' : `픽업${o.pickupPointName ? ' · ' + o.pickupPointName : ''}`}
+                  {o.paymentMethod === 'PREPAID' ? '선입금' : '현장결제'} · {receiveText(o)}
                 </td>
                 <td className="small" data-label="입금">{deposit(o)}</td>
                 <td data-label="상태">

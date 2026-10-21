@@ -8,11 +8,13 @@ interface Defaults { date: string[]; name: string[]; amount: string[]; type: str
 interface Alias { id: number; depositorName: string; customerId: number; customerLabel: string; createdAt: string }
 
 /** 은행 거래내역 열 설정 (은행마다 열 이름이 달라서) + 저장된 입금자 별칭 관리 */
+const emptyPreset = { name: '', nameColumn: '', amountColumn: '', dateColumn: '', typeColumn: '' }
+
 export default function BankSettings() {
   const [defaults, setDefaults] = useState<Defaults | null>(null)
   const [presets, setPresets] = useState<Preset[]>([])
   const [aliases, setAliases] = useState<Alias[]>([])
-  const [form, setForm] = useState({ name: '', nameColumn: '', amountColumn: '', dateColumn: '', typeColumn: '' })
+  const [form, setForm] = useState(emptyPreset)
   const [error, setError] = useState<string | null>(null)
 
   const load = () => {
@@ -27,7 +29,7 @@ export default function BankSettings() {
     setError(null)
     try {
       await api.post('/api/seller/bank-columns/presets', form)
-      setForm({ name: '', nameColumn: '', amountColumn: '', dateColumn: '', typeColumn: '' })
+      setForm(emptyPreset)
       load()
     } catch (err) {
       setError(errorMessage(err))

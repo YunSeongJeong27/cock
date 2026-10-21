@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { api, errorMessage, won } from '../../api'
+import { api, errorMessage, itemsText, won } from '../../api'
 import { ErrorBox } from '../../components/Ui'
 import { sellerOrderText as T } from '../../texts/sellerOrders'
 import type { GroupBuy, PaymentMethod, ReceiveMethod, SellerOrder } from '../../types'
@@ -190,7 +190,7 @@ export default function OrderEditForm({ groupBuy, order, onSaved, onClose }: Pro
 /** 판매자가 댓글에 남길 답글 예시 (판매자가 고쳐서 쓴다) */
 export function changeReply(o: SellerOrder): string {
   const who = o.nickname || o.depositorName || '고객'
-  const items = o.items.map((i) => `${i.productName} ${i.quantity}개`).join(', ')
+  const items = itemsText(o.items)
   const head = `${who}님, 주문을 ${items}(으)로 변경했어요.`
   // 현장결제는 픽업만 가능 (배송은 선입금만)
   if (o.paymentMethod === 'ONSITE') return `${head} 픽업하실 때 ${won(o.expectedAmount)} 결제해 주세요.`

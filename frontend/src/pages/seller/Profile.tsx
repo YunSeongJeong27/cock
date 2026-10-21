@@ -58,11 +58,14 @@ export default function Profile() {
     }
   }
 
+  // 폼은 로그인 정보를 처음 받았을 때만 채운다. 알림 체크박스도 로그인 정보(me)를 바꾸므로 me 가 바뀔 때마다 채우면
+  // 저장 전에 고치던 이름·계좌가 저장된 값으로 되돌아갔음 (2026-10-21 브라우저로 재현)
+  const meId = me?.id
   useEffect(() => {
     if (me) {
       setForm({ displayName: me.displayName, defaultBankName: me.defaultBankName ?? '', defaultAccountNumber: me.defaultAccountNumber ?? '', defaultAccountHolder: me.defaultAccountHolder ?? '' })
     }
-  }, [me])
+  }, [meId])
 
   async function submit(e: FormEvent) {
     e.preventDefault()

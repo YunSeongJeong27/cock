@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
-import { ApiError, api, dateTime, errorMessage, won } from '../../api'
+import { ApiError, api, dateTime, errorMessage, itemsText, receiveText, won } from '../../api'
 import { CopyButton, ErrorBox, Rich, StatusBadge } from '../../components/Ui'
 import { orderText as T } from '../../texts/order'
 import type { PaymentMethod, ReceiveMethod, ShippingFeeType } from '../../types'
@@ -121,7 +121,7 @@ function OrderSummary({ o, title, f }: { o: MyOrder; title: ReactNode; f?: Final
       {o.shippingFee > 0 && <div className="row between receipt-line"><span>배송비</span><span>{won(o.shippingFee)}</span></div>}
       <div className="row between receipt-total"><b>총 금액</b><b>{won(o.expectedAmount)}</b></div>
       <div className="small mt">
-        <div>수령: {o.receiveMethod === 'DELIVERY' ? '배송' : `픽업${o.pickupPointName ? ' · ' + o.pickupPointName : ''}`}</div>
+        <div>수령: {receiveText(o)}</div>
         {o.receiveMethod === 'DELIVERY' && f && (
           <div>배송지: {f.recipientName} · {f.recipientPhone} · {f.zipcode ? `(${f.zipcode}) ` : ''}{f.address}{f.addressDetail ? ' ' + f.addressDetail : ''}</div>
         )}
@@ -129,6 +129,86 @@ function OrderSummary({ o, title, f }: { o: MyOrder; title: ReactNode; f?: Final
         {f?.nickname && <div>닉네임: {f.nickname}</div>}
         {f?.unitAddress && <div>동·호수: {f.unitAddress}</div>}
       </div>
+    </div>
+  )
+}
+
+/** 확정된 주문(판매자가 대조해서 입금 확정): 수정·바로 취소 대신 환불 신청 */
+const confirmedOrder = (o: MyOrder) => o.refundRequestable && o.status === 'PAID'
+
+/** 내 주문: 상태·변경 표시와 [주문 수정]·[주문 취소]·[환불 신청] (멈춤 중에는 버튼 없음) */
+function MyOrdersCard({ view, onEdit, onCancel }: {
+  view: View; onEdit: (o: MyOrder) => void; onCancel: (orderNo: number, mode: CancelMode) => void
+}) {
+  return (
+    <div className="card">
+      <h3>내 주문</h3>
+      {view.myOrders.map((o) => (
+        <div key={o.orderNo} style={{ borderTop: '1px solid var(--line)', padding: '10px 0' }}>
+          <div className="row between">
+            <b>{o.orderNo}번 · {won(o.expectedAmount)}</b>
+            <StatusBadge status={o.status} label={o.statusLabel + (o.status === 'PAID' ? ' ✅' : '')} />
+          </div>
+          <div className="small">{itemsText(o.items)}</div>
+          <div className="small muted">{receiveText(o)} · {o.paymentMethod === 'PREPAID' ? `선입금 (입금자명 ${o.depositorName})` : '현장결제'} · {dateTime(o.orderedAt)}</div>
+          {o.changedAt && <div className="small" style={{ color: 'var(--warn)' }}>{T.changedBySeller(dateTime(o.changedAt))}</div>}
+          {o.customerChangedAt && <div className="small muted">주문 수정됨 ({dateTime(o.customerChangedAt)})</div>}
+          {o.refundRequired && <div className="small" style={{ color: 'var(--danger)' }}>{T.refundPlanned}</div>}
+          {o.refundedAt && <div className="small muted">취소됨 · 환불 완료 ({dateTime(o.refundedAt)})</div>}
+          {o.refundState === 'REQUESTED' && <div className="small" style={{ color: 'var(--warn)' }}>{T.refundRequested}</div>}
+          {o.refundState === 'REJECTED' && <div className="small" style={{ color: 'var(--danger)' }}>{T.refundRejected}</div>}
+          {o.awaitingConfirm && view.account && (
+            <div className="small mt">입금 계좌: {view.account.bankName} {view.account.accountNumber} ({view.account.accountHolder}) <CopyButton text={view.account.accountNumber} label="복사" /></div>
+          )}
+          <div className="row mt">
+            {!view.paused && o.replaceable && o.editValues && <button className="btn small" onClick={() => onEdit(o)}>주문 수정</button>}
+            {!view.paused && o.cancellable && <button className="btn small danger" onClick={() => onCancel(o.orderNo, 'cancel')}>주문 취소</button>}
+            {!view.paused && confirmedOrder(o) && <button className="btn small danger" onClick={() => onCancel(o.orderNo, 'refund')}>환불 신청</button>}
+          </div>
+          {o.replaceable && o.paymentMethod === 'PREPAID' && <div className="small muted mt">{T.editableUntilConfirm}</div>}
+          {confirmedOrder(o) && <div className="small muted mt">{T.confirmedCannotEdit}</div>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** 쿠키로 못 알아본 기기: 휴대폰 번호 전체로 내 주문 찾기 (찾으면 이 기기를 기억해서 내 주문이 보임) */
+function IdentifyCard({ base, kakaoInquiryUrl, onFound }: { base: string; kakaoInquiryUrl: string | null; onFound: (v: View) => void }) {
+  const [identify, setIdentify] = useState({ open: false, phone: '', error: '' })
+
+  async function doIdentify(e: FormEvent) {
+    e.preventDefault()
+    try {
+      const found = await api.post<View>(`${base}/identify`, { phone: identify.phone })
+      setIdentify({ open: false, phone: '', error: '' })
+      onFound(found)
+    } catch (err) {
+      setIdentify({ ...identify, error: errorMessage(err) })
+    }
+  }
+
+  return (
+    <div className="card">
+      {!identify.open ? (
+        <div className="row between"><span className="small">이미 주문하셨나요?</span><button className="btn small" onClick={() => setIdentify({ ...identify, open: true })}>내 주문 찾기</button></div>
+      ) : (
+        <form onSubmit={doIdentify}>
+          <h3>내 주문 찾기</h3>
+          <div className="row">
+            <input type="tel" placeholder="휴대폰 번호 (010-0000-0000)" value={identify.phone} onChange={(e) => setIdentify({ ...identify, phone: e.target.value })} required style={{ flex: 1, minWidth: 160 }} />
+            <button className="btn primary">찾기</button>
+          </div>
+          <p className="small muted">{T.identifyHint}</p>
+          <ErrorBox message={identify.error} />
+          {identify.error && (
+            <p className="small muted">
+              {T.identifyNotFound}
+              {kakaoInquiryUrl && <> <a href={kakaoInquiryUrl} target="_blank" rel="noreferrer">💬 카톡 문의</a></>}
+            </p>
+          )}
+        </form>
+      )}
     </div>
   )
 }
@@ -161,7 +241,6 @@ export default function PublicOrder() {
   const [error, setError] = useState<string | null>(null)
   const [placed, setPlaced] = useState<Placed | null>(null)
   const [busy, setBusy] = useState(false)
-  const [identify, setIdentify] = useState({ open: false, phone: '', error: '' })
   const [cancel, setCancel] = useState(emptyCancel)
 
   const applyView = useCallback((v: View) => {
@@ -217,16 +296,6 @@ export default function PublicOrder() {
       }
     } finally {
       setBusy(false)
-    }
-  }
-
-  async function doIdentify(e: FormEvent) {
-    e.preventDefault()
-    try {
-      applyView(await api.post<View>(`${base}/identify`, { phone: identify.phone }))
-      setIdentify({ open: false, phone: '', error: '' })
-    } catch (err) {
-      setIdentify({ ...identify, error: errorMessage(err) })
     }
   }
 
@@ -286,9 +355,6 @@ export default function PublicOrder() {
     setTimeout(() => document.getElementById('cancel-form')?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
 
-  /** 확정된 주문(판매자가 대조해서 입금 확정): 수정·바로 취소 대신 환불 신청 */
-  const confirmedOrder = (o: MyOrder) => o.refundRequestable && o.status === 'PAID'
-
   /** 주문 변경 안내: 주문 확정 전에는 [주문 수정], 확정 후에는 환불 신청 후 다시 주문 (2026-10-19 사용자 결정) */
   const changeNote = (
     <p className="small mt" style={{ marginBottom: 0 }}><Rich text={T.changeNote} strongStyle={{ fontWeight: 800 }} /></p>
@@ -300,9 +366,9 @@ export default function PublicOrder() {
    */
   const replaceTarget = view?.myOrders.find((o) => o.replaceable) ?? null
   const mine = useMemo(() => {
-    const target = editing ?? view?.myOrders.find((o) => o.replaceable)
+    const target = editing ?? replaceTarget
     return Object.fromEntries((target?.items ?? []).map((i) => [i.productId, i.quantity])) as Record<number, number>
-  }, [view, editing])
+  }, [editing, replaceTarget])
 
   /**
    * 수량 상한: 1인 최대 수량, 그리고 판매자가 "다 팔리면 품절"을 켠 상품만 남은 수량 (기본은 재고로 막지 않음, 2026-10-16).
@@ -381,61 +447,9 @@ export default function PublicOrder() {
         </div>
       )}
 
-      {view.myOrders.length > 0 && (
-        <div className="card">
-          <h3>내 주문</h3>
-          {view.myOrders.map((o) => (
-            <div key={o.orderNo} style={{ borderTop: '1px solid var(--line)', padding: '10px 0' }}>
-              <div className="row between">
-                <b>{o.orderNo}번 · {won(o.expectedAmount)}</b>
-                <StatusBadge status={o.status} label={o.statusLabel + (o.status === 'PAID' ? ' ✅' : '')} />
-              </div>
-              <div className="small">{o.items.map((i) => `${i.productName} ${i.quantity}개`).join(', ')}</div>
-              <div className="small muted">{o.receiveMethod === 'DELIVERY' ? '배송' : `픽업${o.pickupPointName ? ' · ' + o.pickupPointName : ''}`} · {o.paymentMethod === 'PREPAID' ? `선입금 (입금자명 ${o.depositorName})` : '현장결제'} · {dateTime(o.orderedAt)}</div>
-              {o.changedAt && <div className="small" style={{ color: 'var(--warn)' }}>{T.changedBySeller(dateTime(o.changedAt))}</div>}
-              {o.customerChangedAt && <div className="small muted">주문 수정됨 ({dateTime(o.customerChangedAt)})</div>}
-              {o.refundRequired && <div className="small" style={{ color: 'var(--danger)' }}>{T.refundPlanned}</div>}
-              {o.refundedAt && <div className="small muted">취소됨 · 환불 완료 ({dateTime(o.refundedAt)})</div>}
-              {o.refundState === 'REQUESTED' && <div className="small" style={{ color: 'var(--warn)' }}>{T.refundRequested}</div>}
-              {o.refundState === 'REJECTED' && <div className="small" style={{ color: 'var(--danger)' }}>{T.refundRejected}</div>}
-              {o.awaitingConfirm && view.account && (
-                <div className="small mt">입금 계좌: {view.account.bankName} {view.account.accountNumber} ({view.account.accountHolder}) <CopyButton text={view.account.accountNumber} label="복사" /></div>
-              )}
-              <div className="row mt">
-                {!view.paused && o.replaceable && o.editValues && <button className="btn small" onClick={() => startEdit(o)}>주문 수정</button>}
-                {!view.paused && o.cancellable && <button className="btn small danger" onClick={() => openCancel(o.orderNo)}>주문 취소</button>}
-                {!view.paused && confirmedOrder(o) && <button className="btn small danger" onClick={() => openCancel(o.orderNo, 'refund')}>환불 신청</button>}
-              </div>
-              {o.replaceable && o.paymentMethod === 'PREPAID' && <div className="small muted mt">{T.editableUntilConfirm}</div>}
-              {confirmedOrder(o) && <div className="small muted mt">{T.confirmedCannotEdit}</div>}
-            </div>
-          ))}
-        </div>
-      )}
+      {view.myOrders.length > 0 && <MyOrdersCard view={view} onEdit={startEdit} onCancel={openCancel} />}
 
-      {view.myOrders.length === 0 && (
-        <div className="card">
-          {!identify.open ? (
-            <div className="row between"><span className="small">이미 주문하셨나요?</span><button className="btn small" onClick={() => setIdentify({ ...identify, open: true })}>내 주문 찾기</button></div>
-          ) : (
-            <form onSubmit={doIdentify}>
-              <h3>내 주문 찾기</h3>
-              <div className="row">
-                <input type="tel" placeholder="휴대폰 번호 (010-0000-0000)" value={identify.phone} onChange={(e) => setIdentify({ ...identify, phone: e.target.value })} required style={{ flex: 1, minWidth: 160 }} />
-                <button className="btn primary">찾기</button>
-              </div>
-              <p className="small muted">{T.identifyHint}</p>
-              <ErrorBox message={identify.error} />
-              {identify.error && (
-                <p className="small muted">
-                  {T.identifyNotFound}
-                  {view.kakaoInquiryUrl && <> <a href={view.kakaoInquiryUrl} target="_blank" rel="noreferrer">💬 카톡 문의</a></>}
-                </p>
-              )}
-            </form>
-          )}
-        </div>
-      )}
+      {view.myOrders.length === 0 && <IdentifyCard base={base} kakaoInquiryUrl={view.kakaoInquiryUrl} onFound={applyView} />}
 
       {view.acceptingOrders && !view.paused && (
         <form className="card" id="order-form" onSubmit={(e) => submit(e)}>
@@ -618,7 +632,7 @@ export default function PublicOrder() {
                 <div className="small mb"><b>{T.chooseOrder(cancel.mode === 'refund')}</b></div>
                 {cancel.choices.map((o) => (
                   <div key={o.orderNo} className="row between" style={{ borderTop: '1px solid var(--line)', padding: '8px 0' }}>
-                    <span className="small">{o.orderNo}번 · {o.items.map((i) => `${i.productName} ${i.quantity}개`).join(', ')} · {won(o.expectedAmount)} · {o.statusLabel}</span>
+                    <span className="small">{o.orderNo}번 · {itemsText(o.items)} · {won(o.expectedAmount)} · {o.statusLabel}</span>
                     <button type="button" className="btn small danger" disabled={busy} onClick={() => doCancel(null, o.orderNo)}>{cancel.mode === 'refund' ? '이 주문 환불 신청' : '이 주문 취소'}</button>
                   </div>
                 ))}

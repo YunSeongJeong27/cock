@@ -33,7 +33,9 @@ interface Draft { author: string; content: string; duplicateSuspected: boolean }
 
 const TYPE_LABEL = { ORDER: '주문', CANCEL: '취소', NOT_ORDER: '주문 아님', REVIEW: '확인 필요' } as const
 
-/** 비교용: 띄어쓰기 무시 */
+/** 같은 댓글인지 비교하는 키 (띄어쓰기 무시) */
+const commentKey = (author: string, content: string) => squash(author) + '|' + squash(content)
+
 /**
  * 캡처를 다시 올리면(처음부터 다시 찍은 경우 등) 이미 저장한 댓글이 또 들어온다 → 똑같은 댓글(작성자·내용)은 빼 둔다.
  * 같은 댓글이 저장된 개수만큼만 뺀다 (같은 손님이 같은 댓글을 두 번 단 경우 두 번째는 남김).
@@ -41,13 +43,13 @@ const TYPE_LABEL = { ORDER: '주문', CANCEL: '취소', NOT_ORDER: '주문 아�
 function splitAlreadySaved(drafts: Draft[], saved: CommentView[]): { fresh: Draft[]; skipped: Draft[] } {
   const count = new Map<string, number>()
   for (const c of saved) {
-    const k = squash(c.authorName) + '|' + squash(c.content)
+    const k = commentKey(c.authorName, c.content)
     count.set(k, (count.get(k) ?? 0) + 1)
   }
   const fresh: Draft[] = []
   const skipped: Draft[] = []
   for (const d of drafts) {
-    const k = squash(d.author) + '|' + squash(d.content)
+    const k = commentKey(d.author, d.content)
     const n = count.get(k) ?? 0
     if (n > 0) {
       count.set(k, n - 1)

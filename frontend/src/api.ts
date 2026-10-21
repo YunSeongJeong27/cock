@@ -1,6 +1,6 @@
 // 백엔드 API 호출. 로그인 토큰은 httpOnly 쿠키라 JS 에서 다루지 않는다 (credentials: 'include').
 import { commonText } from './texts/common'
-import type { SellerOrder } from './types'
+import type { ReceiveMethod, SellerOrder } from './types'
 
 /** 서버 오류 응답: message = detail (화면에 보여줄 문구), code = 서버 ErrorCode 이름 */
 export class ApiError extends Error {
@@ -74,6 +74,16 @@ export function refundPending(o: SellerOrder): boolean {
   return o.active && o.refundRequestedAt !== null && o.refundRejectedAt === null
 }
 
+/** 상품·수량 한 줄: "파프리카 2개, 차돌 1개" (서버 CustomerOrder.itemsText 와 같은 모양) */
+export function itemsText(items: { productName: string; quantity: number }[]): string {
+  return items.map((i) => `${i.productName} ${i.quantity}개`).join(', ')
+}
+
+/** 수령 방법 한 줄: "배송" / "픽업 · 캐파점" */
+export function receiveText(o: { receiveMethod: ReceiveMethod; pickupPointName: string | null }): string {
+  return o.receiveMethod === 'DELIVERY' ? '배송' : `픽업${o.pickupPointName ? ' · ' + o.pickupPointName : ''}`
+}
+
 export function won(n: number | null | undefined): string {
   if (n === null || n === undefined) return '-'
   return n.toLocaleString('ko-KR') + '원'
@@ -105,6 +115,24 @@ export function shortTime(s: string | null | undefined): string {
   if (isNaN(d.getTime())) return s
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+/** 브라우저 저장소 읽기 (사생활 보호 모드 등에서 막혀 있으면 null). 화면 편의용 값만 둔다 */
+export function storageGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+/** 브라우저 저장소 쓰기. 저장 못 해도 화면은 동작한다 */
+export function storageSet(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // 저장 못 해도 화면은 동작한다
+  }
 }
 
 export async function copyText(text: string): Promise<boolean> {

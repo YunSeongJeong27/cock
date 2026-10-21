@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { api, errorMessage, refundPending, won } from '../../api'
+import { api, errorMessage, itemsText, refundPending, won } from '../../api'
 import { ErrorBox } from '../../components/Ui'
 import { sellerOrderText as T } from '../../texts/sellerOrders'
 import type { GroupBuy, SellerOrder } from '../../types'
@@ -50,7 +50,7 @@ export default function PickupTab({ groupBuy, orders, reload }: Props) {
         <div key={o.id} className="card row between" style={{ padding: 12, borderColor: o.pickedUp ? 'var(--ok)' : undefined }}>
           <div className="grow">
             <b>{o.orderNo}. {o.nickname || o.depositorName}</b> <span className="muted small">{o.phone ? o.phone.slice(-4) : ''} {o.unitAddress ?? ''}</span>
-            <div className="small">{o.items.map((i) => `${i.productName} ${i.quantity}개`).join(', ')} · {won(o.expectedAmount)}</div>
+            <div className="small">{itemsText(o.items)} · {won(o.expectedAmount)}</div>
             <div className="small">
               {o.paymentMethod === 'ONSITE'
                 ? <span style={{ color: 'var(--primary)' }}>현장결제 예정{o.onsitePaid ? ' → 결제 완료' : ''}</span>
