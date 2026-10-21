@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: depositcock
+  profiles:
+    default: local
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        # 시간대: 앱은 한국 시각(LocalDateTime)을 그대로 저장하고 서버 기본 시간대도 한국으로 맞춘다 (DepositcockApplication).
+        # hibernate.jdbc.time_zone 을 넣었을 때 서버 기본 시간대가 UTC 이면 DB 에 9시간 밀려 저장되는 것을 확인해서 넣지 않았다 (2026-10-14)
+        # 지연 로딩 N+1 완화 (주문 목록 → 주문 상품, 픽업 지점 등을 묶어서 읽음)
+        default_batch_fetch_size: 100
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
+  jackson:
+    time-zone: Asia/Seoul
+  # 재고 알림 메일 (SMTP). 호스트는 환경 변수 SPRING_MAIL_HOST 로만 켠다 (없으면 메일을 보내지 않음).
+  # Gmail 예: SPRING_MAIL_HOST=smtp.gmail.com, SPRING_MAIL_USERNAME=보내는@gmail.com, SPRING_MAIL_PASSWORD=앱 비밀번호
+  mail:
+    port: ${SPRING_MAIL_PORT:587}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
+
+server:
+  error:
+    # 예상 못 한 오류의 내부 메시지는 응답에 넣지 않는다 (ApiExceptionHandler 가 ProblemDetail 로 응답)
+    include-message: never
+    include-stacktrace: never
+
+app:
+  zone: Asia/Seoul
+  # JWT 서명 키. 운영에서는 반드시 환경변수 APP_JWT_SECRET 로 32바이트 이상 값을 넣는다.
+  jwt-secret: ${APP_JWT_SECRET:}
+  jwt-ttl-hours: 168
+  # 환불 계좌번호 암호화 키 (DataCipher). 운영에서는 반드시 환경변수 APP_DATA_KEY 로 32바이트 이상 값을 넣는다.
+  # 바꾸면 전에 저장한 계좌번호를 못 읽으므로 한 번 정하면 바꾸지 않는다.
+  data-key: ${APP_DATA_KEY:}
+  cookie-secure: false
+  trial-days: 30
+  # 최초 관리자 계정. 비어 있으면 만들지 않는다.
+  admin-email: ${APP_ADMIN_EMAIL:}
+  admin-password: ${APP_ADMIN_PASSWORD:}
+  # 공개 주문 API: IP 하나당 1분에 허용하는 요청 수
+  public-rate-limit-per-minute: 60
+  # 본인 확인·주문 취소·환불 신청: (IP + 공구)마다 10분에 허용하는 요청 수 (휴대폰 번호를 하나씩 넣어보는 시도 방지)
+  sensitive-rate-limit-per-10-minutes: 20
+  # 메일 보내는 사람 (비우면 SPRING_MAIL_USERNAME), 메일 속 링크용 서비스 주소 (예: https://입금콕.kr)
+  mail-from: ${APP_MAIL_FROM:}
+  public-base-url: ${APP_PUBLIC_BASE_URL:}
+  vision:
+    # fake | anthropic
+    provider: ${APP_VISION_PROVIDER:fake}
+    anthropic-api-key: ${ANTHROPIC_API_KEY:}
+    anthropic-model: ${APP_VISION_MODEL:claude-haiku-5-5}
+    # 판매자별 하루 캡처(이미지) 장수 기본 제한. 관리자 화면에서 판매자별로 바꿀 수 있다. 0 이면 모두 막음.
+    daily-capture-limit: ${APP_VISION_DAILY_CAPTURE_LIMIT:30}

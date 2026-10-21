@@ -1,0 +1,19 @@
+# 내 맥북 로컬 실행용. H2 파일 모드라 재시작해도 데이터가 남는다 (backend/data/ 폴더).
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/depositcock;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  flyway:
+    # 로컬에서만 샘플 데이터(db/local)를 넣는다. 운영 DB에는 실행하지 않는다.
+    locations: classpath:db/migration,classpath:db/local
+
+app:
+  jwt-secret: ${APP_JWT_SECRET:local-dev-secret-change-me-0123456789abcdef}
+  data-key: ${APP_DATA_KEY:local-dev-data-key-change-me-0123456789abcdef}
+  admin-email: ${APP_ADMIN_EMAIL:admin@depositcock.local}
+  admin-password: ${APP_ADMIN_PASSWORD:admin1234}
