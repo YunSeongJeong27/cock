@@ -2,6 +2,7 @@ package com.depositcock.deposit;
 
 import java.time.LocalDateTime;
 
+import com.depositcock.common.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -21,7 +22,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "deposit_upload")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class DepositUpload {
+public class DepositUpload extends BaseTimeEntity {
 
     /** deposit_upload.file_name 칸 길이 */
     static final int MAX_FILE_NAME = 300;

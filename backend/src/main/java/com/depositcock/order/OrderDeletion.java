@@ -1,5 +1,7 @@
 package com.depositcock.order;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -42,8 +44,10 @@ public class OrderDeletion {
     private final AliasBook aliasBook;
     private final Customers customers;
     private final DepositRowRepository rowRepository;
+    private final DepositConfirmationRepository confirmationRepository;
     private final ImportedCommentRepository commentRepository;
     private final EntityManager entityManager;
+    private final Clock clock;
 
     /** @return 지운 주문 수 */
     @Transactional
@@ -73,8 +77,13 @@ public class OrderDeletion {
                 .map(o -> o.getCustomer().getCommentNickname()).filter(Objects::nonNull)
                 .collect(Collectors.toCollection(HashSet::new));
 
+        LocalDateTime now = LocalDateTime.now(clock);
         orderRepository.deleteAll(orders);
         orderRepository.flush();
+        if (!rowIds.isEmpty()) {
+            // 지울 입금 줄을 다른 주문의 취소된 확정 이력이 가리키면 연결을 먼저 비운다 (행 수정 일시를 남기려고)
+            confirmationRepository.unlinkDepositRows(rowIds, now);
+        }
         rowRepository.deleteAllById(rowIds);
         // 같은 닉네임의 댓글 주문이 아직 남아 있으면 댓글은 그대로 둔다
         orderRepository.findByGroupBuyIdAndSource(groupBuy.getId(), OrderSource.COMMENT)
@@ -83,7 +92,7 @@ public class OrderDeletion {
                 .filter(c -> nicknames.contains(c.getAuthorName().trim()))
                 .forEach(commentRepository::delete);
         entityManager.flush();
-        customers.deleteWithoutOrders(sellerId);
+        customers.deleteWithoutOrders(sellerId, now);
         return orders.size();
     }
 }

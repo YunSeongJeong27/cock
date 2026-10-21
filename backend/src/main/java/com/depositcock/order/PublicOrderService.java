@@ -223,14 +223,14 @@ public class PublicOrderService {
             // 기본은 재고를 넘어도 막지 않는다 (2026-10-16). 판매자가 "다 팔리면 품절"을 켠 상품만 준비 수량 안에서 원자적으로
             // 더하고, 넘으면 예외 → 트랜잭션 롤백으로 앞서 늘린 수량도 되돌아간다
             if (product.isBlockWhenSoldOut()) {
-                if (productRepository.increaseSoldWithinStock(product.getId(), e.getValue()) == 0) {
+                if (productRepository.increaseSoldWithinStock(product.getId(), e.getValue(), now) == 0) {
                     entityManager.refresh(product);
                     Integer left = product.publicRemaining();
                     throw left == null ? new ApiException(ErrorCode.SOLD_OUT, product.getName())
                             : new ApiException(ErrorCode.OVER_REMAINING, product.getName(), left);
                 }
             } else {
-                productRepository.increaseSold(product.getId(), e.getValue());
+                productRepository.increaseSold(product.getId(), e.getValue(), now);
             }
             entityManager.refresh(product);
             stockAlerts.check(product);
@@ -290,7 +290,7 @@ public class PublicOrderService {
                     throw new ApiException(ErrorCode.PER_ORDER_LIMIT, name, limit);
                 }
                 throw target != null
-                        ? new ApiException(ErrorCode.PER_ORDER_LIMIT_REPLACING, name, limit, already, target.getOrderNo())
+                        ? new ApiException(ErrorCode.PER_ORDER_LIMIT_REPLACING, name, limit, already)
                         : new ApiException(ErrorCode.PER_ORDER_LIMIT_WITH_PREVIOUS, name, limit, already);
             }
         }

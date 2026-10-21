@@ -2,6 +2,7 @@ package com.depositcock.deposit;
 
 import java.time.LocalDateTime;
 
+import com.depositcock.common.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -16,7 +17,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "deposit_row")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class DepositRow {
+public class DepositRow extends BaseTimeEntity {
 
     /** deposit_row.depositor_name·datetime_text 칸 길이 */
     public static final int MAX_DEPOSITOR_NAME = 200;

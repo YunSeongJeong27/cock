@@ -2,6 +2,7 @@ package com.depositcock.order;
 
 import java.time.LocalDateTime;
 
+import com.depositcock.common.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -22,7 +23,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "order_change")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class OrderChange {
+public class OrderChange extends BaseTimeEntity {
 
     /** order_change.summary 칸 길이 */
     static final int MAX_SUMMARY = 2000;

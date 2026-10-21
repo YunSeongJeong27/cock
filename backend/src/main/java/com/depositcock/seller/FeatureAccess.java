@@ -32,13 +32,14 @@ public class FeatureAccess {
         return !values.isEmpty() && Boolean.parseBoolean(values.get(0));
     }
 
+    /** JPA 를 거치지 않는 쓰기라 행 등록·수정 일시(row_created_at·row_updated_at)도 직접 넣는다 (BaseTimeEntity 와 같은 칸) */
     @Transactional
     public void setCommentFeatureOpen(boolean open, LocalDateTime now) {
-        int updated = jdbc.update("update app_setting set setting_value = ?, updated_at = ? where setting_key = ?",
-                String.valueOf(open), now, COMMENT_FEATURE_OPEN);
+        int updated = jdbc.update("update app_setting set setting_value = ?, updated_at = ?, row_updated_at = ? "
+                + "where setting_key = ?", String.valueOf(open), now, now, COMMENT_FEATURE_OPEN);
         if (updated == 0) {
-            jdbc.update("insert into app_setting (setting_key, setting_value, updated_at) values (?, ?, ?)",
-                    COMMENT_FEATURE_OPEN, String.valueOf(open), now);
+            jdbc.update("insert into app_setting (setting_key, setting_value, updated_at, row_created_at, row_updated_at) "
+                    + "values (?, ?, ?, ?, ?)", COMMENT_FEATURE_OPEN, String.valueOf(open), now, now, now);
         }
     }
 

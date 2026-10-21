@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
+import com.depositcock.common.BaseTimeEntity;
 import com.depositcock.common.Notice;
 import com.depositcock.seller.Seller;
 import jakarta.persistence.CascadeType;
@@ -32,7 +33,7 @@ import org.hibernate.annotations.DynamicUpdate;
 @Table(name = "group_buy")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class GroupBuy {
+public class GroupBuy extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -2,6 +2,7 @@ package com.depositcock.deposit;
 
 import java.time.LocalDateTime;
 
+import com.depositcock.common.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -19,7 +20,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "bank_column_preset")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class BankColumnPreset {
+public class BankColumnPreset extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -99,15 +99,15 @@ final class OrderUpdate {
             }
             if (after > before) {
                 if (product.isBlockWhenSoldOut()) {
-                    if (productRepository.increaseSoldWithinStock(productId, after - before) == 0) {
+                    if (productRepository.increaseSoldWithinStock(productId, after - before, now) == 0) {
                         em.refresh(product);
                         throw notEnoughStock(product, before, actor);
                     }
                 } else {
-                    productRepository.increaseSold(productId, after - before);
+                    productRepository.increaseSold(productId, after - before, now);
                 }
             } else {
-                productRepository.decreaseSold(productId, before - after);
+                productRepository.decreaseSold(productId, before - after, now);
             }
             touched.add(product);
             if (item == null) {
@@ -147,7 +147,7 @@ final class OrderUpdate {
             throw new ApiException(ErrorCode.ORDER_AMOUNT_TOO_LARGE);
         }
         if (changes.isEmpty()) {
-            throw actor == ChangeActor.CUSTOMER ? new ApiException(ErrorCode.NO_CHANGE_CUSTOMER, order.getOrderNo())
+            throw actor == ChangeActor.CUSTOMER ? new ApiException(ErrorCode.NO_CHANGE_CUSTOMER)
                     : new ApiException(ErrorCode.NO_CHANGE);
         }
         int beforeAmount = order.getExpectedAmount();

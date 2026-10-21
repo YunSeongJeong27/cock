@@ -2,6 +2,7 @@ package com.depositcock.customer;
 
 import java.time.LocalDateTime;
 
+import com.depositcock.order.DepositConfirmationRepository;
 import com.depositcock.seller.SellerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,7 @@ public class Customers {
 
     private final CustomerRepository repository;
     private final SellerRepository sellerRepository;
+    private final DepositConfirmationRepository confirmationRepository;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public Customer byPhone(Long sellerId, String normalizedPhone, LocalDateTime now) {
@@ -38,9 +40,13 @@ public class Customers {
         });
     }
 
-    /** 주문이 하나도 남지 않은 고객(과 그 기기·별칭)을 지운다. 공구 삭제·댓글 주문 다시 반영 뒤에 부른다 (개인정보 파기) */
+    /**
+     * 주문이 하나도 남지 않은 고객(과 그 기기·별칭)을 지운다. 공구 삭제·댓글 주문 다시 반영 뒤에 부른다 (개인정보 파기).
+     * 지울 고객을 가리키는 확정 기록의 연결은 먼저 비운다 (행 수정 일시를 남기려고, DepositConfirmationRepository)
+     */
     @Transactional(propagation = Propagation.MANDATORY)
-    public int deleteWithoutOrders(Long sellerId) {
+    public int deleteWithoutOrders(Long sellerId, LocalDateTime now) {
+        confirmationRepository.unlinkPreviousCustomersWithoutOrders(sellerId, now);
         return repository.deleteWithoutOrders(sellerId);
     }
 }

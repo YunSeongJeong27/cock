@@ -1,10 +1,13 @@
 package com.depositcock.groupbuy;
 
+import java.time.LocalDateTime;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/** 아래 UPDATE 들은 JPA Auditing 을 거치지 않으므로 행 수정 일시(rowUpdatedAt)를 직접 넣는다 (BaseTimeEntity) */
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
     /**
@@ -14,21 +17,23 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
      * 메모리의 Product.sold 는 바뀌지 않으므로 필요하면 EntityManager.refresh 로 다시 읽는다.
      */
     @Modifying(flushAutomatically = true)
-    @Query("update Product p set p.sold = p.sold + :quantity where p.id = :productId")
-    int increaseSold(@Param("productId") Long productId, @Param("quantity") int quantity);
+    @Query("update Product p set p.sold = p.sold + :quantity, p.rowUpdatedAt = :now where p.id = :productId")
+    int increaseSold(@Param("productId") Long productId, @Param("quantity") int quantity, @Param("now") LocalDateTime now);
 
     /**
      * "다 팔리면 품절" 을 켠 상품용: 준비 수량 안에서만 더한다. 영향받은 행이 0 이면 품절(남은 수량 부족).
      * 여러 사람이 동시에 주문해도 DB 가 한 줄씩 처리하므로 준비 수량을 넘지 않는다.
      */
     @Modifying(flushAutomatically = true)
-    @Query("update Product p set p.sold = p.sold + :quantity "
+    @Query("update Product p set p.sold = p.sold + :quantity, p.rowUpdatedAt = :now "
             + "where p.id = :productId and (p.stockLimit is null or p.sold + :quantity <= p.stockLimit)")
-    int increaseSoldWithinStock(@Param("productId") Long productId, @Param("quantity") int quantity);
+    int increaseSoldWithinStock(@Param("productId") Long productId, @Param("quantity") int quantity,
+                                @Param("now") LocalDateTime now);
 
     /** 취소 시 판매 수량 복구 */
     @Modifying(flushAutomatically = true)
-    @Query("update Product p set p.sold = p.sold - :quantity where p.id = :productId and p.sold >= :quantity")
-    int decreaseSold(@Param("productId") Long productId, @Param("quantity") int quantity);
+    @Query("update Product p set p.sold = p.sold - :quantity, p.rowUpdatedAt = :now "
+            + "where p.id = :productId and p.sold >= :quantity")
+    int decreaseSold(@Param("productId") Long productId, @Param("quantity") int quantity, @Param("now") LocalDateTime now);
 
 }

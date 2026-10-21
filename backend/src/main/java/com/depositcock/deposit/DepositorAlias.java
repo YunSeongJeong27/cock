@@ -2,6 +2,7 @@ package com.depositcock.deposit;
 
 import java.time.LocalDateTime;
 
+import com.depositcock.common.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -20,7 +21,7 @@ import lombok.Setter;
 @Table(name = "depositor_alias")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class DepositorAlias {
+public class DepositorAlias extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

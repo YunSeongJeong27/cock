@@ -146,7 +146,7 @@ function MyOrdersCard({ view, onEdit, onCancel }: {
       {view.myOrders.map((o) => (
         <div key={o.orderNo} style={{ borderTop: '1px solid var(--line)', padding: '10px 0' }}>
           <div className="row between">
-            <b>{o.orderNo}번 · {won(o.expectedAmount)}</b>
+            <b>{won(o.expectedAmount)}</b>
             <StatusBadge status={o.status} label={o.statusLabel + (o.status === 'PAID' ? ' ✅' : '')} />
           </div>
           <div className="small">{itemsText(o.items)}</div>
@@ -236,7 +236,7 @@ export default function PublicOrder() {
   const [form, setForm] = useState(emptyForm)
   const [warnings, setWarnings] = useState<Warnings | null>(null)
   const [showExisting, setShowExisting] = useState(false)
-  /** "내 주문"의 [주문 수정]으로 고친 주문 (주문서가 "N번 주문 수정"이 됨) */
+  /** "내 주문"의 [주문 수정]으로 고친 주문 (주문서가 "주문 수정"이 됨) */
   const [editing, setEditing] = useState<MyOrder | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [placed, setPlaced] = useState<Placed | null>(null)
@@ -398,6 +398,11 @@ export default function PublicOrder() {
   if (loadError) return <div className="container narrow"><h2>📌 입금콕</h2><ErrorBox message={loadError} /></div>
   if (!view) return <div className="page-loading">불러오는 중…</div>
   const set = (k: keyof typeof emptyForm, v: string) => setForm((f) => ({ ...f, [k]: v }))
+  /**
+   * 고객 화면에는 주문번호를 보여주지 않는다 (2026-10-21 사용자 요청). 주문은 상품·금액·주문 시각으로 구분하고,
+   * 번호는 어느 주문인지 서버에 알리는 값으로만 쓴다
+   */
+  const cancelTarget = cancel.orderNo ? view.myOrders.find((o) => String(o.orderNo) === cancel.orderNo) : undefined
 
   return (
     <div className="container narrow">
@@ -433,8 +438,8 @@ export default function PublicOrder() {
           <h2>{placed.changed ? '주문을 수정했어요 ✅' : '주문 완료 🎉'}</h2>
           {placed.changed
             ? <OrderSummary o={placed.finalOrder.order} f={placed.finalOrder}
-                title={<><b>최종 주문 · {placed.orderNo}번</b> <span className="muted">(이 내용으로 수정되었습니다)</span></>} />
-            : <div>주문번호 <b>{placed.orderNo}</b> · 총 <b>{won(placed.expectedAmount)}</b></div>}
+                title={<><b>최종 주문</b> <span className="muted">(이 내용으로 수정되었습니다)</span></>} />
+            : <div>총 금액 <b>{won(placed.expectedAmount)}</b></div>}
           {placed.account ? (
             <div className="mt">
               <div><Rich text={T.sendTo(won(placed.expectedAmount))} /></div>
@@ -453,7 +458,7 @@ export default function PublicOrder() {
 
       {view.acceptingOrders && !view.paused && (
         <form className="card" id="order-form" onSubmit={(e) => submit(e)}>
-          <h3>{editing ? `${editing.orderNo}번 주문 수정` : replaceTarget ? '주문서' : view.myOrders.length > 0 ? '추가 주문하기' : '주문서'}</h3>
+          <h3>{editing ? '주문 수정' : replaceTarget ? '주문서' : view.myOrders.length > 0 ? '추가 주문하기' : '주문서'}</h3>
           {editing && editing.paymentMethod === 'PREPAID' && <div className="small mb"><b>주문 확정 전이에요.</b></div>}
           {/* 수정은 휴대폰 번호 + 입금자명이 기존 주문과 같아야 한다 (2026-10-19). 그래서 둘은 고칠 수 없다 */}
           {editing && <div className="small muted mb">{T.editLockedFields}</div>}
@@ -625,14 +630,16 @@ export default function PublicOrder() {
                 <label className="field"><span>계좌번호</span><input type="text" inputMode="numeric" value={cancel.accountNumber} onChange={(e) => setCancel({ ...cancel, accountNumber: e.target.value })} required maxLength={30} placeholder="숫자만 (- 있어도 됨)" /></label>
               </>
             )}
-            {cancel.orderNo && cancel.choices.length === 0 && <div className="small muted mb">{cancel.orderNo}번 주문</div>}
+            {cancelTarget && cancel.choices.length === 0 && (
+              <div className="small muted mb">{itemsText(cancelTarget.items)} · {won(cancelTarget.expectedAmount)}</div>
+            )}
             <ErrorBox message={cancel.error} />
             {cancel.choices.length > 0 ? (
               <div>
                 <div className="small mb"><b>{T.chooseOrder(cancel.mode === 'refund')}</b></div>
                 {cancel.choices.map((o) => (
                   <div key={o.orderNo} className="row between" style={{ borderTop: '1px solid var(--line)', padding: '8px 0' }}>
-                    <span className="small">{o.orderNo}번 · {itemsText(o.items)} · {won(o.expectedAmount)} · {o.statusLabel}</span>
+                    <span className="small">{itemsText(o.items)} · {won(o.expectedAmount)} · {o.statusLabel} · {dateTime(o.orderedAt)}</span>
                     <button type="button" className="btn small danger" disabled={busy} onClick={() => doCancel(null, o.orderNo)}>{cancel.mode === 'refund' ? '이 주문 환불 신청' : '이 주문 취소'}</button>
                   </div>
                 ))}

@@ -92,7 +92,7 @@ class CustomerReorderTest extends IntegrationTest {
         // 같은 내용이면 바꿀 게 없다
         mvc.perform(withJson(post(url + "/orders").cookie(device), order(Map.of(g.apple(), 1), "010-7100-0001", "김사과", 1)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("1번 주문과 같은 내용입니다. 바뀐 내용이 없습니다."));
+                .andExpect(jsonPath("$.detail").value("기존 주문과 같은 내용입니다. 바뀐 내용이 없습니다."));
     }
 
     @Test

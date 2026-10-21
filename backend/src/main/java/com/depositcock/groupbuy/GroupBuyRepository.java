@@ -39,9 +39,13 @@ public interface GroupBuyRepository extends JpaRepository<GroupBuy, Long> {
             + "and g.closeAt is not null and g.closeAt <= :now")
     List<GroupBuy> findExpiredOpen(@Param("now") LocalDateTime now);
 
-    /** 마감 시각이 지난 OPEN 공구를 CLOSED 로 바꾼다. 그 사이 판매자가 직접 마감했거나 마감 시각을 바꿨으면 0 */
+    /**
+     * 마감 시각이 지난 OPEN 공구를 CLOSED 로 바꾼다. 그 사이 판매자가 직접 마감했거나 마감 시각을 바꿨으면 0.
+     * JPA Auditing 을 거치지 않는 UPDATE 라 행 수정 일시(rowUpdatedAt)도 직접 넣는다 (BaseTimeEntity)
+     */
     @Modifying
-    @Query("update GroupBuy g set g.status = com.depositcock.groupbuy.GroupBuyStatus.CLOSED, g.updatedAt = :now "
+    @Query("update GroupBuy g set g.status = com.depositcock.groupbuy.GroupBuyStatus.CLOSED, g.updatedAt = :now, "
+            + "g.rowUpdatedAt = :now "
             + "where g.id = :id and g.status = com.depositcock.groupbuy.GroupBuyStatus.OPEN "
             + "and g.closeAt is not null and g.closeAt <= :now")
     int closeIfExpired(@Param("id") Long id, @Param("now") LocalDateTime now);

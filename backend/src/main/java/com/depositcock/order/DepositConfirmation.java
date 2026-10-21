@@ -2,6 +2,7 @@ package com.depositcock.order;
 
 import java.time.LocalDateTime;
 
+import com.depositcock.common.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -27,7 +28,7 @@ import lombok.Setter;
 @Table(name = "deposit_confirmation")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class DepositConfirmation {
+public class DepositConfirmation extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

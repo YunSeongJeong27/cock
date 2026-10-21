@@ -88,7 +88,7 @@ public enum ErrorCode {
     ORDER_AMOUNT_TOO_LARGE(BAD_REQUEST, "주문 금액이 너무 큽니다. 수량을 확인해 주세요."),
     PER_ORDER_LIMIT(BAD_REQUEST, "'%s'은(는) 1인 최대 %d개까지 주문할 수 있습니다."),
     PER_ORDER_LIMIT_WITH_PREVIOUS(BAD_REQUEST, "'%s'은(는) 1인 최대 %d개까지 주문할 수 있습니다. (이미 주문한 %d개 포함)"),
-    PER_ORDER_LIMIT_REPLACING(BAD_REQUEST, "'%s'은(는) 1인 최대 %d개까지 주문할 수 있습니다. (이미 주문한 %d개 포함, 바뀔 %d번 주문 제외)"),
+    PER_ORDER_LIMIT_REPLACING(BAD_REQUEST, "'%s'은(는) 1인 최대 %d개까지 주문할 수 있습니다. (이미 주문한 %d개 포함, 수정되는 주문 제외)"),
     // 같은 번호로 다시 주문할 때 확인 (409). 응답 detail 은 아래 줄들을 이어 붙인 것
     REORDER_WARNING(CONFLICT, "주문하기 전에 확인해 주세요."),
     REORDER_CANNOT_REPLACE(CONFLICT, "이 주문은 수정할 수 없습니다. 주문이 확정됐거나 휴대폰 번호가 다릅니다."),
@@ -99,7 +99,8 @@ public enum ErrorCode {
     REORDER_NEW_AFTER_PICKUP(CONFLICT, "이 번호로 수령한 주문이 있어, 이번 주문은 새 주문으로 추가됩니다."),
     ORDER_NOT_FOUND_BY_PHONE(NOT_FOUND, "일치하는 주문이 없습니다. 휴대폰 번호를 확인해 주세요."),
     ORDER_NOT_FOUND_BY_PHONE_NAME(NOT_FOUND, "휴대폰 번호와 입금자명이 일치하는 주문이 없습니다."),
-    ORDER_NO_INVALID(NOT_FOUND, "주문번호를 확인해 주세요."),
+    // 고객 화면에는 주문번호를 보여주지 않으므로(2026-10-21) 번호 대신 고른 주문과 맞지 않는다고 알린다
+    ORDER_NO_INVALID(NOT_FOUND, "선택한 주문의 휴대폰 번호·입금자명과 다릅니다. 주문할 때 적은 그대로 입력해 주세요."),
     CHOOSE_ORDER_TO_CANCEL(CONFLICT, "주문이 여러 건 있습니다. 취소할 주문을 골라주세요."),
     CHOOSE_ORDER_TO_REFUND(CONFLICT, "주문이 여러 건 있습니다. 환불 신청할 주문을 골라주세요."),
     NOTHING_TO_CANCEL(BAD_REQUEST, "취소할 수 있는 주문이 없습니다. (이미 취소·수령했거나 환불 신청한 주문)"),
@@ -128,7 +129,7 @@ public enum ErrorCode {
     NOT_ENOUGH_STOCK(CONFLICT, "'%s'은(는) 남은 수량이 부족해 최대 %d개까지 주문할 수 있습니다."),
     NOT_ENOUGH_STOCK_WITH_CURRENT(CONFLICT, "'%s'은(는) 남은 수량이 부족해 최대 %d개까지 주문할 수 있습니다. (지금 주문한 %d개 포함)"),
     NO_CHANGE(BAD_REQUEST, "바뀐 내용이 없습니다."),
-    NO_CHANGE_CUSTOMER(BAD_REQUEST, "%d번 주문과 같은 내용입니다. 바뀐 내용이 없습니다."),
+    NO_CHANGE_CUSTOMER(BAD_REQUEST, "기존 주문과 같은 내용입니다. 바뀐 내용이 없습니다."),
 
     // ---- 판매자 주문 관리 ----
     ORDER_NOT_FOUND(NOT_FOUND, "주문을 찾을 수 없습니다."),

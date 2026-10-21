@@ -1,5 +1,6 @@
 package com.depositcock;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -179,7 +180,7 @@ class ReviewFixesOrderTest extends IntegrationTest {
         Opened g = open(groupBuyBody("재고", List.of(product("상품", 1000, 10))));
         tx.executeWithoutResult(status -> {
             Product loaded = productRepository.findById(g.productId()).orElseThrow(); // sold = 0 인 상태로 읽음
-            productRepository.increaseSold(g.productId(), 3);                         // 그 사이 다른 주문이 3개
+            productRepository.increaseSold(g.productId(), 3, LocalDateTime.now());    // 그 사이 다른 주문이 3개
             loaded.setName("상품 이름 변경");                                          // 판매자 수정 (옛 sold 를 들고 있음)
         });
         assertThat(productRepository.findById(g.productId()).orElseThrow().getSold()).isEqualTo(3);

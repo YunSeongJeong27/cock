@@ -2,6 +2,7 @@ package com.depositcock.vision;
 
 import java.time.LocalDate;
 
+import com.depositcock.common.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -17,7 +18,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "capture_usage")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class CaptureUsage {
+public class CaptureUsage extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

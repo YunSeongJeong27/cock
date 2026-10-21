@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.depositcock.common.BaseTimeEntity;
 import com.depositcock.customer.Customer;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.PickupPoint;
@@ -37,7 +38,7 @@ import org.hibernate.annotations.DynamicUpdate;
 @Table(name = "customer_order")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class CustomerOrder {
+public class CustomerOrder extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -6,9 +6,9 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 
-import jakarta.persistence.CollectionTable;
+import com.depositcock.common.BaseTimeEntity;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -17,8 +17,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.MapKeyColumn;
-import jakarta.persistence.MapKeyEnumerated;
+import jakarta.persistence.MapKey;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -29,7 +29,7 @@ import lombok.Setter;
 @Table(name = "seller")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Seller {
+public class Seller extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -88,14 +88,15 @@ public class Seller {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    /** 판매자가 켜고 끈 알림 (2026-10-19). 없는 알림은 NotificationType 기본값 */
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "seller_notification", joinColumns = @JoinColumn(name = "seller_id"))
-    @MapKeyEnumerated(EnumType.STRING)
-    @MapKeyColumn(name = "notification_type")
-    @Column(name = "enabled", nullable = false)
+    /**
+     * 판매자가 켜고 끈 알림 (2026-10-19). 없는 알림은 NotificationType 기본값.
+     * seller_id 는 SellerNotification 이 직접 넣으므로 여기서는 읽기만 한다 (insertable·updatable = false)
+     */
+    @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "seller_id", insertable = false, updatable = false)
+    @MapKey(name = "notificationType")
     @Getter(AccessLevel.NONE)
-    private Map<NotificationType, Boolean> notifications = new HashMap<>();
+    private Map<NotificationType, SellerNotification> notifications = new HashMap<>();
 
     public Seller(String email, String passwordHash, String displayName, Role role,
                   LocalDateTime createdAt, LocalDateTime trialEndsAt) {
@@ -122,7 +123,8 @@ public class Seller {
     }
 
     public boolean isNotificationOn(NotificationType type) {
-        return notifications.getOrDefault(type, type.isDefaultOn());
+        SellerNotification setting = notifications.get(type);
+        return setting == null ? type.isDefaultOn() : setting.isEnabled();
     }
 
     /** 알림 전체 (판매자가 안 정한 것은 기본값으로 채움) */
@@ -137,8 +139,14 @@ public class Seller {
     /** 보낸 것만 바꾼다 (보내지 않은 알림은 그대로) */
     public void changeNotifications(Map<NotificationType, Boolean> changes) {
         changes.forEach((type, on) -> {
-            if (type != null && on != null) {
-                notifications.put(type, on);
+            if (type == null || on == null) {
+                return;
+            }
+            SellerNotification setting = notifications.get(type);
+            if (setting == null) {
+                notifications.put(type, new SellerNotification(id, type, on));
+            } else {
+                setting.setEnabled(on);
             }
         });
     }

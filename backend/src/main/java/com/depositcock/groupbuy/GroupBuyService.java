@@ -189,7 +189,7 @@ public class GroupBuyService {
         orders.forEach(entityManager::detach);
         groupBuyRepository.delete(groupBuy);
         // 이 공구에서만 주문한 고객(휴대폰 번호)과 그 기기·별칭도 파기한다 (다른 공구에 주문이 있는 고객은 남김)
-        customers.deleteWithoutOrders(sellerId);
+        customers.deleteWithoutOrders(sellerId, LocalDateTime.now(clock));
     }
 
     private void apply(GroupBuy groupBuy, GroupBuyRequest r, LocalDateTime now) {

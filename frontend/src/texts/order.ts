@@ -11,7 +11,7 @@ export const orderText = {
   depositorReminder: (name: string) => `받는 분 통장 표시(입금자명)를 꼭 **${name}**(으)로 해주세요. 입금 확인이 빨라집니다.`,
   confirmAfterDeposit: '판매자가 입금을 확인하면 "주문 확정"으로 바뀝니다.',
   payOnsite: '현장에서 결제해 주세요.',
-  checkLater: '이 화면 위쪽 "내 주문"에서 언제든 상태를 확인할 수 있습니다. 이 링크를 다시 열면 됩니다.',
+  checkLater: '"내 주문"에서 언제든 상태를 확인할 수 있습니다.',
 
   // 내 주문
   changedBySeller: (time: string) => `판매자가 주문을 변경했어요 (${time}). 위 내용·금액을 확인해 주세요.`,

@@ -311,7 +311,7 @@ public class CommentService {
             order.addItem(new OrderItem(order, product, t.quantity()));
             order.fillAmounts((int) amount, 0);
             orderRepository.save(order);
-            productRepository.increaseSold(product.getId(), t.quantity());
+            productRepository.increaseSold(product.getId(), t.quantity(), now);
             created++;
         }
         entityManager.refresh(product);

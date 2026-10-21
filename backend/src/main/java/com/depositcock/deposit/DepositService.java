@@ -163,9 +163,13 @@ public class DepositService {
         DepositUpload upload = uploadRepository.findByIdAndGroupBuyId(uploadId, groupBuy.getId())
                 .orElseThrow(() -> new ApiException(ErrorCode.UPLOAD_NOT_FOUND));
         Set<Long> usedRows = usedRowIds(groupBuy.getId());
-        boolean used = rowRepository.findByUploadId(upload.getId()).stream().anyMatch(r -> usedRows.contains(r.getId()));
-        if (used) {
+        List<Long> rowIds = rowRepository.findByUploadId(upload.getId()).stream().map(DepositRow::getId).toList();
+        if (rowIds.stream().anyMatch(usedRows::contains)) {
             throw new ApiException(ErrorCode.UPLOAD_IN_USE);
+        }
+        if (!rowIds.isEmpty()) {
+            // 취소된 확정 이력이 이 업로드의 입금 줄을 가리키면 연결을 먼저 비운다 (행 수정 일시를 남기려고)
+            confirmationRepository.unlinkDepositRows(rowIds, LocalDateTime.now(clock));
         }
         uploadRepository.delete(upload);
     }

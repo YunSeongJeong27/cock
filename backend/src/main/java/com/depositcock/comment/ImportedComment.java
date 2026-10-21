@@ -2,6 +2,7 @@ package com.depositcock.comment;
 
 import java.time.LocalDateTime;
 
+import com.depositcock.common.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -22,7 +23,7 @@ import lombok.Setter;
 @Table(name = "imported_comment")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ImportedComment {
+public class ImportedComment extends BaseTimeEntity {
 
     /** imported_comment.author_name·content 칸 길이 */
     public static final int MAX_AUTHOR_NAME = 200;
