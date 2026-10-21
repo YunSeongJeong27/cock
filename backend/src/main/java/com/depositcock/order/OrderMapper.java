@@ -57,14 +57,15 @@ final class OrderMapper {
     }
 
     static List<SellerOrder> toSellerOrders(List<CustomerOrder> orders, DataCipher cipher) {
-        Map<Long, Long> activeByKey = orders.stream().filter(CustomerOrder::isActive)
+        // 같은 고객(휴대폰 번호)의 살아 있는 링크 주문 수 (2건 이상이면 연락처 중복 표시)
+        Map<Long, Long> activeByCustomer = orders.stream().filter(CustomerOrder::isActive)
                 .filter(o -> o.getSource() == OrderSource.FORM)
                 .collect(Collectors.groupingBy(CustomerOrder::getCustomerId, Collectors.counting()));
         // 같은 닉네임의 링크 주문·댓글 주문 (같은 사람이 양쪽으로 주문했을 수 있음. 경고만)
         Map<String, List<CustomerOrder>> byNickname = orders.stream().filter(CustomerOrder::isActive)
                 .filter(o -> Nicknames.key(o.getNickname()) != null)
                 .collect(Collectors.groupingBy(o -> Nicknames.key(o.getNickname())));
-        return orders.stream().map(o -> toSellerOrder(o, activeByKey.getOrDefault(o.getCustomerId(), 0L) > 1,
+        return orders.stream().map(o -> toSellerOrder(o, activeByCustomer.getOrDefault(o.getCustomerId(), 0L) > 1,
                 sameNicknameOtherSource(o, byNickname), cipher)).toList();
     }
 
@@ -102,7 +103,8 @@ final class OrderMapper {
                 .address(o.getAddress())
                 .addressDetail(o.getAddressDetail())
                 .paymentMethod(o.getPaymentMethod())
-                .items(o.getItems().stream().map(i -> new SellerOrderItem(i.getProduct().getId(), i.getProductNameSnapshot(), i.getQuantity(), i.getUnitPriceSnapshot())).toList())
+                .items(o.getItems().stream().map(i -> new SellerOrderItem(i.getProduct().getId(), i.getProductNameSnapshot(),
+                        i.getQuantity(), i.getUnitPriceSnapshot())).toList())
                 .totalQuantity(o.totalQuantity())
                 .itemsAmount(o.getItemsAmount())
                 .shippingFee(o.getShippingFee())
@@ -128,8 +130,10 @@ final class OrderMapper {
                 .orderedAt(o.getOrderedAt())
                 .updatedAt(o.getUpdatedAt())
                 .cancelledAt(o.getCancelledAt())
-                .payments(o.getConfirmations().stream().map(c -> new PaymentRecord(c.getDepositorName(), c.getAmount(), c.isManual(), c.getConfirmedAt(), c.getCancelledAt())).toList())
-                .changes(o.getChanges().stream().map(c -> new ChangeRecord(c.getSummary(), c.getChangedBy(), c.getChangedAt())).toList())
+                .payments(o.getConfirmations().stream().map(c -> new PaymentRecord(c.getDepositorName(), c.getAmount(),
+                        c.isManual(), c.getConfirmedAt(), c.getCancelledAt())).toList())
+                .changes(o.getChanges().stream()
+                        .map(c -> new ChangeRecord(c.getSummary(), c.getChangedBy(), c.getChangedAt())).toList())
                 .sameNicknameOrderNos(sameNicknameOrderNos)
                 .build();
     }
