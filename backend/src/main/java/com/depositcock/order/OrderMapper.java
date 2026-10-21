@@ -1,5 +1,6 @@
 package com.depositcock.order;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -50,7 +51,7 @@ final class OrderMapper {
                 .build();
     }
 
-    private static java.time.LocalDateTime lastChange(CustomerOrder o, ChangeActor actor) {
+    private static LocalDateTime lastChange(CustomerOrder o, ChangeActor actor) {
         return o.getChanges().stream().filter(c -> c.getChangedBy() == actor).map(OrderChange::getChangedAt)
                 .reduce((a, b) -> b).orElse(null);
     }

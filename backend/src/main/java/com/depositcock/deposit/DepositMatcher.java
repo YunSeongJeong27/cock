@@ -104,6 +104,7 @@ public final class DepositMatcher {
     }
 
     private static final Pattern DIGITS = Pattern.compile("\\d+");
+    private static final Pattern NOT_LETTER = Pattern.compile("[^가-힣a-zA-Z]");
 
     /** @param aliasToCustomerId 입금자명(별칭) → 고객 id */
     public static Outcome match(List<Payee> payees, List<Deposit> deposits, Map<String, Long> aliasToCustomerId) {
@@ -313,7 +314,7 @@ public final class DepositMatcher {
 
     /** 한글·영문만 남긴다 (소문자) */
     static String lettersOnly(String value) {
-        return value == null ? "" : value.replaceAll("[^가-힣a-zA-Z]", "").toLowerCase(Locale.ROOT);
+        return value == null ? "" : NOT_LETTER.matcher(value).replaceAll("").toLowerCase(Locale.ROOT);
     }
 
     /** 3자리 이상 숫자 묶음 + 전부 이어붙인 값. "217-1505" → {217, 1505, 2171505} */

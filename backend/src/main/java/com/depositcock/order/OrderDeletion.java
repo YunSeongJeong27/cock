@@ -1,11 +1,12 @@
 package com.depositcock.order;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.depositcock.comment.ImportedCommentRepository;
@@ -52,11 +53,13 @@ public class OrderDeletion {
         if (ids.isEmpty()) {
             throw new ApiException(ErrorCode.DELETE_NOTHING_SELECTED);
         }
-        List<CustomerOrder> orders = new ArrayList<>();
-        for (Long id : ids) {
-            orders.add(orderRepository.findByIdAndGroupBuyId(id, groupBuy.getId())
-                    .orElseThrow(() -> new ApiException(ErrorCode.ORDER_NOT_FOUND)));
+        // 고른 주문을 한 번에 읽는다 (전에는 주문마다 따로 읽었음, 2026-10-21). 다른 공구 주문 id 가 섞이면 404
+        Map<Long, CustomerOrder> found = orderRepository.findByGroupBuyIdAndIdIn(groupBuy.getId(), ids).stream()
+                .collect(Collectors.toMap(CustomerOrder::getId, Function.identity()));
+        if (found.size() != ids.size()) {
+            throw new ApiException(ErrorCode.ORDER_NOT_FOUND);
         }
+        List<CustomerOrder> orders = ids.stream().map(found::get).toList();
         List<String> notFinished = orders.stream().filter(o -> !o.isFinished()).map(o -> o.getOrderNo() + "번").toList();
         if (!notFinished.isEmpty()) {
             throw new ApiException(ErrorCode.DELETE_ONLY_FINISHED, String.join(", ", notFinished));

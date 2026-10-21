@@ -17,6 +17,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
@@ -63,6 +64,12 @@ public class BankStatementReader {
             DateTimeFormatter.ofPattern("yyyy-MM-dd"),
             DateTimeFormatter.ofPattern("yyyy/MM/dd"),
             DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+    /** 엑셀 날짜 칸을 글자로 바꿀 때 쓰는 형식 (위 DATE_TIME_FORMATS 의 하나라 다시 읽을 수 있다) */
+    private static final DateTimeFormatter CELL_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final Pattern AMOUNT_NOISE = Pattern.compile("[,원₩\\s]");
+    private static final Pattern AMOUNT_NUMBER = Pattern.compile("[+-]?\\d+(\\.\\d+)?");
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     private static final Charset MS949 = Charset.forName("MS949");
 
@@ -127,7 +134,7 @@ public class BankStatementReader {
         if (type == CellType.NUMERIC) {
             if (DateUtil.isCellDateFormatted(cell)) {
                 LocalDateTime dt = cell.getLocalDateTimeCellValue();
-                return dt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                return dt.format(CELL_DATE_TIME);
             }
             double value = cell.getNumericCellValue();
             if (value == Math.rint(value) && Math.abs(value) < 1e15) {
@@ -317,8 +324,8 @@ public class BankStatementReader {
         if (raw == null) {
             return null;
         }
-        String cleaned = raw.replace(",", "").replace("원", "").replace("₩", "").replaceAll("\\s+", "");
-        if (cleaned.isEmpty() || !cleaned.matches("[+-]?\\d+(\\.\\d+)?")) {
+        String cleaned = AMOUNT_NOISE.matcher(raw).replaceAll("");
+        if (!AMOUNT_NUMBER.matcher(cleaned).matches()) {
             return null;
         }
         try {
@@ -334,13 +341,13 @@ public class BankStatementReader {
 
     /**
      * 입금 시각 변환. 은행마다 형식이 달라서 아는 형식만 바꾸고 모르면 null (미결 39번).
-     * 연도가 없는 "10-08 10:01" 같은 값은 연도를 추측하지 않고 null 로 둔다.
+     * 연도가 없는 "10-08 10:01" 같은 값은 연도를 추측하지 않고 null 로 둔다. 스크린샷 입금(ScreenshotService)도 같이 쓴다.
      */
-    static LocalDateTime parseDateTime(String raw) {
+    public static LocalDateTime parseDateTime(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;
         }
-        String text = raw.trim().replaceAll("\\s+", " ");
+        String text = WHITESPACE.matcher(raw.trim()).replaceAll(" ");
         for (DateTimeFormatter f : DATE_TIME_FORMATS) {
             try {
                 return LocalDateTime.parse(text, f);
@@ -356,11 +363,6 @@ public class BankStatementReader {
             }
         }
         return null;
-    }
-
-    /** 다른 경로(스크린샷 등)에서 입금 시각 원문을 변환할 때 쓴다. */
-    public static LocalDateTime parseDateTimeText(String raw) {
-        return parseDateTime(raw);
     }
 
     private static boolean isBlank(String value) {

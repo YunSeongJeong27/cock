@@ -3,6 +3,7 @@ package com.depositcock.order;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import com.depositcock.customer.Customer;
 import com.depositcock.groupbuy.GroupBuy;
@@ -254,7 +255,7 @@ public class CustomerOrder {
     }
 
     /** 살아 있는 입금 확정 (없으면 미입금) */
-    public java.util.Optional<DepositConfirmation> activeConfirmation() {
+    public Optional<DepositConfirmation> activeConfirmation() {
         return confirmations.stream().filter(DepositConfirmation::isActive).findFirst();
     }
 

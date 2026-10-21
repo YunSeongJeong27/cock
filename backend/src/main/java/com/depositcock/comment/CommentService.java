@@ -1,7 +1,5 @@
 package com.depositcock.comment;
 
-import com.depositcock.common.Texts;
-import com.depositcock.groupbuy.StockAlerts;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -16,14 +14,15 @@ import java.util.stream.Collectors;
 import com.depositcock.comment.OrderAggregator.CustomerTotal;
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
+import com.depositcock.common.Texts;
 import com.depositcock.common.Tokens;
 import com.depositcock.customer.Customer;
 import com.depositcock.customer.Customers;
 import com.depositcock.groupbuy.GroupBuy;
-import com.depositcock.groupbuy.GroupBuyRepository;
 import com.depositcock.groupbuy.GroupBuyService;
 import com.depositcock.groupbuy.Product;
 import com.depositcock.groupbuy.ProductRepository;
+import com.depositcock.groupbuy.StockAlerts;
 import com.depositcock.order.CustomerOrder;
 import com.depositcock.order.CustomerOrderRepository;
 import com.depositcock.order.Nicknames;
@@ -48,7 +47,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class CommentService {
 
     private final GroupBuyService groupBuyService;
-    private final GroupBuyRepository groupBuyRepository;
     private final ImportedCommentRepository commentRepository;
     private final CustomerOrderRepository orderRepository;
     private final ProductRepository productRepository;
@@ -221,8 +219,9 @@ public class CommentService {
                 // 읽지 못한 글자가 남은 채로 저장하면 그 닉네임이 고객 키가 되어 주문으로 만들어진다
                 throw new ApiException(ErrorCode.COMMENT_UNREADABLE_CHARS, author, content);
             }
-            commentRepository.save(new ImportedComment(groupBuy.getId(), source, ++seq, Texts.cut(author, 200),
-                    Texts.cut(content, 2000), in.duplicateSuspected(), now));
+            commentRepository.save(new ImportedComment(groupBuy.getId(), source, ++seq,
+                    Texts.cut(author, ImportedComment.MAX_AUTHOR_NAME), Texts.cut(content, ImportedComment.MAX_CONTENT),
+                    in.duplicateSuspected(), now));
             saved++;
         }
         return saved;
@@ -241,8 +240,8 @@ public class CommentService {
             throw new ApiException(ErrorCode.COMMENT_FIX_UNREADABLE);
         }
         // 저장할 때와 같이 칸 길이에 맞춰 자른다 (넘기면 409 "이미 같은 데이터" 로 잘못 안내됐음, 2026-10-20 점검)
-        comment.setAuthorName(Texts.cut(authorName.trim(), 200));
-        comment.setContent(Texts.cut(content.trim(), 2000));
+        comment.setAuthorName(Texts.cut(authorName.trim(), ImportedComment.MAX_AUTHOR_NAME));
+        comment.setContent(Texts.cut(content.trim(), ImportedComment.MAX_CONTENT));
         comment.setManualQuantity(manualQuantity);
     }
 
@@ -286,7 +285,8 @@ public class CommentService {
         int created = 0;
         int review = 0;
         for (CustomerTotal t : totals) {
-            List<CustomerOrder> existing = appliedOrders.get(t.authorName().trim());
+            String nickname = t.authorName().trim();
+            List<CustomerOrder> existing = appliedOrders.get(nickname);
             if (existing != null) {
                 if (applied(existing, t.quantity()).state() == ApplyState.DIFFERENT) {
                     review++;
@@ -299,10 +299,10 @@ public class CommentService {
             // 주문서 주문과 같은 금액 상한. 전에는 int 로 곱해서 넘치면 금액이 음수로 저장됐음 (2026-10-20 점검)
             long amount = (long) product.getUnitPrice() * t.quantity();
             if (amount > PublicOrderService.MAX_ORDER_AMOUNT) {
-                throw new ApiException(ErrorCode.COMMENT_ORDER_AMOUNT_TOO_LARGE, t.authorName().trim());
+                throw new ApiException(ErrorCode.COMMENT_ORDER_AMOUNT_TOO_LARGE, nickname);
             }
             // 댓글 고객은 휴대폰을 모르므로 댓글 닉네임으로 알아본다
-            Customer customer = customers.byCommentNickname(groupBuy.getSeller().getId(), t.authorName().trim(), now);
+            Customer customer = customers.byCommentNickname(groupBuy.getSeller().getId(), nickname, now);
             CustomerOrder order = new CustomerOrder(groupBuy, groupBuy.nextOrderNo(maxOrderNo), OrderSource.COMMENT, customer,
                     Tokens.random(16), now);
             order.setNickname(t.authorName());

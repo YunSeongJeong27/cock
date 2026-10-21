@@ -161,7 +161,7 @@ public class GroupBuyService {
         GroupBuy groupBuy = lockOwned(sellerId, groupBuyId);
         LocalDateTime now = LocalDateTime.now(clock);
         String link = Texts.blankToNull(r.linkUrl());
-        if (link != null && !link.matches("(?i)^https?://\\S+$")) {
+        if (link != null && !Texts.isWebLink(link)) {
             throw new ApiException(ErrorCode.PAUSE_LINK_INVALID);
         }
         String message = Texts.blankToNull(r.message());
@@ -199,8 +199,7 @@ public class GroupBuyService {
             throw new ApiException(ErrorCode.PICKUP_PAYMENT_SETTING_REQUIRED);
         }
         String kakaoUrl = Texts.blankToNull(r.kakaoInquiryUrl());
-        if (kakaoUrl != null && !kakaoUrl.matches("(?i)^https?://\\S+$")) {
-            // javascript: 같은 주소가 고객 화면 링크로 들어가지 않게 한다
+        if (kakaoUrl != null && !Texts.isWebLink(kakaoUrl)) {
             throw new ApiException(ErrorCode.KAKAO_LINK_INVALID);
         }
         if (r.deliveryEnabled() && r.shippingFeeType() == ShippingFeeType.FIXED && r.shippingFee() <= 0) {
@@ -232,7 +231,7 @@ public class GroupBuyService {
         groupBuy.setShippingFee(feeType == ShippingFeeType.FIXED ? r.shippingFee() : 0);
         groupBuy.setOrderChannel(r.orderChannel());
         groupBuy.setUnitAddressFieldEnabled(r.unitAddressFieldEnabled());
-        groupBuy.setKakaoInquiryUrl(Texts.blankToNull(r.kakaoInquiryUrl()));
+        groupBuy.setKakaoInquiryUrl(kakaoUrl);
         groupBuy.setAdminNames(Texts.blankToNull(r.adminNames()));
         groupBuy.setUpdatedAt(now);
         syncProducts(groupBuy, r.products());

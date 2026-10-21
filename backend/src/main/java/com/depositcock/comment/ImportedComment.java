@@ -24,6 +24,10 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ImportedComment {
 
+    /** imported_comment.author_name·content 칸 길이 */
+    public static final int MAX_AUTHOR_NAME = 200;
+    public static final int MAX_CONTENT = 2000;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

@@ -117,7 +117,7 @@ public class ScreenshotService {
                 throw new ApiException(ErrorCode.SCREENSHOT_DATETIME_TOO_LONG, no);
             }
             lines.add(new DepositLine(no, r.name().trim(), r.amount(), Texts.blankToNull(r.datetimeText()),
-                    BankStatementReader.parseDateTimeText(r.datetimeText())));
+                    BankStatementReader.parseDateTime(r.datetimeText())));
         }
         if (lines.isEmpty()) {
             throw new ApiException(ErrorCode.SCREENSHOT_NOTHING_TO_SAVE);

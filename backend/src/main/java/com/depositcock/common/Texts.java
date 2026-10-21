@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public final class Texts {
 
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    private static final Pattern WEB_LINK = Pattern.compile("(?i)^https?://\\S+$");
 
     /** 앞뒤 공백을 지운 값. 비었거나 공백뿐이면 null */
     public static String blankToNull(String value) {
@@ -25,6 +26,11 @@ public final class Texts {
     /** 이름 비교용: 공백을 모두 지운다 ("김 지영" = "김지영"). null 이면 "" */
     public static String squash(String value) {
         return value == null ? "" : WHITESPACE.matcher(value).replaceAll("");
+    }
+
+    /** 고객 화면에 링크로 넣어도 되는 주소인지 (http·https 만. javascript: 같은 주소를 막는다) */
+    public static boolean isWebLink(String value) {
+        return value != null && WEB_LINK.matcher(value).matches();
     }
 
     /** DB 칸 길이(max)에 맞춰 뒤를 자른다 */
