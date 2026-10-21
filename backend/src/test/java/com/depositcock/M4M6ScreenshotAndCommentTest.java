@@ -206,8 +206,23 @@ class M4M6ScreenshotAndCommentTest extends IntegrationTest {
                 assertThat(s.get("captureToday").asInt()).isEqualTo(3);
                 assertThat(s.get("captureThisMonth").asInt()).isEqualTo(3);
                 assertThat(s.get("customCaptureLimit").asBoolean()).isTrue();
+                assertThat(s.get("groupBuyCount").asLong()).isEqualTo(1);
             }
         }
+        // 공구·캡처 사용이 없는 판매자는 0 (판매자별 한 번에 읽은 결과에 없는 판매자, 2026-10-21)
+        String idle = uniqueEmail();
+        signup(idle);
+        JsonNode withIdle = read(mvc.perform(get("/api/admin/sellers").cookie(admin)).andReturn());
+        boolean idleFound = false;
+        for (JsonNode s : withIdle) {
+            if (s.get("email").asText().equals(idle)) {
+                idleFound = true;
+                assertThat(s.get("groupBuyCount").asLong()).isZero();
+                assertThat(s.get("captureToday").asInt()).isZero();
+                assertThat(s.get("captureThisMonth").asInt()).isZero();
+            }
+        }
+        assertThat(idleFound).isTrue();
         // AI 가 꺼져 있으면 사용량을 세지 않는다 (올려도 차감 안 됨)
         when(visionExtractor.available()).thenReturn(false);
         mvc.perform(multipart(url).file(image("1.png")).cookie(seller))

@@ -12,6 +12,7 @@ import com.depositcock.common.Texts;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.PickupPoint;
 import com.depositcock.groupbuy.Product;
+import com.depositcock.groupbuy.ShippingFeeType;
 import com.depositcock.order.OrderDtos.DeliveryInput;
 import com.depositcock.order.OrderDtos.OrderItemRequest;
 import lombok.AccessLevel;
@@ -22,7 +23,7 @@ import lombok.NoArgsConstructor;
  * - 픽업·배송 둘 다 켜져 있으면 골라야 하고, 하나만 켜져 있으면 그것
  * - 배송은 선입금만. 픽업은 공구의 픽업 결제 설정(선입금·현장결제)을 따른다
  * - 픽업 지점이 2개 이상이면 골라야 한다
- * - 상품 수량·배송 정보 읽기도 두 곳이 같이 쓴다 (전에는 두 서비스에 같은 코드가 따로 있었음, 2026-10-21)
+ * - 상품 수량·배송 정보 읽기·배송비도 두 곳이 같이 쓴다 (전에는 두 서비스에 같은 코드가 따로 있었음, 2026-10-21)
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class OrderRules {
@@ -104,5 +105,11 @@ final class OrderRules {
             throw new ApiException(missingError);
         }
         return new Delivery(name, phone, Texts.blankToNull(r.zipcode()), address, Texts.blankToNull(r.addressDetail()));
+    }
+
+    /** 배송비: 배송 주문이고 공구가 고정 배송비일 때만 (새 주문·주문 변경이 같이 씀) */
+    static int shippingFee(GroupBuy groupBuy, ReceiveMethod receive) {
+        return receive == ReceiveMethod.DELIVERY && groupBuy.getShippingFeeType() == ShippingFeeType.FIXED
+                ? groupBuy.getShippingFee() : 0;
     }
 }

@@ -15,7 +15,6 @@ import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.PickupPoint;
 import com.depositcock.groupbuy.Product;
 import com.depositcock.groupbuy.ProductRepository;
-import com.depositcock.groupbuy.ShippingFeeType;
 import com.depositcock.groupbuy.StockAlerts;
 import jakarta.persistence.EntityManager;
 import lombok.AccessLevel;
@@ -143,8 +142,7 @@ final class OrderUpdate {
 
         // 3) 금액
         long itemsAmount = order.getItems().stream().mapToLong(i -> (long) i.getUnitPriceSnapshot() * i.getQuantity()).sum();
-        int shippingFee = v.receive() == ReceiveMethod.DELIVERY && groupBuy.getShippingFeeType() == ShippingFeeType.FIXED
-                ? groupBuy.getShippingFee() : 0;
+        int shippingFee = OrderRules.shippingFee(groupBuy, v.receive());
         if (itemsAmount + shippingFee > PublicOrderService.MAX_ORDER_AMOUNT) {
             throw new ApiException(ErrorCode.ORDER_AMOUNT_TOO_LARGE);
         }
@@ -205,7 +203,6 @@ final class OrderUpdate {
         }
         return method.getLabel() + "(" + point.getName() + ")";
     }
-
 
     private static String won(long amount) {
         return String.format("%,d원", amount);

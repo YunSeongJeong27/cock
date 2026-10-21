@@ -1,8 +1,8 @@
 package com.depositcock.vision;
 
-import com.depositcock.common.ErrorCode;
 import java.util.List;
 
+import com.depositcock.common.ErrorCode;
 import com.depositcock.common.ExternalApiException;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;

@@ -2,12 +2,16 @@ package com.depositcock.vision;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
 import com.depositcock.common.AppProperties;
 import com.depositcock.seller.Seller;
 import com.depositcock.seller.SellerRepository;
+import com.depositcock.vision.CaptureUsageRepository.SellerImages;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -47,16 +51,29 @@ public class CaptureUsageService {
     public Usage usage(Long sellerId) {
         Seller seller = sellerRepository.findById(sellerId)
                 .orElseThrow(() -> new ApiException(ErrorCode.LOGIN_REQUIRED));
-        return usage(seller);
-    }
-
-    /** 이미 읽은 판매자로 사용량을 계산한다 (관리자 목록에서 판매자를 다시 읽지 않게) */
-    @Transactional(readOnly = true)
-    public Usage usage(Seller seller) {
-        Long sellerId = seller.getId();
         LocalDate today = LocalDate.now(clock);
         int usedToday = usageRepository.findBySellerIdAndUsageDate(sellerId, today).map(CaptureUsage::getImageCount).orElse(0);
         int usedMonth = usageRepository.sumBetween(sellerId, today.withDayOfMonth(1), today);
+        return usage(seller, usedToday, usedMonth);
+    }
+
+    /**
+     * 여러 판매자의 사용량을 한 번에 읽는다 (관리자 판매자 목록). 전에는 판매자마다 오늘·이번 달을 따로 읽었음 (2026-10-21)
+     *
+     * @return 판매자 id → 사용량
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, Usage> usages(List<Seller> sellers) {
+        LocalDate today = LocalDate.now(clock);
+        Map<Long, Integer> usedToday = usageRepository.findByUsageDate(today).stream()
+                .collect(Collectors.toMap(CaptureUsage::getSellerId, CaptureUsage::getImageCount));
+        Map<Long, Integer> usedMonth = usageRepository.sumPerSellerBetween(today.withDayOfMonth(1), today).stream()
+                .collect(Collectors.toMap(SellerImages::getSellerId, s -> s.getCount().intValue()));
+        return sellers.stream().collect(Collectors.toMap(Seller::getId, s -> usage(s,
+                usedToday.getOrDefault(s.getId(), 0), usedMonth.getOrDefault(s.getId(), 0)), (a, b) -> a));
+    }
+
+    private Usage usage(Seller seller, int usedToday, int usedMonth) {
         int limit = effectiveLimit(seller);
         return new Usage(usedToday, usedMonth, limit, Math.max(0, limit - usedToday), seller.getDailyCaptureLimit() != null);
     }

@@ -185,8 +185,8 @@ public class ScreenshotService {
             }
         }
         if (firstError != null && failed.size() == files.size()) {
-            if (firstError instanceof ImageSlicer.UnusableImageException) {
-                throw ApiException.withMessage(((ImageSlicer.UnusableImageException) firstError).getCode(), firstError.getMessage());
+            if (firstError instanceof ImageSlicer.UnusableImageException unusable) {
+                throw ApiException.withMessage(unusable.getCode(), unusable.getMessage());
             }
             throw firstError;
         }
@@ -229,7 +229,7 @@ public class ScreenshotService {
         return Notice.VISION_NOT_CONFIGURED.text();
     }
 
-    private static List<MultipartFile> checked(List<MultipartFile> files) {
+    private static void checked(List<MultipartFile> files) {
         if (files == null || files.isEmpty()) {
             throw new ApiException(ErrorCode.IMAGE_REQUIRED);
         }
@@ -241,7 +241,6 @@ public class ScreenshotService {
                 throw new ApiException(ErrorCode.IMAGE_TYPE_NOT_ALLOWED, f.getOriginalFilename());
             }
         }
-        return files;
     }
 
     private static String mediaType(MultipartFile file) {

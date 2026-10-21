@@ -22,7 +22,6 @@ import com.depositcock.groupbuy.GroupBuyService;
 import com.depositcock.groupbuy.PickupPoint;
 import com.depositcock.groupbuy.Product;
 import com.depositcock.groupbuy.ProductRepository;
-import com.depositcock.groupbuy.ShippingFeeType;
 import com.depositcock.groupbuy.StockAlerts;
 import com.depositcock.notify.MailText;
 import com.depositcock.notify.SellerNotices;
@@ -238,17 +237,12 @@ public class PublicOrderService {
             order.addItem(new OrderItem(order, product, e.getValue()));
             itemsAmount += (long) product.getUnitPrice() * e.getValue();
         }
-        int shippingFee = shippingFee(groupBuy, v.receive());
+        int shippingFee = OrderRules.shippingFee(groupBuy, v.receive());
         if (itemsAmount + shippingFee > MAX_ORDER_AMOUNT) {
             throw new ApiException(ErrorCode.ORDER_AMOUNT_TOO_LARGE);
         }
         order.fillAmounts((int) itemsAmount, shippingFee);
         return orderRepository.save(order);
-    }
-
-    private static int shippingFee(GroupBuy groupBuy, ReceiveMethod receive) {
-        return receive == ReceiveMethod.DELIVERY && groupBuy.getShippingFeeType() == ShippingFeeType.FIXED
-                ? groupBuy.getShippingFee() : 0;
     }
 
     /**

@@ -5,12 +5,14 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
 import com.depositcock.common.AppProperties;
 import com.depositcock.common.Texts;
 import com.depositcock.groupbuy.GroupBuyRepository;
+import com.depositcock.groupbuy.GroupBuyRepository.SellerCount;
 import com.depositcock.vision.CaptureUsageService;
 import com.depositcock.seller.SellerDtos.AdminSellerRow;
 import com.depositcock.seller.SellerDtos.AdminUpdateRequest;
@@ -78,9 +80,14 @@ public class SellerService {
 
     public List<AdminSellerRow> listForAdmin() {
         LocalDateTime now = LocalDateTime.now(clock);
-        return sellerRepository.findAllByOrderByIdDesc().stream()
+        List<Seller> sellers = sellerRepository.findAllByOrderByIdDesc();
+        // 공구 수·캡처 사용량은 판매자마다 따로 읽지 않고 한 번에 읽는다 (전에는 판매자 1명당 3번 조회, 2026-10-21)
+        Map<Long, Long> groupBuyCounts = groupBuyRepository.countPerSeller().stream()
+                .collect(Collectors.toMap(SellerCount::getSellerId, SellerCount::getCount));
+        Map<Long, CaptureUsageService.Usage> usages = captureUsageService.usages(sellers);
+        return sellers.stream()
                 .map(s -> {
-                    CaptureUsageService.Usage usage = captureUsageService.usage(s);
+                    CaptureUsageService.Usage usage = usages.get(s.getId());
                     return AdminSellerRow.builder()
                             .id(s.getId())
                             .email(s.getEmail())
@@ -93,7 +100,7 @@ public class SellerService {
                             .suspended(s.isSuspended())
                             .adminMemo(s.getAdminMemo())
                             .createdAt(s.getCreatedAt())
-                            .groupBuyCount(groupBuyRepository.countBySellerId(s.getId()))
+                            .groupBuyCount(groupBuyCounts.getOrDefault(s.getId(), 0L))
                             .captureToday(usage.usedToday())
                             .captureThisMonth(usage.usedThisMonth())
                             .dailyCaptureLimit(usage.dailyLimit())

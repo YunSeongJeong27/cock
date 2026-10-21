@@ -1,10 +1,10 @@
 package com.depositcock.vision;
 
-import com.depositcock.common.ErrorCode;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
 
+import com.depositcock.common.ErrorCode;
 import com.depositcock.common.ExternalApiException;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.AnthropicChatOptions;

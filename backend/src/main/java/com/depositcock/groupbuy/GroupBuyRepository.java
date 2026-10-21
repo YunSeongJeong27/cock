@@ -19,7 +19,15 @@ public interface GroupBuyRepository extends JpaRepository<GroupBuy, Long> {
 
     Optional<GroupBuy> findByPublicToken(String publicToken);
 
-    long countBySellerId(Long sellerId);
+    /** 판매자별 공구 수 (관리자 판매자 목록에서 판매자마다 따로 세지 않게) */
+    @Query("select g.seller.id as sellerId, count(g) as count from GroupBuy g group by g.seller.id")
+    List<SellerCount> countPerSeller();
+
+    interface SellerCount {
+        Long getSellerId();
+
+        Long getCount();
+    }
 
     /** 주문 생성 시 공구 행을 잠가 주문번호가 겹치지 않게 한다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
