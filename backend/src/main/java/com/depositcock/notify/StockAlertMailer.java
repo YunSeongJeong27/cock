@@ -1,8 +1,8 @@
 package com.depositcock.notify;
 
 import com.depositcock.common.Notice;
-import com.depositcock.groupbuy.StockAlerts;
 import com.depositcock.groupbuy.StockAlerts.StockAlertEvent;
+import com.depositcock.groupbuy.StockAlerts;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;

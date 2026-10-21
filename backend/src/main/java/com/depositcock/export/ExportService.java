@@ -3,7 +3,6 @@ package com.depositcock.export;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import com.depositcock.deposit.DepositDtos.AnnouncementLine;
 import com.depositcock.deposit.DepositDtos.AnnouncementResponse;
@@ -51,7 +50,7 @@ public class ExportService {
                         .displayName(displayName(o))
                         .nickname(o.getNickname())
                         .depositorName(o.getDepositorName())
-                        .itemsText(itemsText(o))
+                        .itemsText(o.itemsText())
                         .paidAt(o.getPaidAt())
                         .pickedUp(o.isPickedUp())
                         .build())
@@ -72,10 +71,5 @@ public class ExportService {
 
     private static String displayName(CustomerOrder o) {
         return o.getNickname() != null && !o.getNickname().isBlank() ? o.getNickname() : o.getDepositorName();
-    }
-
-    private static String itemsText(CustomerOrder o) {
-        return o.getItems().stream().map(i -> i.getProductNameSnapshot() + " " + i.getQuantity() + "개")
-                .collect(Collectors.joining(", "));
     }
 }

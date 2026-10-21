@@ -32,14 +32,14 @@ public class AuthController {
     public MeResponse signup(@Valid @RequestBody SignupRequest request, HttpServletResponse response) {
         Seller seller = sellerService.signup(request);
         tokenService.writeCookie(response, tokenService.issue(seller));
-        return MeResponse.of(seller, LocalDateTime.now(clock), featureAccess.commentsAllowed(seller));
+        return toMe(seller);
     }
 
     @PostMapping("/api/auth/login")
     public MeResponse login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
         Seller seller = sellerService.login(request.email(), request.password());
         tokenService.writeCookie(response, tokenService.issue(seller));
-        return MeResponse.of(seller, LocalDateTime.now(clock), featureAccess.commentsAllowed(seller));
+        return toMe(seller);
     }
 
     @PostMapping("/api/auth/logout")

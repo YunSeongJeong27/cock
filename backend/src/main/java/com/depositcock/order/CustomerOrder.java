@@ -4,16 +4,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import com.depositcock.customer.Customer;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.PickupPoint;
 import jakarta.persistence.CascadeType;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import org.hibernate.annotations.DynamicUpdate;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -27,6 +23,11 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * 주문 1건. 입금·수령 상태는 주문 단위로 관리한다 (개발 전 인터뷰 결과 3번).
@@ -105,7 +106,7 @@ public class CustomerOrder {
     @Column(nullable = false)
     private OrderStatus status;
 
-    /** 판매자가 주문 내용을 바꾼 기록 (오래된 순) */
+    /** 판매자·고객이 주문 내용을 바꾼 기록 (오래된 순, 누가 바꿨는지는 changedBy) */
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     @OrderBy("id")
     private List<OrderChange> changes = new ArrayList<>();
@@ -281,7 +282,7 @@ public class CustomerOrder {
         }
     }
 
-    /** 판매자가 환불 신청을 받아들임: 취소 + 환불 필요 (입금 확인 전 신고만 된 주문도 고객이 입금했다고 했으므로) */
+    /** 판매자가 환불 신청을 받아들임: 취소 + 환불 필요 (주문 확정 전이라도 고객이 입금했다며 환불을 신청한 것이므로) */
     public void cancelForRefund(LocalDateTime now) {
         this.refundRequired = true;
         cancel(now);
@@ -360,6 +361,12 @@ public class CustomerOrder {
 
     public int totalQuantity() {
         return items.stream().mapToInt(OrderItem::getQuantity).sum();
+    }
+
+    /** 상품·수량 한 줄: "파프리카 2개, 차돌 1개" (입금 확인 문구·알림 메일이 같이 씀) */
+    public String itemsText() {
+        return items.stream().map(i -> i.getProductNameSnapshot() + " " + i.getQuantity() + "개")
+                .collect(Collectors.joining(", "));
     }
 
     public Long getCustomerId() {

@@ -13,13 +13,14 @@ import lombok.NoArgsConstructor;
 public final class PhoneNumbers {
 
     private static final Pattern MOBILE = Pattern.compile("^01[016789]\\d{7,8}$");
+    private static final Pattern NON_DIGIT = Pattern.compile("\\D");
 
     /** 숫자만 남긴다. 휴대폰 번호 형식이 아니면 null. */
     public static String normalize(String raw) {
         if (raw == null) {
             return null;
         }
-        String digits = raw.replaceAll("\\D", "");
+        String digits = NON_DIGIT.matcher(raw).replaceAll("");
         if (digits.startsWith("82") && digits.length() >= 11) {
             digits = "0" + digits.substring(2);
         }

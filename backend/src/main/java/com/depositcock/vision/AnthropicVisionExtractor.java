@@ -131,25 +131,32 @@ public class AnthropicVisionExtractor implements VisionExtractor {
 
     @Override
     public List<ExtractedDeposit> extractDeposits(byte[] image, String mediaType) {
-        DepositList result = call(image, mediaType, DEPOSIT_PROMPT, DepositList.class);
-        return result == null || result.deposits() == null ? List.of() : result.deposits();
+        return deposits(image, mediaType, DEPOSIT_PROMPT);
     }
 
     @Override
     public List<ExtractedComment> extractComments(byte[] image, String mediaType) {
-        CommentList result = call(image, mediaType, COMMENT_PROMPT, CommentList.class);
-        return result == null || result.comments() == null ? List.of() : result.comments();
+        return comments(image, mediaType, COMMENT_PROMPT);
     }
 
     @Override
     public List<ExtractedDeposit> extractDepositsFromPiece(byte[] image, String mediaType) {
-        DepositList result = call(image, mediaType, DEPOSIT_PROMPT + PIECE_NOTE, DepositList.class);
-        return result == null || result.deposits() == null ? List.of() : result.deposits();
+        return deposits(image, mediaType, DEPOSIT_PROMPT + PIECE_NOTE);
     }
 
     @Override
     public List<ExtractedComment> extractCommentsFromPiece(byte[] image, String mediaType) {
-        CommentList result = call(image, mediaType, COMMENT_PROMPT + PIECE_NOTE, CommentList.class);
+        return comments(image, mediaType, COMMENT_PROMPT + PIECE_NOTE);
+    }
+
+    /** 모델이 빈 응답·빈 배열을 주면 빈 목록 */
+    private List<ExtractedDeposit> deposits(byte[] image, String mediaType, String prompt) {
+        DepositList result = call(image, mediaType, prompt, DepositList.class);
+        return result == null || result.deposits() == null ? List.of() : result.deposits();
+    }
+
+    private List<ExtractedComment> comments(byte[] image, String mediaType, String prompt) {
+        CommentList result = call(image, mediaType, prompt, CommentList.class);
         return result == null || result.comments() == null ? List.of() : result.comments();
     }
 

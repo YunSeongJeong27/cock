@@ -39,23 +39,21 @@ public class TokenService {
     }
 
     public void writeCookie(HttpServletResponse response, String token) {
-        ResponseCookie cookie = ResponseCookie.from(SecurityConfig.TOKEN_COOKIE, token)
-                .httpOnly(true)
-                .secure(properties.cookieSecure())
-                .sameSite("Lax")
-                .path("/")
-                .maxAge(Duration.ofHours(properties.jwtTtlHours()))
-                .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        setCookie(response, token, Duration.ofHours(properties.jwtTtlHours()));
     }
 
     public void clearCookie(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from(SecurityConfig.TOKEN_COOKIE, "")
+        setCookie(response, "", Duration.ZERO);
+    }
+
+    /** 로그인 쿠키 (넣을 때·지울 때 같은 속성이어야 브라우저가 같은 쿠키로 본다) */
+    private void setCookie(HttpServletResponse response, String value, Duration maxAge) {
+        ResponseCookie cookie = ResponseCookie.from(SecurityConfig.TOKEN_COOKIE, value)
                 .httpOnly(true)
                 .secure(properties.cookieSecure())
                 .sameSite("Lax")
                 .path("/")
-                .maxAge(0)
+                .maxAge(maxAge)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }

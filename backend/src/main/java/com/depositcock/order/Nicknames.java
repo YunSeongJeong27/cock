@@ -2,6 +2,7 @@ package com.depositcock.order;
 
 import java.util.Locale;
 
+import com.depositcock.common.Texts;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -18,7 +19,7 @@ public final class Nicknames {
         if (nickname == null) {
             return null;
         }
-        String key = nickname.replaceAll("\\s+", "").toLowerCase(Locale.ROOT);
+        String key = Texts.squash(nickname).toLowerCase(Locale.ROOT);
         return key.isEmpty() ? null : key;
     }
 }

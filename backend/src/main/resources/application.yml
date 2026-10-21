@@ -53,7 +53,7 @@ app:
   admin-password: ${APP_ADMIN_PASSWORD:}
   # 공개 주문 API: IP 하나당 1분에 허용하는 요청 수
   public-rate-limit-per-minute: 60
-  # 본인 확인·주문 취소: (IP + 공구)마다 10분에 허용하는 요청 수 (뒷4자리 대입 방지)
+  # 본인 확인·주문 취소·환불 신청: (IP + 공구)마다 10분에 허용하는 요청 수 (휴대폰 번호를 하나씩 넣어보는 시도 방지)
   sensitive-rate-limit-per-10-minutes: 20
   # 메일 보내는 사람 (비우면 SPRING_MAIL_USERNAME), 메일 속 링크용 서비스 주소 (예: https://입금콕.kr)
   mail-from: ${APP_MAIL_FROM:}

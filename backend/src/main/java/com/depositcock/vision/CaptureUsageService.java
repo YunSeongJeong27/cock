@@ -7,8 +7,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.depositcock.common.ApiException;
-import com.depositcock.common.ErrorCode;
 import com.depositcock.common.AppProperties;
+import com.depositcock.common.ErrorCode;
 import com.depositcock.seller.Seller;
 import com.depositcock.seller.SellerRepository;
 import com.depositcock.vision.CaptureUsageRepository.SellerImages;

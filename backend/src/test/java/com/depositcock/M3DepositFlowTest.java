@@ -189,6 +189,13 @@ class M3DepositFlowTest extends IntegrationTest {
                 .andExpect(jsonPath("$.parsed.message").exists());
         mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/uploads").file(csv(content)).cookie(seller))
                 .andExpect(status().isBadRequest());
+        // 화면의 "열 직접 지정": 요청 칸으로 열 이름을 보내면 그 열로 읽는다 (프리셋 없이)
+        mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/preview").file(csv(content))
+                        .param("nameColumn", "보낸 사람 이름").param("amountColumn", "들어온 돈").cookie(seller))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.parsed.autoDetected").value(false))
+                .andExpect(jsonPath("$.parsed.mapping.nameColumn").value("보낸 사람 이름"))
+                .andExpect(jsonPath("$.parsed.deposits.length()").value(1));
 
         JsonNode preset = read(mvc.perform(withJson(post("/api/seller/bank-columns/presets").cookie(seller),
                 Map.of("name", "우리동네은행", "nameColumn", "보낸 사람 이름", "amountColumn", "들어온 돈"))).andReturn());

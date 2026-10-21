@@ -6,7 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
@@ -215,7 +214,6 @@ class PublicPage {
 
     /** 알림 메일 한 줄: 상품·금액만 (이름·연락처·계좌는 메일에 넣지 않는다, 판매자 화면에서 봄) */
     static String noticeLine(CustomerOrder order) {
-        return order.getItems().stream().map(i -> i.getProductNameSnapshot() + " " + i.getQuantity() + "개")
-                .collect(Collectors.joining(", ")) + " · " + String.format("%,d원", order.getExpectedAmount());
+        return order.itemsText() + " · " + String.format("%,d원", order.getExpectedAmount());
     }
 }

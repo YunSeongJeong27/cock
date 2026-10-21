@@ -41,26 +41,20 @@ public class DepositController {
                 BankStatementReader.AMOUNT_CANDIDATES, BankStatementReader.TYPE_CANDIDATES);
     }
 
+    /**
+     * 열을 직접 지정할 때는 요청 칸 dateColumn·nameColumn·amountColumn·typeColumn 을 ColumnMapping 으로 묶어 받는다
+     * (없으면 모두 null → 자동 탐지). 전에는 두 메서드가 칸 4개를 따로 받아 직접 묶었음 (2026-10-21)
+     */
     @PostMapping(BASE + "/preview")
     public PreviewResponse preview(@PathVariable Long groupBuyId, @RequestPart("file") MultipartFile file,
-                                   @RequestParam(required = false) String dateColumn,
-                                   @RequestParam(required = false) String nameColumn,
-                                   @RequestParam(required = false) String amountColumn,
-                                   @RequestParam(required = false) String typeColumn,
-                                   @RequestParam(required = false) Long presetId) {
-        return service.preview(CurrentSeller.id(), groupBuyId, file,
-                new ColumnMapping(dateColumn, nameColumn, amountColumn, typeColumn), presetId);
+                                   ColumnMapping mapping, @RequestParam(required = false) Long presetId) {
+        return service.preview(CurrentSeller.id(), groupBuyId, file, mapping, presetId);
     }
 
     @PostMapping(BASE + "/uploads")
     public UploadResponse upload(@PathVariable Long groupBuyId, @RequestPart("file") MultipartFile file,
-                                 @RequestParam(required = false) String dateColumn,
-                                 @RequestParam(required = false) String nameColumn,
-                                 @RequestParam(required = false) String amountColumn,
-                                 @RequestParam(required = false) String typeColumn,
-                                 @RequestParam(required = false) Long presetId) {
-        return service.upload(CurrentSeller.id(), groupBuyId, file,
-                new ColumnMapping(dateColumn, nameColumn, amountColumn, typeColumn), presetId);
+                                 ColumnMapping mapping, @RequestParam(required = false) Long presetId) {
+        return service.upload(CurrentSeller.id(), groupBuyId, file, mapping, presetId);
     }
 
     @GetMapping(BASE + "/uploads")
