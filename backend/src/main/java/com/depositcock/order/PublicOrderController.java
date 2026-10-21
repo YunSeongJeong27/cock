@@ -36,6 +36,7 @@ public class PublicOrderController {
     private static final Duration COOKIE_AGE = Duration.ofDays(365);
 
     private final PublicOrderService service;
+    private final CustomerCancelService cancelService;
     private final AppProperties properties;
 
     @GetMapping
@@ -62,14 +63,14 @@ public class PublicOrderController {
     @PostMapping("/cancel")
     public PublicGroupBuy cancel(@PathVariable String token, @Valid @RequestBody CancelRequest body,
                                  HttpServletRequest request) {
-        return service.cancel(token, readCookie(request, token), body);
+        return cancelService.cancel(token, readCookie(request, token), body);
     }
 
     /** 입금 후 환불 신청 (판매자가 확인 후 취소·환불) */
     @PostMapping("/refund-request")
     public PublicGroupBuy refundRequest(@PathVariable String token, @Valid @RequestBody RefundRequest body,
                                         HttpServletRequest request) {
-        return service.requestRefund(token, readCookie(request, token), body);
+        return cancelService.requestRefund(token, readCookie(request, token), body);
     }
 
     static String cookieName(String token) {
