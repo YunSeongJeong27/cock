@@ -178,8 +178,7 @@ public class DepositService {
         Map<Long, CustomerOrder> orderById = orders.stream().collect(Collectors.toMap(CustomerOrder::getId, Function.identity()));
         List<Payee> payees = orders.stream()
                 .filter(o -> o.isActive() && o.isPrepaid() && !o.isPaid())
-                .map(o -> new Payee(o.getId(), o.getCustomerId(), o.getDepositorName(), o.getNickname(),
-                        o.getExpectedAmount(), o.getOrderedAt()))
+                .map(DepositService::payee)
                 .toList();
         List<DepositRow> rows = rowRepository.findByGroupBuyId(groupBuy.getId());
         Map<Long, Long> orderByRow = new HashMap<>();
@@ -192,8 +191,7 @@ public class DepositService {
         // 대조 대상은 아니지만, 입금자가 이미 입금 확인된 주문·취소된 주문의 입금자인지 알려주는 데 쓴다
         List<Known> known = orders.stream()
                 .filter(o -> o.isPrepaid() && (o.isPaid() || !o.isActive()))
-                .map(o -> new Known(new Payee(o.getId(), o.getCustomerId(), o.getDepositorName(), o.getNickname(),
-                        o.getExpectedAmount(), o.getOrderedAt()), o.isActive() ? Relation.PAID : Relation.CANCELLED))
+                .map(o -> new Known(payee(o), o.isActive() ? Relation.PAID : Relation.CANCELLED))
                 .toList();
         Outcome outcome = DepositMatcher.match(payees, known, deposits, aliasMap(sellerId));
 
@@ -458,6 +456,12 @@ public class DepositService {
         } catch (IOException e) {
             throw new ApiException(ErrorCode.FILE_UNREADABLE);
         }
+    }
+
+    /** 대조에 쓰는 주문 모양 (대조 대상 주문·이미 입금 확인된 주문·취소된 주문 모두 같음) */
+    private static Payee payee(CustomerOrder o) {
+        return new Payee(o.getId(), o.getCustomerId(), o.getDepositorName(), o.getNickname(), o.getExpectedAmount(),
+                o.getOrderedAt());
     }
 
     static OrderBrief brief(CustomerOrder o) {
