@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.depositcock.groupbuy.GroupBuyDtos.PickupPointResponse;
+import com.depositcock.groupbuy.Product;
 import com.depositcock.groupbuy.ShippingFeeType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -87,6 +88,10 @@ public final class OrderDtos {
      */
     public record PublicProduct(Long id, String name, int unitPrice, Integer remaining, Integer perOrderLimit,
                                 boolean blockWhenSoldOut, boolean soldOut) {
+        public static PublicProduct of(Product p) {
+            return new PublicProduct(p.getId(), p.getName(), p.getUnitPrice(), p.publicRemaining(), p.getPerOrderLimit(),
+                    p.isBlockWhenSoldOut(), p.isSoldOut());
+        }
     }
 
     public record AccountInfo(String bankName, String accountNumber, String accountHolder) {

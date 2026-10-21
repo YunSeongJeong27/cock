@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import com.depositcock.common.ApiException;
@@ -25,6 +26,7 @@ import com.depositcock.customer.Customers;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.GroupBuyDtos.PickupPointResponse;
 import com.depositcock.groupbuy.GroupBuyRepository;
+import com.depositcock.groupbuy.GroupBuyService;
 import com.depositcock.groupbuy.GroupBuyStatus;
 import com.depositcock.groupbuy.PickupPoint;
 import com.depositcock.groupbuy.Product;
@@ -62,6 +64,7 @@ import org.springframework.web.ErrorResponseException;
 public class PublicOrderService {
 
     private final GroupBuyRepository groupBuyRepository;
+    private final GroupBuyService groupBuyService;
     private final ProductRepository productRepository;
     private final CustomerOrderRepository orderRepository;
     private final CustomerDeviceRepository deviceRepository;
@@ -73,10 +76,10 @@ public class PublicOrderService {
     private final DataCipher cipher;
     private final SellerNotices notices;
 
-    /** 공개 화면 결과 + 쿠키에 새로 넣을 토큰(있으면) */
     /** 주문 1건 금액 상한 (int 넘침 방지). 공구 주문으로 1억원은 넘지 않는다고 본다 [판단] */
     public static final long MAX_ORDER_AMOUNT = 100_000_000L;
 
+    /** 공개 화면 결과 + 쿠키에 새로 넣을 토큰(있으면) */
     public record WithCookie<T>(T body, String cookieToken) {
     }
 
@@ -412,7 +415,7 @@ public class PublicOrderService {
 
     /** 고른 주문번호의 주문, 아니면 조건에 맞는 주문이 하나일 때 그 주문. 여러 건이면 409 + 주문 목록(orders) */
     private static CustomerOrder pick(List<CustomerOrder> matches, Integer orderNo,
-                                      java.util.function.Predicate<CustomerOrder> eligible, ErrorCode choose,
+                                      Predicate<CustomerOrder> eligible, ErrorCode choose,
                                       ErrorCode none) {
         if (orderNo != null) {
             return matches.stream().filter(o -> o.getOrderNo() == orderNo).findFirst()
@@ -448,10 +451,9 @@ public class PublicOrderService {
         }
     }
 
+    /** 공구 행을 잠그고 다시 읽는다 (GroupBuyService.lock 과 같은 코드가 여기에도 있던 것을 그쪽으로 모음) */
     private GroupBuy lock(GroupBuy groupBuy) {
-        groupBuyRepository.findByIdForUpdate(groupBuy.getId());
-        entityManager.refresh(groupBuy);
-        return groupBuy;
+        return groupBuyService.lock(groupBuy);
     }
 
     private Optional<CustomerDevice> device(GroupBuy groupBuy, String cookieToken) {
@@ -544,8 +546,10 @@ public class PublicOrderService {
     private PublicGroupBuy toPublic(GroupBuy g, CustomerDevice device, LocalDateTime now) {
         boolean accepting = g.isAcceptingOrders(now);
         String closedReason = accepting ? null : Notice.ORDER_CLOSED.text();
-        List<MyOrder> myOrders = myOrders(g, device, now);
-        Prefill prefill = prefill(g, device);
+        // 이 기기가 볼 수 있는 주문을 한 번만 읽어 "내 주문"과 자동 채움에 같이 쓴다 (전에는 각각 다시 읽었음, 2026-10-21)
+        List<CustomerOrder> visible = visibleOrders(g, device);
+        List<MyOrder> myOrders = myOrders(device, visible, accepting);
+        Prefill prefill = prefill(device, visible);
         return PublicGroupBuy.builder()
                 .title(g.getTitle())
                 .description(g.getDescription())
@@ -553,7 +557,7 @@ public class PublicOrderService {
                 .acceptingOrders(accepting)
                 .closedReason(closedReason)
                 .closeAt(g.getCloseAt())
-                .products(g.sortedProducts().stream().map(p -> new PublicProduct(p.getId(), p.getName(), p.getUnitPrice(), p.publicRemaining(), p.getPerOrderLimit(), p.isBlockWhenSoldOut(), p.isSoldOut())).toList())
+                .products(g.sortedProducts().stream().map(PublicProduct::of).toList())
                 .pickupPoints(g.sortedPickupPoints().stream().map(PickupPointResponse::of).toList())
                 .pickupEnabled(g.isPickupEnabled())
                 .pickupPrepayEnabled(g.isPickupPrepayEnabled())
@@ -574,8 +578,11 @@ public class PublicOrderService {
     }
 
     private List<MyOrder> myOrders(GroupBuy g, CustomerDevice device, LocalDateTime now) {
-        boolean accepting = g.isAcceptingOrders(now);
-        return visibleOrders(g, device).stream()
+        return myOrders(device, visibleOrders(g, device), g.isAcceptingOrders(now));
+    }
+
+    private static List<MyOrder> myOrders(CustomerDevice device, List<CustomerOrder> visible, boolean accepting) {
+        return visible.stream()
                 .sorted(Comparator.comparingInt(CustomerOrder::getOrderNo).reversed())
                 .map(o -> OrderMapper.toMyOrder(o, accepting, accepting && o.isReplaceableByCustomer()
                         ? prefillOf(o, o.getDeviceToken() != null && o.getDeviceToken().equals(device.getCookieToken()))
@@ -588,14 +595,14 @@ public class PublicOrderService {
      * 휴대폰 전체 번호·동호수·배송지는 이 기기에서 넣은 주문에서만 가져온다.
      * 본인 확인만 거친 기기(다른 기기에서 주문)에는 입금자명·닉네임·수령 방법만 채운다 (limited).
      */
-    private Prefill prefill(GroupBuy g, CustomerDevice device) {
+    private static Prefill prefill(CustomerDevice device, List<CustomerOrder> visible) {
         if (device == null) {
             return null;
         }
-        List<CustomerOrder> own = orderRepository.findByGroupBuyIdAndDeviceTokenOrderByOrderNoAsc(g.getId(),
-                device.getCookieToken());
+        // 볼 수 있는 주문에는 이 기기에서 넣은 주문이 모두 들어 있다 (visibleOrders)
+        List<CustomerOrder> own = visible.stream().filter(o -> device.getCookieToken().equals(o.getDeviceToken())).toList();
         boolean fromOwn = !own.isEmpty();
-        List<CustomerOrder> orders = fromOwn ? own : visibleOrders(g, device);
+        List<CustomerOrder> orders = fromOwn ? own : visible;
         if (orders.isEmpty()) {
             return null;
         }
@@ -607,18 +614,11 @@ public class PublicOrderService {
         Long pointId = o.getPickupPoint() == null ? null : o.getPickupPoint().getId();
         if (!full) {
             return Prefill.builder()
-                    .phone(null)
                     .depositorName(o.getDepositorName())
                     .nickname(o.getNickname())
-                    .unitAddress(null)
                     .receiveMethod(o.getReceiveMethod())
                     .pickupPointId(pointId)
                     .paymentMethod(o.getPaymentMethod())
-                    .recipientName(null)
-                    .recipientPhone(null)
-                    .zipcode(null)
-                    .address(null)
-                    .addressDetail(null)
                     .limited(true)
                     .build();
         }
