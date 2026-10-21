@@ -14,6 +14,7 @@ import com.depositcock.order.PaymentMethod;
 import com.depositcock.order.PhoneNumbers;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.IndexedColors;
@@ -27,12 +28,15 @@ import org.springframework.stereotype.Component;
  * 주문 정리표 xlsx (정리본 9장). 판매자가 내려받아 쓰는 파일이다 (은행 거래내역과 별개).
  * 열: 주문번호, 닉네임, 상품별 수량, 금액, 결제 방식, 입금 여부, 입금자명, 수령, 확인필요 (+ 선택: 연락처·배송지 열)
  * - 시트 이름은 WorkbookUtil.createSafeSheetName
- * - autoSizeColumn 은 서버에 폰트가 없으면 실패할 수 있어 쓰지 않고 고정 폭을 쓴다.
+ * - 열 너비는 칸 내용 길이에 맞춘다 (fitColumns)
  */
 @Component
 public class OrderSheetExcelWriter {
 
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    /** 열 너비 상한 (글자 수). 긴 주소도 이 폭에서 잘려 보이고 칸을 누르면 다 보인다 */
+    private static final int MAX_COLUMN_WIDTH = 60;
 
     public byte[] write(GroupBuy groupBuy, List<CustomerOrder> orders, boolean includeContact) {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -80,7 +84,6 @@ public class OrderSheetExcelWriter {
             Cell cell = header.createCell(i);
             cell.setCellValue(headers.get(i));
             cell.setCellStyle(headerStyle);
-            sheet.setColumnWidth(i, columnWidth(headers.get(i)));
         }
         sheet.createFreezePane(0, 1);
 
@@ -136,6 +139,32 @@ public class OrderSheetExcelWriter {
         for (Cell cell : total) {
             cell.setCellStyle(cell.getColumnIndex() == 2 + products.size() ? moneyStyle : headerStyle);
         }
+        fitColumns(sheet, headers.size());
+    }
+
+    /**
+     * 열 너비를 칸에 보이는 글자(금액은 "3,800"처럼 서식 적용 뒤)의 가장 긴 길이에 맞춘다.
+     * 한글·한자는 영문·숫자의 2칸으로 센다. 글자 수로 재므로 서버에 깔린 폰트와 상관없이 같은 너비가 나온다
+     */
+    private static void fitColumns(Sheet sheet, int columns) {
+        DataFormatter formatter = new DataFormatter();
+        int[] widths = new int[columns];
+        for (Row row : sheet) {
+            for (Cell cell : row) {
+                int i = cell.getColumnIndex();
+                widths[i] = Math.max(widths[i], displayWidth(formatter.formatCellValue(cell)));
+            }
+        }
+        for (int i = 0; i < columns; i++) {
+            // 앞뒤 여백 2칸, 아주 짧은 열도 최소 6칸
+            sheet.setColumnWidth(i, Math.min(MAX_COLUMN_WIDTH, Math.max(6, widths[i] + 2)) * 256);
+        }
+    }
+
+    static int displayWidth(String text) {
+        return text.codePoints()
+                .map(c -> Character.UnicodeScript.of(c) == Character.UnicodeScript.HANGUL || Character.isIdeographic(c) ? 2 : 1)
+                .sum();
     }
 
     private static List<String> checks(CustomerOrder o) {
@@ -167,15 +196,6 @@ public class OrderSheetExcelWriter {
     private static int quantity(CustomerOrder o, Product product) {
         return o.getItems().stream().filter(i -> i.getProduct().getId().equals(product.getId()))
                 .mapToInt(OrderItem::getQuantity).sum();
-    }
-
-    private static int columnWidth(String header) {
-        return switch (header) {
-            case "주소", "상세주소" -> 40 * 256;
-            case "주문 시각", "확인필요" -> 18 * 256;
-            case "닉네임", "입금자명", "휴대폰", "받는 분 연락처", "주문 상태", "입금 여부" -> 16 * 256;
-            default -> Math.max(10, Math.min(24, header.length() * 2 + 4)) * 256;
-        };
     }
 
     private static String safeTitle(String title) {

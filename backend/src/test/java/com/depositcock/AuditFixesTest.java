@@ -10,6 +10,7 @@ import com.depositcock.support.IntegrationTest;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.servlet.http.Cookie;
 import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
@@ -139,6 +140,33 @@ class AuditFixesTest extends IntegrationTest {
             List<String> names = new ArrayList<>();
             header.forEach(c -> names.add(c.getStringCellValue()));
             assertThat(names).contains("수령 방법", "픽업 지점").doesNotContain("휴대폰", "주소");
+        }
+    }
+
+    /** 열 너비는 칸 내용 길이에 맞춘다 (한글 2칸, 영문·숫자 1칸, 여백 2칸, 최소 6칸·최대 60칸) */
+    @Test
+    void excelColumnWidthFollowsContent() throws Exception {
+        Map<String, Object> body = groupBuyBody("엑셀 너비", List.of(product("상품", 1000, null)));
+        body.put("deliveryEnabled", true);
+        Opened g = open(body);
+        String address = "서울특별시 강남구 테헤란로 123 상가동 4층"; // 한글 16자(32칸) + 공백·숫자 9칸 = 41칸
+        Map<String, Object> delivery = order(g.productId(), "010-9700-0002", "나");
+        delivery.put("receiveMethod", "DELIVERY");
+        delivery.put("paymentMethod", "PREPAID");
+        delivery.put("recipientName", "나");
+        delivery.put("recipientPhone", "010-9700-0003");
+        delivery.put("address", address);
+        mvc.perform(withJson(post("/api/public/g/" + g.token() + "/orders"), delivery)).andExpect(status().isOk());
+        byte[] xlsx = mvc.perform(get("/api/seller/group-buys/" + g.id() + "/export.xlsx").param("includeContact", "true")
+                        .cookie(g.seller()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        try (Workbook wb = new XSSFWorkbook(new ByteArrayInputStream(xlsx))) {
+            Sheet sheet = wb.getSheetAt(0);
+            Map<String, Integer> width = new HashMap<>();
+            sheet.getRow(0).forEach(c -> width.put(c.getStringCellValue(), sheet.getColumnWidth(c.getColumnIndex()) / 256));
+            assertThat(width.get("주소")).isEqualTo(41 + 2);
+            assertThat(width.get("주문번호")).isEqualTo(8 + 2);          // 머리줄 "주문번호" 한글 4자
+            assertThat(width.get("금액")).isEqualTo(5 + 2);              // 금액 서식 적용 뒤 "1,000"
         }
     }
 }

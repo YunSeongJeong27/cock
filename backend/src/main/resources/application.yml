@@ -9,9 +9,8 @@ spring:
       ddl-auto: validate
     properties:
       hibernate:
-        # hibernate.jdbc.time_zone 은 쓰지 않는다 (2026-10-14): 서버 기본 시간대가 UTC 이면 LocalDateTime(한국 시각)이
-        # DB 에 9시간 밀려 저장됐다. 앱은 한국 시각(LocalDateTime)을 그대로 저장하고, 서버 기본 시간대도 한국으로 맞춘다
-        # (DepositcockApplication).
+        # 시간대: 앱은 한국 시각(LocalDateTime)을 그대로 저장하고 서버 기본 시간대도 한국으로 맞춘다 (DepositcockApplication).
+        # hibernate.jdbc.time_zone 을 넣었을 때 서버 기본 시간대가 UTC 이면 DB 에 9시간 밀려 저장되는 것을 확인해서 넣지 않았다 (2026-10-14)
         # 지연 로딩 N+1 완화 (주문 목록 → 주문 상품, 픽업 지점 등을 묶어서 읽음)
         default_batch_fetch_size: 100
   flyway:
