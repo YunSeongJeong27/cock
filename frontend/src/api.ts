@@ -1,5 +1,6 @@
 // 백엔드 API 호출. 로그인 토큰은 httpOnly 쿠키라 JS 에서 다루지 않는다 (credentials: 'include').
 import { commonText } from './texts/common'
+import type { SellerOrder } from './types'
 
 /** 서버 오류 응답: message = detail (화면에 보여줄 문구), code = 서버 ErrorCode 이름 */
 export class ApiError extends Error {
@@ -61,6 +62,16 @@ export function errorMessage(e: unknown): string {
   if (e instanceof ApiError) return e.message
   if (e instanceof Error) return e.message
   return String(e)
+}
+
+/** 이름 비교용: 공백을 모두 지운다 ("김 지영" = "김지영", 서버 Texts.squash 와 같음) */
+export function squash(v: string | null | undefined): string {
+  return (v ?? '').replace(/\s+/g, '')
+}
+
+/** 판매자 확인을 기다리는 고객 환불 신청 (주문 목록·수령 체크가 같이 씀) */
+export function refundPending(o: SellerOrder): boolean {
+  return o.active && o.refundRequestedAt !== null && o.refundRejectedAt === null
 }
 
 export function won(n: number | null | undefined): string {

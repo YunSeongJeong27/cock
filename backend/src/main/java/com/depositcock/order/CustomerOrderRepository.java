@@ -19,6 +19,8 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     List<CustomerOrder> findByGroupBuyIdAndSource(Long groupBuyId, OrderSource source);
 
+    boolean existsByGroupBuyIdAndSourceAndStatus(Long groupBuyId, OrderSource source, OrderStatus status);
+
     Optional<CustomerOrder> findByIdAndGroupBuyId(Long id, Long groupBuyId);
 
     /** 고른 여러 주문을 한 번에 (이 공구 것만) */

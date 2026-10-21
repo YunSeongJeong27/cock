@@ -83,8 +83,13 @@ interface Placed {
 /** replaceOrderNo·replaceOrder: 확인하면 이 주문이 지금 적은 내용으로 바뀜 (없으면 새 주문) */
 interface Warnings { list: string[]; replaceOrderNo: number | null; replaceOrder: MyOrder | null }
 
+/** 우편번호 서비스가 돌려주는 값 중 쓰는 것만 (postcode.map.kakao.com/guide) */
+interface PostcodeResult { zonecode: string; roadAddress: string; jibunAddress: string }
+
 declare global {
-  interface Window { daum?: any }
+  interface Window {
+    daum?: { Postcode: new (options: { oncomplete: (data: PostcodeResult) => void }) => { open: () => void } }
+  }
 }
 
 /** 카카오(다음) 우편번호 서비스. 키 불필요, 상업적 이용 무료 (postcode.map.kakao.com/guide) */
@@ -316,8 +321,8 @@ export default function PublicOrder() {
   async function searchAddress() {
     try {
       await loadPostcode()
-      new window.daum.Postcode({
-        oncomplete: (data: any) => setForm((f) => ({ ...f, zipcode: data.zonecode, address: data.roadAddress || data.jibunAddress })),
+      new window.daum!.Postcode({
+        oncomplete: (data) => setForm((f) => ({ ...f, zipcode: data.zonecode, address: data.roadAddress || data.jibunAddress })),
       }).open()
     } catch (e) {
       setError(errorMessage(e))

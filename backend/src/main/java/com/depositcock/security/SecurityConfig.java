@@ -26,9 +26,10 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
-import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.web.util.WebUtils;
 
 /**
  * 판매자 로그인: JWT 를 httpOnly 쿠키(DC_TOKEN)에 담는다 (개발 전 인터뷰 결과 5번).
@@ -79,16 +80,8 @@ public class SecurityConfig {
             if (!uri.startsWith("/api/") || uri.startsWith("/api/auth/") || uri.startsWith("/api/public/")) {
                 return null;
             }
-            Cookie[] cookies = request.getCookies();
-            if (cookies == null) {
-                return null;
-            }
-            for (Cookie cookie : cookies) {
-                if (TOKEN_COOKIE.equals(cookie.getName()) && !cookie.getValue().isBlank()) {
-                    return cookie.getValue();
-                }
-            }
-            return null;
+            Cookie cookie = WebUtils.getCookie(request, TOKEN_COOKIE);
+            return cookie == null || cookie.getValue().isBlank() ? null : cookie.getValue();
         };
     }
 

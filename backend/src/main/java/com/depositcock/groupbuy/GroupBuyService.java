@@ -24,8 +24,9 @@ import com.depositcock.groupbuy.GroupBuyDtos.PauseRequest;
 import com.depositcock.groupbuy.GroupBuyDtos.PickupPointRequest;
 import com.depositcock.groupbuy.GroupBuyDtos.ProductRequest;
 import com.depositcock.order.CustomerOrder;
-import com.depositcock.order.OrderSource;
 import com.depositcock.order.CustomerOrderRepository;
+import com.depositcock.order.OrderSource;
+import com.depositcock.order.OrderStatus;
 import com.depositcock.seller.Seller;
 import com.depositcock.seller.FeatureAccess;
 import com.depositcock.seller.SellerRepository;
@@ -211,8 +212,7 @@ public class GroupBuyService {
             throw new ApiException(ErrorCode.COMMENT_CHANNEL_CLOSED);
         }
         if (r.orderChannel() == OrderChannel.LINK_ONLY && groupBuy.getId() != null
-                && orderRepository.findByGroupBuyIdAndSource(groupBuy.getId(), OrderSource.COMMENT).stream()
-                .anyMatch(CustomerOrder::isActive)) {
+                && orderRepository.existsByGroupBuyIdAndSourceAndStatus(groupBuy.getId(), OrderSource.COMMENT, OrderStatus.ORDERED)) {
             // 링크만 쓰는 공구에서는 댓글 집계를 숨기므로, 이미 있는 댓글 주문을 관리할 수 없게 된다
             throw new ApiException(ErrorCode.COMMENT_ORDERS_EXIST);
         }

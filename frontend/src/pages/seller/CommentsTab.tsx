@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, errorMessage, won } from '../../api'
+import { api, errorMessage, squash, won } from '../../api'
 import { ErrorBox, Rich } from '../../components/Ui'
 import { commentText as T } from '../../texts/comments'
 import type { GroupBuy } from '../../types'
@@ -34,8 +34,6 @@ interface Draft { author: string; content: string; duplicateSuspected: boolean }
 const TYPE_LABEL = { ORDER: '주문', CANCEL: '취소', NOT_ORDER: '주문 아님', REVIEW: '확인 필요' } as const
 
 /** 비교용: 띄어쓰기 무시 */
-const squash = (v: string) => v.replace(/\s+/g, '')
-
 /**
  * 캡처를 다시 올리면(처음부터 다시 찍은 경우 등) 이미 저장한 댓글이 또 들어온다 → 똑같은 댓글(작성자·내용)은 빼 둔다.
  * 같은 댓글이 저장된 개수만큼만 뺀다 (같은 손님이 같은 댓글을 두 번 단 경우 두 번째는 남김).

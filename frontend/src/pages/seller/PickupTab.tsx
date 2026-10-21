@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react'
-import { api, errorMessage, won } from '../../api'
+import { api, errorMessage, refundPending, won } from '../../api'
 import { ErrorBox } from '../../components/Ui'
 import { sellerOrderText as T } from '../../texts/sellerOrders'
 import type { GroupBuy, SellerOrder } from '../../types'
 
 interface Props { groupBuy: GroupBuy; orders: SellerOrder[]; reload: () => void }
-
-const refundPending = (o: SellerOrder) => o.active && o.refundRequestedAt !== null && o.refundRejectedAt === null
 
 /** 수령 체크 (정리본 9장): 선입금인데 미입금이면 경고, 현장결제는 수령할 때 결제 완료 처리 */
 export default function PickupTab({ groupBuy, orders, reload }: Props) {

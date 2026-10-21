@@ -30,10 +30,15 @@ public class SellerMail {
         this.baseUrl = baseUrl;
     }
 
+    /** 메일 본문 글자 이스케이프: <>&"' 만 바꾸고 한글·가운뎃점(·)은 그대로 둔다 (두 알림 메일이 같은 방식으로) */
+    static String escape(String text) {
+        return HtmlUtils.htmlEscape(text, "UTF-8");
+    }
+
     /** 공구 화면 링크 (주소 설정이 없으면 빈 문자열) */
     String groupBuyLink(Long groupBuyId) {
         return baseUrl == null || baseUrl.isBlank() ? ""
-                : "<p><a href=\"" + HtmlUtils.htmlEscape(baseUrl.replaceAll("/+$", "") + "/seller/group-buys/" + groupBuyId)
+                : "<p><a href=\"" + escape(baseUrl.replaceAll("/+$", "") + "/seller/group-buys/" + groupBuyId)
                 + "\">" + MailText.OPEN_GROUP_BUY.text() + "</a></p>";
     }
 

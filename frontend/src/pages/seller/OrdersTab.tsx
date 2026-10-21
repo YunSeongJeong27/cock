@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
-import { api, dateTime, errorMessage, maskPhone, shortTime, won } from '../../api'
+import { api, dateTime, errorMessage, maskPhone, refundPending, shortTime, squash, won } from '../../api'
 import { useAuth } from '../../auth'
 import { CopyButton, ErrorBox, Rich, StatusBadge, useIsMobile } from '../../components/Ui'
 import { sellerOrderText as T } from '../../texts/sellerOrders'
@@ -18,12 +18,6 @@ const SORT_VALUE: Record<SortKey, (o: SellerOrder) => string | number> = {
   orderedAt: (o) => o.orderedAt,
   updatedAt: (o) => o.updatedAt,
 }
-
-/** 이름 비교용: 띄어쓰기 무시 */
-const squash = (v: string | null) => (v ?? '').replace(/\s+/g, '')
-
-/** 판매자 확인을 기다리는 고객 환불 신청 */
-const refundPending = (o: SellerOrder) => o.active && o.refundRequestedAt !== null && o.refundRejectedAt === null
 
 /** 상품별 수량 (같은 상품 줄이 여러 개여도 합산) */
 const qtyOf = (o: SellerOrder, productId: number) =>

@@ -4,11 +4,11 @@ import java.time.Duration;
 
 import com.depositcock.common.AppProperties;
 import com.depositcock.order.OrderDtos.CancelRequest;
-import com.depositcock.order.OrderDtos.RefundRequest;
 import com.depositcock.order.OrderDtos.IdentifyRequest;
 import com.depositcock.order.OrderDtos.PlaceOrderRequest;
 import com.depositcock.order.OrderDtos.PlaceOrderResponse;
 import com.depositcock.order.OrderDtos.PublicGroupBuy;
+import com.depositcock.order.OrderDtos.RefundRequest;
 import com.depositcock.order.PublicOrderService.WithCookie;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.WebUtils;
 
 /**
  * 고객용 공개 API. 공구 링크 /g/{공구토큰} 화면이 호출한다.
@@ -78,16 +79,8 @@ public class PublicOrderController {
     }
 
     private static String readCookie(HttpServletRequest request, String token) {
-        Cookie[] cookies = request.getCookies();
-        if (cookies == null) {
-            return null;
-        }
-        for (Cookie cookie : cookies) {
-            if (cookieName(token).equals(cookie.getName())) {
-                return cookie.getValue();
-            }
-        }
-        return null;
+        Cookie cookie = WebUtils.getCookie(request, cookieName(token));
+        return cookie == null ? null : cookie.getValue();
     }
 
     private void writeCookie(HttpServletResponse response, String token, String cookieToken) {
