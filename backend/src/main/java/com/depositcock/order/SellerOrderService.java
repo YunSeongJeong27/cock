@@ -1,13 +1,11 @@
 package com.depositcock.order;
 
+import com.depositcock.common.Texts;
 import com.depositcock.groupbuy.StockAlerts;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
@@ -16,7 +14,6 @@ import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.GroupBuyService;
 import com.depositcock.groupbuy.PickupPoint;
 import com.depositcock.groupbuy.ProductRepository;
-import com.depositcock.order.OrderDtos.OrderItemRequest;
 import com.depositcock.order.OrderDtos.SellerEditRequest;
 import com.depositcock.order.OrderDtos.SellerOrder;
 import jakarta.persistence.EntityManager;
@@ -151,56 +148,27 @@ public class SellerOrderService {
         PaymentMethod payment = sameReceive && r.paymentMethod() != null && r.paymentMethod() == order.getPaymentMethod()
                 ? order.getPaymentMethod() : OrderRules.paymentMethod(groupBuy, receive, r.paymentMethod());
         PickupPoint point = receive == ReceiveMethod.PICKUP ? OrderRules.pickupPoint(groupBuy, r.pickupPointId()) : null;
-        String recipientPhone = null;
-        if (receive == ReceiveMethod.DELIVERY) {
-            recipientPhone = PhoneNumbers.normalize(r.recipientPhone());
-            if (trimToNull(r.recipientName()) == null || recipientPhone == null || trimToNull(r.address()) == null) {
-                throw new ApiException(ErrorCode.DELIVERY_INFO_REQUIRED_FOR_CHANGE);
-            }
-        }
-        String depositorName = trimToNull(r.depositorName());
+        Delivery delivery = OrderRules.delivery(receive, r, ErrorCode.DELIVERY_INFO_REQUIRED_FOR_CHANGE);
+        String depositorName = Texts.blankToNull(r.depositorName());
         if (order.getSource() == OrderSource.FORM && depositorName == null) {
             throw new ApiException(ErrorCode.DEPOSITOR_NAME_REQUIRED);
         }
 
         // 2) 상품 수량
-        Set<Long> productIds = new HashSet<>();
-        groupBuy.getProducts().forEach(p -> productIds.add(p.getId()));
-        Map<Long, Integer> wanted = new LinkedHashMap<>();
-        for (OrderItemRequest item : r.items()) {
-            if (item.quantity() <= 0) {
-                continue;
-            }
-            if (!productIds.contains(item.productId())) {
-                throw new ApiException(ErrorCode.PRODUCT_NOT_FOUND);
-            }
-            wanted.merge(item.productId(), item.quantity(), Integer::sum);
-        }
-        if (wanted.isEmpty()) {
-            throw new ApiException(ErrorCode.QUANTITY_REQUIRED_FOR_CHANGE);
-        }
+        Map<Long, Integer> wanted = OrderRules.quantities(groupBuy, r.items(), ErrorCode.QUANTITY_REQUIRED_FOR_CHANGE);
 
-        boolean delivery = receive == ReceiveMethod.DELIVERY;
         OrderUpdate.apply(order, OrderUpdate.Values.builder()
                 .quantities(wanted)
                 .receive(receive)
                 .point(point)
                 .payment(payment)
                 .depositorName(depositorName)
-                .nickname(trimToNull(r.nickname()))
-                .unitAddress(trimToNull(r.unitAddress()))
-                .recipientName(delivery ? r.recipientName().trim() : null)
-                .recipientPhone(recipientPhone)
-                .zipcode(delivery ? trimToNull(r.zipcode()) : null)
-                .address(delivery ? r.address().trim() : null)
-                .addressDetail(delivery ? trimToNull(r.addressDetail()) : null)
+                .nickname(Texts.blankToNull(r.nickname()))
+                .unitAddress(Texts.blankToNull(r.unitAddress()))
+                .delivery(delivery)
                 .build(),
                 ChangeActor.SELLER, null, productRepository, entityManager, stockAlerts, now);
         orderRepository.flush();
         return OrderMapper.toSellerOrder(order, false, cipher);
-    }
-
-    private static String trimToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 }

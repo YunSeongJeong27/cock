@@ -6,6 +6,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.depositcock.common.Texts;
 import com.depositcock.groupbuy.GroupBuy;
 import com.depositcock.groupbuy.Product;
 import com.depositcock.order.CustomerOrder;
@@ -94,7 +95,7 @@ public class OrderSheetExcelWriter {
             Row row = sheet.createRow(r++);
             int c = 0;
             row.createCell(c++).setCellValue(o.getOrderNo());
-            row.createCell(c++).setCellValue(nullToEmpty(o.getNickname()));
+            row.createCell(c++).setCellValue(Texts.nullToEmpty(o.getNickname()));
             for (int p = 0; p < products.size(); p++) {
                 int qty = quantity(o, products.get(p));
                 productTotals[p] += qty;
@@ -109,20 +110,20 @@ public class OrderSheetExcelWriter {
             amountTotal += o.getExpectedAmount();
             row.createCell(c++).setCellValue(o.getPaymentMethod().getLabel());
             row.createCell(c++).setCellValue(paidText(o));
-            row.createCell(c++).setCellValue(nullToEmpty(o.getDepositorName()));
+            row.createCell(c++).setCellValue(Texts.nullToEmpty(o.getDepositorName()));
             row.createCell(c++).setCellValue(o.getReceiveMethod().getLabel());
             row.createCell(c++).setCellValue(o.getPickupPoint() == null ? "" : o.getPickupPoint().getName());
             row.createCell(c++).setCellValue(o.isPickedUp() ? "수령" : "");
             row.createCell(c++).setCellValue(String.join(", ", checks(o)));
             row.createCell(c++).setCellValue(o.displayStatus().getLabel());
             if (includeContact) {
-                row.createCell(c++).setCellValue(nullToEmpty(PhoneNumbers.format(o.getPhone())));
-                row.createCell(c++).setCellValue(nullToEmpty(o.getUnitAddress()));
-                row.createCell(c++).setCellValue(nullToEmpty(o.getRecipientName()));
-                row.createCell(c++).setCellValue(nullToEmpty(PhoneNumbers.format(o.getRecipientPhone())));
-                row.createCell(c++).setCellValue(nullToEmpty(o.getZipcode()));
-                row.createCell(c++).setCellValue(nullToEmpty(o.getAddress()));
-                row.createCell(c++).setCellValue(nullToEmpty(o.getAddressDetail()));
+                row.createCell(c++).setCellValue(Texts.nullToEmpty(PhoneNumbers.format(o.getPhone())));
+                row.createCell(c++).setCellValue(Texts.nullToEmpty(o.getUnitAddress()));
+                row.createCell(c++).setCellValue(Texts.nullToEmpty(o.getRecipientName()));
+                row.createCell(c++).setCellValue(Texts.nullToEmpty(PhoneNumbers.format(o.getRecipientPhone())));
+                row.createCell(c++).setCellValue(Texts.nullToEmpty(o.getZipcode()));
+                row.createCell(c++).setCellValue(Texts.nullToEmpty(o.getAddress()));
+                row.createCell(c++).setCellValue(Texts.nullToEmpty(o.getAddressDetail()));
             }
             row.createCell(c).setCellValue(o.getOrderedAt().format(DATE_TIME));
         }
@@ -200,9 +201,5 @@ public class OrderSheetExcelWriter {
 
     private static String safeTitle(String title) {
         return title == null || title.isBlank() ? "주문 정리표" : title;
-    }
-
-    private static String nullToEmpty(String value) {
-        return value == null ? "" : value;
     }
 }

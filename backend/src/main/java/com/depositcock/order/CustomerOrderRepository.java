@@ -11,6 +11,9 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     List<CustomerOrder> findByGroupBuyIdOrderByOrderNoAsc(Long groupBuyId);
 
+    /** 판매자의 모든 공구 주문 (공구 목록 요약을 공구마다 따로 읽지 않고 한 번에 계산할 때) */
+    List<CustomerOrder> findByGroupBuySellerId(Long sellerId);
+
     List<CustomerOrder> findByGroupBuyIdAndCustomer_IdOrderByOrderNoAsc(Long groupBuyId, Long customerId);
 
     List<CustomerOrder> findByGroupBuyIdAndSource(Long groupBuyId, OrderSource source);

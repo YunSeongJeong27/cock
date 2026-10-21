@@ -32,11 +32,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class OrderUpdate {
 
-    /** 바꿀 값. 입력 검사(필수값, 수령·결제 규칙, 배송 정보)는 부르는 쪽에서 끝낸 값. 배송이 아니면 배송 칸은 null */
+    /** 바꿀 값. 입력 검사(필수값, 수령·결제 규칙, 배송 정보)는 부르는 쪽에서 끝낸 값. 배송이 아니면 delivery 는 Delivery.NONE */
     @Builder
     record Values(Map<Long, Integer> quantities, ReceiveMethod receive, PickupPoint point, PaymentMethod payment,
-                  String depositorName, String nickname, String unitAddress, String recipientName,
-                  String recipientPhone, String zipcode, String address, String addressDetail) {
+                  String depositorName, String nickname, String unitAddress, Delivery delivery) {
     }
 
     /** 수량·금액 말고 주문서 칸을 넣는다 (새 주문, 주문 변경). 배송이 아니면 배송 칸이 null 로 지워진다 */
@@ -47,11 +46,11 @@ final class OrderUpdate {
         order.setReceiveMethod(v.receive());
         order.setPickupPoint(v.point());
         order.setPaymentMethod(v.payment());
-        order.setRecipientName(v.recipientName());
-        order.setRecipientPhone(v.recipientPhone());
-        order.setZipcode(v.zipcode());
-        order.setAddress(v.address());
-        order.setAddressDetail(v.addressDetail());
+        order.setRecipientName(v.delivery().recipientName());
+        order.setRecipientPhone(v.delivery().recipientPhone());
+        order.setZipcode(v.delivery().zipcode());
+        order.setAddress(v.delivery().address());
+        order.setAddressDetail(v.delivery().addressDetail());
     }
 
     /** 상품 수량이 어떻게 바뀌는지 ("사과 2→3개", 뺀 상품 "사과 2→0개", 새 상품 "배 0→1개") */
@@ -138,13 +137,8 @@ final class OrderUpdate {
         addIfChanged(changes, "입금자명", order.getDepositorName(), v.depositorName());
         addIfChanged(changes, "닉네임", order.getNickname(), v.nickname());
         addIfChanged(changes, "동·호수", order.getUnitAddress(), v.unitAddress());
-        if (v.receive() == ReceiveMethod.DELIVERY) {
-            String before = deliveryText(order.getRecipientName(), order.getRecipientPhone(), order.getZipcode(),
-                    order.getAddress(), order.getAddressDetail());
-            String after = deliveryText(v.recipientName(), v.recipientPhone(), v.zipcode(), v.address(), v.addressDetail());
-            if (!after.equals(before)) {
-                changes.add("배송지 변경");
-            }
+        if (v.receive() == ReceiveMethod.DELIVERY && !v.delivery().equals(Delivery.of(order))) {
+            changes.add("배송지 변경");
         }
 
         // 3) 금액
@@ -212,10 +206,6 @@ final class OrderUpdate {
         return method.getLabel() + "(" + point.getName() + ")";
     }
 
-    private static String deliveryText(String name, String phone, String zipcode, String address, String detail) {
-        return String.join("|", Objects.toString(name, ""), Objects.toString(phone, ""), Objects.toString(zipcode, ""),
-                Objects.toString(address, ""), Objects.toString(detail, ""));
-    }
 
     private static String won(long amount) {
         return String.format("%,d원", amount);

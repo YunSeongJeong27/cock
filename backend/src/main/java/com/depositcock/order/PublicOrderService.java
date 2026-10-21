@@ -17,6 +17,7 @@ import com.depositcock.common.ApiExceptionHandler;
 import com.depositcock.common.DataCipher;
 import com.depositcock.common.ErrorCode;
 import com.depositcock.common.Notice;
+import com.depositcock.common.Texts;
 import com.depositcock.common.Tokens;
 import com.depositcock.customer.Customer;
 import com.depositcock.customer.CustomerRepository;
@@ -37,7 +38,6 @@ import com.depositcock.order.OrderDtos.CancelRequest;
 import com.depositcock.order.OrderDtos.FinalOrder;
 import com.depositcock.order.OrderDtos.IdentifyRequest;
 import com.depositcock.order.OrderDtos.MyOrder;
-import com.depositcock.order.OrderDtos.OrderItemRequest;
 import com.depositcock.order.OrderDtos.PlaceOrderRequest;
 import com.depositcock.order.OrderDtos.PlaceOrderResponse;
 import com.depositcock.order.OrderDtos.Prefill;
@@ -101,8 +101,8 @@ public class PublicOrderService {
             throw new ApiException(ErrorCode.PHONE_INVALID);
         }
         String depositorName = r.depositorName().trim();
-        String nickname = trimToNull(r.nickname());
-        String unitAddress = trimToNull(r.unitAddress());
+        String nickname = Texts.blankToNull(r.nickname());
+        String unitAddress = Texts.blankToNull(r.unitAddress());
         if (groupBuy.isNicknameRequired() && nickname == null) {
             throw new ApiException(ErrorCode.NICKNAME_REQUIRED);
         }
@@ -116,19 +116,7 @@ public class PublicOrderService {
 
         Map<Long, Product> products = new HashMap<>();
         groupBuy.getProducts().forEach(p -> products.put(p.getId(), p));
-        Map<Long, Integer> quantities = new LinkedHashMap<>();
-        for (OrderItemRequest item : r.items()) {
-            if (item.quantity() <= 0) {
-                continue;
-            }
-            if (!products.containsKey(item.productId())) {
-                throw new ApiException(ErrorCode.PRODUCT_NOT_FOUND);
-            }
-            quantities.merge(item.productId(), item.quantity(), Integer::sum);
-        }
-        if (quantities.isEmpty()) {
-            throw new ApiException(ErrorCode.QUANTITY_REQUIRED);
-        }
+        Map<Long, Integer> quantities = OrderRules.quantities(groupBuy, r.items(), ErrorCode.QUANTITY_REQUIRED);
         Long sellerId = groupBuy.getSeller().getId();
         // 처음 주문하는 번호면 아직 고객이 없다. 고객은 검사를 모두 통과한 뒤에 만든다 (실패한 주문의 번호를 남기지 않게)
         Long existingCustomerId = customerRepository.findBySellerIdAndPhone(sellerId, phone).map(Customer::getId).orElse(null);
@@ -140,26 +128,20 @@ public class PublicOrderService {
         // "내 주문"의 [주문 수정]으로 고른 주문(replaceOrderNo)이 수정할 수 있는 주문이면 그 주문, 아니면 입금자명이 같은
         // 가장 최근 주문, 아니면 가장 최근 주문(아래에서 입금자명 불일치로 막힘). 여러 건: 판매자가 입금 확정을 취소한 경우 등
         List<CustomerOrder> replaceable = previous.stream().filter(CustomerOrder::isReplaceableByCustomer).toList();
-        String name = squash(depositorName);
+        String name = Texts.squash(depositorName);
         CustomerOrder target = replaceable.stream().filter(o -> Objects.equals(o.getOrderNo(), r.replaceOrderNo()))
                 .findFirst()
-                .or(() -> replaceable.stream().filter(o -> name.equals(squash(o.getDepositorName()))).reduce((a, b) -> b))
+                .or(() -> replaceable.stream().filter(o -> name.equals(Texts.squash(o.getDepositorName()))).reduce((a, b) -> b))
                 .orElse(replaceable.isEmpty() ? null : replaceable.get(replaceable.size() - 1));
         // 수정은 휴대폰 번호 + 입금자명이 기존 주문과 같아야 한다 (2026-10-19 사용자 결정, 취소·환불 신청과 같은 기준).
         // 그래서 고객은 수정으로 입금자명을 바꿀 수 없다 (판매자 "주문 변경"으로). 기존 주문 내용도 이름이 맞을 때만 보여준다
-        if (target != null && !name.equals(squash(target.getDepositorName()))) {
+        if (target != null && !name.equals(Texts.squash(target.getDepositorName()))) {
             throw new ApiException(ErrorCode.REORDER_NAME_MISMATCH);
         }
         checkPerPersonLimit(products, quantities, previous, target);
 
         // 배송 정보 검사는 경고(409)보다 먼저 한다 (경고를 확인한 뒤에 입력 오류가 나오지 않게)
-        String recipientPhone = null;
-        if (receiveMethod == ReceiveMethod.DELIVERY) {
-            recipientPhone = PhoneNumbers.normalize(r.recipientPhone());
-            if (trimToNull(r.recipientName()) == null || recipientPhone == null || trimToNull(r.address()) == null) {
-                throw new ApiException(ErrorCode.DELIVERY_INFO_REQUIRED);
-            }
-        }
+        Delivery delivery = OrderRules.delivery(receiveMethod, r, ErrorCode.DELIVERY_INFO_REQUIRED);
 
         // 고른(또는 경고에서 보여준) 주문을 수정할 수 없게 됐으면(입금·취소, 다른 번호 등) 확인을 다시 받는다
         Integer targetNo = target == null ? null : target.getOrderNo();
@@ -182,7 +164,6 @@ public class PublicOrderService {
             }
         }
 
-        boolean delivery = receiveMethod == ReceiveMethod.DELIVERY;
         OrderUpdate.Values values = OrderUpdate.Values.builder()
                 .quantities(quantities)
                 .receive(receiveMethod)
@@ -191,11 +172,7 @@ public class PublicOrderService {
                 .depositorName(depositorName)
                 .nickname(nickname)
                 .unitAddress(unitAddress)
-                .recipientName(delivery ? r.recipientName().trim() : null)
-                .recipientPhone(recipientPhone)
-                .zipcode(delivery ? trimToNull(r.zipcode()) : null)
-                .address(delivery ? r.address().trim() : null)
-                .addressDetail(delivery ? trimToNull(r.addressDetail()) : null)
+                .delivery(delivery)
                 .build();
         CustomerOrder order;
         String newCookie;
@@ -416,9 +393,9 @@ public class PublicOrderService {
 
     private List<CustomerOrder> matchByPhoneAndName(GroupBuy groupBuy, String rawPhone, String rawName) {
         String phone = PhoneNumbers.normalize(rawPhone);
-        String name = squash(rawName);
+        String name = Texts.squash(rawName);
         List<CustomerOrder> matches = phone == null ? List.of() : customerOrdersByPhone(groupBuy, phone).stream()
-                .filter(o -> name.equals(squash(o.getDepositorName())))
+                .filter(o -> name.equals(Texts.squash(o.getDepositorName())))
                 .toList();
         if (matches.isEmpty()) {
             throw new ApiException(ErrorCode.ORDER_NOT_FOUND_BY_PHONE_NAME);
@@ -664,14 +641,5 @@ public class PublicOrderService {
 
     private static AccountInfo account(GroupBuy g) {
         return new AccountInfo(g.getBankName(), g.getAccountNumber(), g.getAccountHolder());
-    }
-
-    /** 이름 비교용: 공백을 모두 지운다 ("김 지영" = "김지영") */
-    static String squash(String value) {
-        return value == null ? "" : value.replaceAll("\\s+", "");
-    }
-
-    private static String trimToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 }

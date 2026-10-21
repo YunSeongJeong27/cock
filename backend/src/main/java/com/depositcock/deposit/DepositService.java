@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
 import com.depositcock.common.Notice;
+import com.depositcock.common.Texts;
 import com.depositcock.deposit.DepositDtos.AliasResponse;
 import com.depositcock.deposit.DepositDtos.CandidateView;
 import com.depositcock.deposit.DepositDtos.ConfirmItem;
@@ -397,8 +398,8 @@ public class DepositService {
     /** 같은 이름이 있으면 덮어쓴다. */
     @Transactional
     public PresetResponse savePreset(Long sellerId, PresetRequest r) {
-        ColumnMapping mapping = new ColumnMapping(blankToNull(r.dateColumn()), r.nameColumn().trim(),
-                r.amountColumn().trim(), blankToNull(r.typeColumn()));
+        ColumnMapping mapping = new ColumnMapping(Texts.blankToNull(r.dateColumn()), r.nameColumn().trim(),
+                r.amountColumn().trim(), Texts.blankToNull(r.typeColumn()));
         BankColumnPreset preset = presetRepository.findBySellerIdAndName(sellerId, r.name().trim())
                 .map(p -> {
                     p.update(mapping);
@@ -465,9 +466,5 @@ public class DepositService {
         }
         return new OrderBrief(o.getId(), o.getOrderNo(), o.getDepositorName(), o.getNickname(),
                 PhoneNumbers.last4(o.getPhone()), o.getExpectedAmount(), o.getOrderedAt());
-    }
-
-    private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 }

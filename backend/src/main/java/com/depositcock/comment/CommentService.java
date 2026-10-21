@@ -1,5 +1,6 @@
 package com.depositcock.comment;
 
+import com.depositcock.common.Texts;
 import com.depositcock.groupbuy.StockAlerts;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -220,8 +221,8 @@ public class CommentService {
                 // 읽지 못한 글자가 남은 채로 저장하면 그 닉네임이 고객 키가 되어 주문으로 만들어진다
                 throw new ApiException(ErrorCode.COMMENT_UNREADABLE_CHARS, author, content);
             }
-            commentRepository.save(new ImportedComment(groupBuy.getId(), source, ++seq, truncate(author, 200),
-                    truncate(content, 2000), in.duplicateSuspected(), now));
+            commentRepository.save(new ImportedComment(groupBuy.getId(), source, ++seq, Texts.cut(author, 200),
+                    Texts.cut(content, 2000), in.duplicateSuspected(), now));
             saved++;
         }
         return saved;
@@ -240,8 +241,8 @@ public class CommentService {
             throw new ApiException(ErrorCode.COMMENT_FIX_UNREADABLE);
         }
         // 저장할 때와 같이 칸 길이에 맞춰 자른다 (넘기면 409 "이미 같은 데이터" 로 잘못 안내됐음, 2026-10-20 점검)
-        comment.setAuthorName(truncate(authorName.trim(), 200));
-        comment.setContent(truncate(content.trim(), 2000));
+        comment.setAuthorName(Texts.cut(authorName.trim(), 200));
+        comment.setContent(Texts.cut(content.trim(), 2000));
         comment.setManualQuantity(manualQuantity);
     }
 
@@ -382,9 +383,5 @@ public class CommentService {
             }
         }
         return list;
-    }
-
-    private static String truncate(String value, int max) {
-        return value.length() <= max ? value : value.substring(0, max);
     }
 }

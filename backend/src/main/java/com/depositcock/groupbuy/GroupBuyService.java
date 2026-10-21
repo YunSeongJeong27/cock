@@ -3,12 +3,16 @@ package com.depositcock.groupbuy;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
 import com.depositcock.common.Notice;
+import com.depositcock.common.Texts;
 import com.depositcock.common.Tokens;
 import com.depositcock.customer.Customers;
 import com.depositcock.deposit.AliasBook;
@@ -78,6 +82,9 @@ public class GroupBuyService {
 
     public List<GroupBuySummary> list(Long sellerId) {
         LocalDateTime now = LocalDateTime.now(clock);
+        // 공구마다 주문을 따로 읽던 것(공구 수만큼 조회)을 판매자 주문 한 번 조회로
+        Map<Long, List<CustomerOrder>> ordersByGroupBuy = orderRepository.findByGroupBuySellerId(sellerId).stream()
+                .collect(Collectors.groupingBy(o -> o.getGroupBuy().getId()));
         return groupBuyRepository.findBySellerIdOrderByIdDesc(sellerId).stream()
                 .map(g -> GroupBuySummary.builder()
                         .id(g.getId())
@@ -88,7 +95,7 @@ public class GroupBuyService {
                         .closeAt(g.getCloseAt())
                         .publicToken(g.getPublicToken())
                         .createdAt(g.getCreatedAt())
-                        .dashboard(dashboard(orderRepository.findByGroupBuyIdOrderByOrderNoAsc(g.getId())))
+                        .dashboard(dashboard(ordersByGroupBuy.getOrDefault(g.getId(), List.of())))
                         .paused(g.isPaused())
                         .build())
                 .toList();
@@ -153,11 +160,11 @@ public class GroupBuyService {
     public GroupBuyResponse pause(Long sellerId, Long groupBuyId, PauseRequest r) {
         GroupBuy groupBuy = lockOwned(sellerId, groupBuyId);
         LocalDateTime now = LocalDateTime.now(clock);
-        String link = blankToNull(r.linkUrl());
+        String link = Texts.blankToNull(r.linkUrl());
         if (link != null && !link.matches("(?i)^https?://\\S+$")) {
             throw new ApiException(ErrorCode.PAUSE_LINK_INVALID);
         }
-        String message = blankToNull(r.message());
+        String message = Texts.blankToNull(r.message());
         // 문구·링크는 풀어도 남겨서 다음에 다시 쓴다
         groupBuy.setPaused(r.paused());
         groupBuy.setPauseMessage(message == null || message.equals(Notice.PAUSE_DEFAULT.text()) ? null : message);
@@ -191,7 +198,7 @@ public class GroupBuyService {
         if (r.pickupEnabled() && !r.pickupPrepayEnabled() && !r.pickupOnsiteEnabled()) {
             throw new ApiException(ErrorCode.PICKUP_PAYMENT_SETTING_REQUIRED);
         }
-        String kakaoUrl = blankToNull(r.kakaoInquiryUrl());
+        String kakaoUrl = Texts.blankToNull(r.kakaoInquiryUrl());
         if (kakaoUrl != null && !kakaoUrl.matches("(?i)^https?://\\S+$")) {
             // javascript: 같은 주소가 고객 화면 링크로 들어가지 않게 한다
             throw new ApiException(ErrorCode.KAKAO_LINK_INVALID);
@@ -212,11 +219,11 @@ public class GroupBuyService {
         }
         ShippingFeeType feeType = r.deliveryEnabled() ? r.shippingFeeType() : ShippingFeeType.NONE;
         groupBuy.setTitle(r.title().trim());
-        groupBuy.setDescription(blankToNull(r.description()));
+        groupBuy.setDescription(Texts.blankToNull(r.description()));
         groupBuy.setCloseAt(r.closeAt());
-        groupBuy.setBankName(blankToNull(r.bankName()));
-        groupBuy.setAccountNumber(blankToNull(r.accountNumber()));
-        groupBuy.setAccountHolder(blankToNull(r.accountHolder()));
+        groupBuy.setBankName(Texts.blankToNull(r.bankName()));
+        groupBuy.setAccountNumber(Texts.blankToNull(r.accountNumber()));
+        groupBuy.setAccountHolder(Texts.blankToNull(r.accountHolder()));
         groupBuy.setPickupEnabled(r.pickupEnabled());
         groupBuy.setPickupPrepayEnabled(r.pickupEnabled() && r.pickupPrepayEnabled());
         groupBuy.setPickupOnsiteEnabled(r.pickupEnabled() && r.pickupOnsiteEnabled());
@@ -225,8 +232,8 @@ public class GroupBuyService {
         groupBuy.setShippingFee(feeType == ShippingFeeType.FIXED ? r.shippingFee() : 0);
         groupBuy.setOrderChannel(r.orderChannel());
         groupBuy.setUnitAddressFieldEnabled(r.unitAddressFieldEnabled());
-        groupBuy.setKakaoInquiryUrl(blankToNull(r.kakaoInquiryUrl()));
-        groupBuy.setAdminNames(blankToNull(r.adminNames()));
+        groupBuy.setKakaoInquiryUrl(Texts.blankToNull(r.kakaoInquiryUrl()));
+        groupBuy.setAdminNames(Texts.blankToNull(r.adminNames()));
         groupBuy.setUpdatedAt(now);
         syncProducts(groupBuy, r.products());
         // 픽업을 꺼도 지점은 지우지 않는다: 이미 들어온 픽업 주문은 그 지점 그대로 두고, 새 주문만 픽업을 못 고른다 (2026-10-19).
@@ -241,7 +248,7 @@ public class GroupBuyService {
         Map<Long, Product> existing = new HashMap<>();
         groupBuy.getProducts().forEach(p -> existing.put(p.getId(), p));
         int order = 0;
-        java.util.Set<Long> kept = new java.util.HashSet<>();
+        Set<Long> kept = new HashSet<>();
         for (ProductRequest r : requests) {
             order++;
             if (r.id() != null && existing.containsKey(r.id())) {
@@ -285,17 +292,17 @@ public class GroupBuyService {
         Map<Long, PickupPoint> existing = new HashMap<>();
         groupBuy.getPickupPoints().forEach(p -> existing.put(p.getId(), p));
         int order = 0;
-        java.util.Set<Long> kept = new java.util.HashSet<>();
+        Set<Long> kept = new HashSet<>();
         for (PickupPointRequest r : requests) {
             order++;
             if (r.id() != null && existing.containsKey(r.id())) {
                 PickupPoint point = existing.get(r.id());
                 point.setName(r.name().trim());
-                point.setInfo(blankToNull(r.info()));
+                point.setInfo(Texts.blankToNull(r.info()));
                 point.setSortOrder(order);
                 kept.add(r.id());
             } else {
-                groupBuy.getPickupPoints().add(new PickupPoint(groupBuy, r.name().trim(), blankToNull(r.info()), order));
+                groupBuy.getPickupPoints().add(new PickupPoint(groupBuy, r.name().trim(), Texts.blankToNull(r.info()), order));
             }
         }
         for (PickupPoint point : List.copyOf(groupBuy.getPickupPoints())) {
@@ -372,9 +379,5 @@ public class GroupBuyService {
                 .refundRequestCount(refundRequests)
                 .cancelledCount(cancelled)
                 .build();
-    }
-
-    private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 }

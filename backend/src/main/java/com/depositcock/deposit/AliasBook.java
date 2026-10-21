@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.depositcock.common.Texts;
 import com.depositcock.order.CustomerOrder;
 import com.depositcock.order.CustomerOrderRepository;
 import com.depositcock.order.DepositConfirmation;
@@ -27,7 +28,7 @@ public class AliasBook {
 
     /** 입금자명 → 고객 별칭을 저장하고, 새로 만들었는지·바꿨는지를 그 확정 기록에 남긴다 */
     public void record(Long sellerId, CustomerOrder order, DepositConfirmation confirmation, LocalDateTime now) {
-        String name = DepositMatcher.squash(confirmation.getDepositorName());
+        String name = Texts.squash(confirmation.getDepositorName());
         if (name.isEmpty()) {
             return;
         }
@@ -54,7 +55,7 @@ public class AliasBook {
         if (confirmation == null || confirmation.getAliasChange() == null) {
             return;
         }
-        String name = DepositMatcher.squash(confirmation.getDepositorName());
+        String name = Texts.squash(confirmation.getDepositorName());
         DepositorAlias alias = aliasRepository.findBySellerIdAndDepositorName(sellerId, name).orElse(null);
         if (alias == null || !alias.getCustomerId().equals(order.getCustomerId())) {
             return;
@@ -62,7 +63,7 @@ public class AliasBook {
         boolean stillBacked = orderRepository.findOtherPaidOfCustomer(order.getCustomerId(), order.getId())
                 .stream()
                 .filter(o -> !ignoredOrderIds.contains(o.getId()))
-                .anyMatch(o -> o.getPaidDepositorName() != null && DepositMatcher.squash(o.getPaidDepositorName()).equals(name));
+                .anyMatch(o -> o.getPaidDepositorName() != null && Texts.squash(o.getPaidDepositorName()).equals(name));
         if (stillBacked) {
             return;
         }

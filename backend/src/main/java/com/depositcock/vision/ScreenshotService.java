@@ -16,6 +16,7 @@ import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
 import com.depositcock.common.Notice;
 import com.depositcock.common.ExternalApiException;
+import com.depositcock.common.Texts;
 import com.depositcock.deposit.BankStatementReader;
 import com.depositcock.deposit.DepositLine;
 import com.depositcock.deposit.DepositRow;
@@ -89,7 +90,7 @@ public class ScreenshotService {
                 skipped++;
                 continue;
             }
-            drafts.add(new DepositDraft(d.name() == null ? "" : d.name().trim(), d.amount(), blankToNull(d.datetime()),
+            drafts.add(new DepositDraft(d.name() == null ? "" : d.name().trim(), d.amount(), Texts.blankToNull(d.datetime()),
                     type, item.duplicateSuspected(), item.imageIndex()));
         }
         return new DepositExtractResponse(drafts, skipped, extractor.provider(),
@@ -115,7 +116,7 @@ public class ScreenshotService {
             if (r.datetimeText() != null && r.datetimeText().trim().length() > DepositRow.MAX_DATETIME_TEXT) {
                 throw new ApiException(ErrorCode.SCREENSHOT_DATETIME_TOO_LONG, no);
             }
-            lines.add(new DepositLine(no, r.name().trim(), r.amount(), blankToNull(r.datetimeText()),
+            lines.add(new DepositLine(no, r.name().trim(), r.amount(), Texts.blankToNull(r.datetimeText()),
                     BankStatementReader.parseDateTimeText(r.datetimeText())));
         }
         if (lines.isEmpty()) {
@@ -142,7 +143,7 @@ public class ScreenshotService {
         List<List<Item<ExtractedComment>>> perImage = readAll(files, failed, extractor::extractComments,
                 extractor::extractCommentsFromPiece, ExtractedComment::order, ScreenshotService::commentKey);
         List<CommentDraft> drafts = OverlapDeduplicator.dedupeItems(perImage, ScreenshotService::commentKey).stream()
-                .map(i -> new CommentDraft(nullToEmpty(i.value().author()).trim(), nullToEmpty(i.value().content()).trim(),
+                .map(i -> new CommentDraft(Texts.nullToEmpty(i.value().author()).trim(), Texts.nullToEmpty(i.value().content()).trim(),
                         i.duplicateSuspected(), i.imageIndex()))
                 .toList();
         return new CommentExtractResponse(drafts, extractor.provider(),
@@ -254,13 +255,5 @@ public class ScreenshotService {
         } catch (IOException e) {
             throw new ApiException(ErrorCode.IMAGE_UNREADABLE);
         }
-    }
-
-    private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
-    }
-
-    private static String nullToEmpty(String value) {
-        return value == null ? "" : value;
     }
 }

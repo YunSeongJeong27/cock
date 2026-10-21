@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.depositcock.common.Texts;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -305,14 +306,9 @@ public final class DepositMatcher {
         return null;
     }
 
-    /** 저장용: 공백만 지운다 (별칭은 이 값으로 저장) */
-    static String squash(String value) {
-        return value == null ? "" : value.replaceAll("\\s+", "");
-    }
-
     /** 비교용: 공백을 지우고 영문은 소문자로 ("Kim Jiyoung" = "KIMJIYOUNG") */
     static String normalize(String value) {
-        return squash(value).toLowerCase(Locale.ROOT);
+        return Texts.squash(value).toLowerCase(Locale.ROOT);
     }
 
     /** 한글·영문만 남긴다 (소문자) */

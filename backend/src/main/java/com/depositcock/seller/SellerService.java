@@ -9,6 +9,7 @@ import java.util.Map;
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
 import com.depositcock.common.AppProperties;
+import com.depositcock.common.Texts;
 import com.depositcock.groupbuy.GroupBuyRepository;
 import com.depositcock.vision.CaptureUsageService;
 import com.depositcock.seller.SellerDtos.AdminSellerRow;
@@ -16,7 +17,6 @@ import com.depositcock.seller.SellerDtos.AdminUpdateRequest;
 import com.depositcock.seller.SellerDtos.SignupRequest;
 import com.depositcock.seller.SellerDtos.UpdateProfileRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,9 +63,9 @@ public class SellerService {
     public Seller updateProfile(Long sellerId, UpdateProfileRequest request) {
         Seller seller = get(sellerId);
         seller.setDisplayName(request.displayName().trim());
-        seller.setDefaultBankName(blankToNull(request.defaultBankName()));
-        seller.setDefaultAccountNumber(blankToNull(request.defaultAccountNumber()));
-        seller.setDefaultAccountHolder(blankToNull(request.defaultAccountHolder()));
+        seller.setDefaultBankName(Texts.blankToNull(request.defaultBankName()));
+        seller.setDefaultAccountNumber(Texts.blankToNull(request.defaultAccountNumber()));
+        seller.setDefaultAccountHolder(Texts.blankToNull(request.defaultAccountHolder()));
         return seller;
     }
 
@@ -117,7 +117,7 @@ public class SellerService {
             seller.setTrialEndsAt(request.trialEndsAt());
         }
         seller.setSuspended(request.suspended());
-        seller.setAdminMemo(blankToNull(request.adminMemo()));
+        seller.setAdminMemo(Texts.blankToNull(request.adminMemo()));
         seller.setDailyCaptureLimit(request.dailyCaptureLimit());
         if (request.commentFeatureEnabled() != null) {
             seller.setCommentFeatureEnabled(request.commentFeatureEnabled());
@@ -170,9 +170,5 @@ public class SellerService {
 
     private static String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 }

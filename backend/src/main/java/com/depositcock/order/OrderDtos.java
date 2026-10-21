@@ -26,6 +26,19 @@ public final class OrderDtos {
                                    @Max(value = 9999, message = "QUANTITY_RANGE") int quantity) {
     }
 
+    /** 요청 중 배송 칸 (주문서·판매자 주문 변경 공통, OrderRules.delivery 가 읽는다) */
+    public interface DeliveryInput {
+        String recipientName();
+
+        String recipientPhone();
+
+        String zipcode();
+
+        String address();
+
+        String addressDetail();
+    }
+
     public record PlaceOrderRequest(
             @Valid @NotEmpty(message = "QUANTITY_REQUIRED") List<@NotNull(message = "PRODUCT_NOT_CHOSEN") OrderItemRequest> items,
             @NotBlank(message = "PHONE_REQUIRED") @Size(max = 20, message = "PHONE_INVALID") String phone,
@@ -46,7 +59,7 @@ public final class OrderDtos {
              * 경고에서 "이 내용으로 바뀝니다"라고 보여준 주문번호 (409 의 replaceOrderNo 를 그대로).
              * 그 사이에 바뀔 주문이 달라졌으면(입금 확정 등) 다시 경고한다
              */
-            @Min(value = 1, message = "ORDER_NO_FORMAT") Integer replaceOrderNo) {
+            @Min(value = 1, message = "ORDER_NO_FORMAT") Integer replaceOrderNo) implements DeliveryInput {
     }
 
     /** 내 주문 찾기: 휴대폰 번호 전체만 (2026-10-15 사용자 결정) */
@@ -264,7 +277,7 @@ public final class OrderDtos {
             @Size(max = 20, message = "RECIPIENT_PHONE_TOO_LONG") String recipientPhone,
             @Size(max = 10, message = "ZIPCODE_TOO_LONG") String zipcode,
             @Size(max = 300, message = "ADDRESS_TOO_LONG") String address,
-            @Size(max = 300, message = "ADDRESS_DETAIL_TOO_LONG") String addressDetail) {
+            @Size(max = 300, message = "ADDRESS_DETAIL_TOO_LONG") String addressDetail) implements DeliveryInput {
     }
 
     /** 입금 확정 1건. manual = 거래내역 없이 수동 확정, cancelledAt 이 있으면 취소된 확정 */

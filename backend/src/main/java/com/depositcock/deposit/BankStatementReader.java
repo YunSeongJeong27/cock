@@ -20,6 +20,7 @@ import java.util.Set;
 
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
+import com.depositcock.common.Texts;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -202,17 +203,17 @@ public class BankStatementReader {
         boolean manual = requested != null && requested.isComplete();
 
         for (int r = 0; r < Math.min(rows.size(), HEADER_SEARCH_ROWS); r++) {
-            List<String> header = rows.get(r).stream().map(BankStatementReader::squash).toList();
+            List<String> header = rows.get(r).stream().map(Texts::squash).toList();
             int nameIdx;
             int amountIdx;
             int dateIdx;
             int typeIdx;
             ColumnMapping used;
             if (manual) {
-                nameIdx = header.indexOf(squash(requested.nameColumn()));
-                amountIdx = header.indexOf(squash(requested.amountColumn()));
-                dateIdx = isBlank(requested.dateColumn()) ? -1 : header.indexOf(squash(requested.dateColumn()));
-                typeIdx = isBlank(requested.typeColumn()) ? -1 : header.indexOf(squash(requested.typeColumn()));
+                nameIdx = header.indexOf(Texts.squash(requested.nameColumn()));
+                amountIdx = header.indexOf(Texts.squash(requested.amountColumn()));
+                dateIdx = isBlank(requested.dateColumn()) ? -1 : header.indexOf(Texts.squash(requested.dateColumn()));
+                typeIdx = isBlank(requested.typeColumn()) ? -1 : header.indexOf(Texts.squash(requested.typeColumn()));
                 used = requested;
             } else {
                 nameIdx = firstIndex(header, NAME_CANDIDATES);
@@ -234,15 +235,15 @@ public class BankStatementReader {
                 }
                 // DB 칸 길이를 넘는 값(메모 열을 이름 열로 고른 경우 등)은 잘라 담는다. 전에는 저장할 때
                 // "이미 같은 데이터가 있거나 동시에 저장" 오류(409)로 업로드 전체가 실패했음 (2026-10-20 점검)
-                String name = cut(get(row, nameIdx).trim(), DepositRow.MAX_DEPOSITOR_NAME);
+                String name = Texts.cut(get(row, nameIdx).trim(), DepositRow.MAX_DEPOSITOR_NAME);
                 Integer amount = parseAmount(get(row, amountIdx));
                 String type = typeIdx >= 0 ? get(row, typeIdx) : "";
                 if (name.isEmpty() || amount == null || amount <= 0 || excludedType(type)) {
                     skipped++;
                     continue;
                 }
-                String dateText = dateIdx >= 0 ? cut(get(row, dateIdx).trim(), DepositRow.MAX_DATETIME_TEXT) : null;
-                deposits.add(new DepositLine(i + 1, name, amount, blankToNull(dateText), parseDateTime(dateText)));
+                String dateText = dateIdx >= 0 ? Texts.cut(get(row, dateIdx).trim(), DepositRow.MAX_DATETIME_TEXT) : null;
+                deposits.add(new DepositLine(i + 1, name, amount, Texts.blankToNull(dateText), parseDateTime(dateText)));
             }
             return ParsedStatement.builder()
                     .mapping(used)
@@ -311,10 +312,6 @@ public class BankStatementReader {
         return idx >= 0 && idx < row.size() ? row.get(idx) : "";
     }
 
-    static String squash(String value) {
-        return value == null ? "" : value.replaceAll("\\s+", "");
-    }
-
     /** "1,900", "1900원", "+250,000", "-69,120" → 정수. 숫자가 아니면 null */
     static Integer parseAmount(String raw) {
         if (raw == null) {
@@ -366,15 +363,7 @@ public class BankStatementReader {
         return parseDateTime(raw);
     }
 
-    private static String cut(String value, int max) {
-        return value.length() <= max ? value : value.substring(0, max);
-    }
-
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
-    }
-
-    private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value;
     }
 }
