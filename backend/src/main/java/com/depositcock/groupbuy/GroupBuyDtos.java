@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.depositcock.common.Notice;
+import com.depositcock.order.OrderDtos.SellerOrder;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -183,6 +184,10 @@ public final class GroupBuyDtos {
             /** 판매자 확인을 기다리는 고객 환불 신청 수 */
             int refundRequestCount,
             int cancelledCount) {
+    }
+
+    /** 판매자 공구 상세 화면을 한 번에: 공구 + 대시보드 + 주문 목록 (대시보드와 목록은 같은 주문을 한 번 읽어 만든다) */
+    public record GroupBuyDetail(GroupBuyResponse groupBuy, Dashboard dashboard, List<SellerOrder> orders) {
     }
 
     @Builder

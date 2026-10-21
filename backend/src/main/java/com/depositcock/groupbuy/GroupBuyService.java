@@ -106,11 +106,6 @@ public class GroupBuyService {
         return GroupBuyResponse.of(getOwned(sellerId, groupBuyId), LocalDateTime.now(clock));
     }
 
-    public Dashboard getDashboard(Long sellerId, Long groupBuyId) {
-        GroupBuy groupBuy = getOwned(sellerId, groupBuyId);
-        return dashboard(orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()));
-    }
-
     @Transactional
     public GroupBuyResponse create(Long sellerId, GroupBuyRequest request) {
         Seller seller = sellerRepository.getReferenceById(sellerId);

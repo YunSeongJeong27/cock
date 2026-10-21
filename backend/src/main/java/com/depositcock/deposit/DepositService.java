@@ -20,9 +20,11 @@ import com.depositcock.common.Texts;
 import com.depositcock.customer.Customer;
 import com.depositcock.customer.CustomerRepository;
 import com.depositcock.deposit.DepositDtos.AliasResponse;
+import com.depositcock.deposit.DepositDtos.BankSettingsResponse;
 import com.depositcock.deposit.DepositDtos.CandidateView;
 import com.depositcock.deposit.DepositDtos.ConfirmItem;
 import com.depositcock.deposit.DepositDtos.ConfirmResponse;
+import com.depositcock.deposit.DepositDtos.DefaultColumns;
 import com.depositcock.deposit.DepositDtos.MatchResponse;
 import com.depositcock.deposit.DepositDtos.MatchRow;
 import com.depositcock.deposit.DepositDtos.OrderBrief;
@@ -146,14 +148,19 @@ public class DepositService {
 
     public List<UploadSummary> uploads(Long sellerId, Long groupBuyId) {
         GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
-        Set<Long> usedRows = usedRowIds(groupBuy.getId());
-        // 입금 줄은 한 번에 읽어 업로드별로 나눈다 (전에는 업로드마다 따로 읽었음, 2026-10-20 점검)
-        Map<Long, List<DepositRow>> rowsByUpload = rowRepository.findByGroupBuyId(groupBuy.getId()).stream()
-                .collect(Collectors.groupingBy(DepositRow::getUploadId));
-        return uploadRepository.findByGroupBuyIdOrderByIdDesc(groupBuy.getId()).stream().map(u -> {
-            List<DepositRow> rows = rowsByUpload.getOrDefault(u.getId(), List.of());
-            int used = (int) rows.stream().filter(r -> usedRows.contains(r.getId())).count();
-            return new UploadSummary(u.getId(), u.getSource(), u.getFileName(), u.getUploadedAt(), rows.size(), used);
+        return uploadSummaries(groupBuy.getId(), rowRepository.findByGroupBuyId(groupBuy.getId()), usedRowIds(groupBuy.getId()));
+    }
+
+    /**
+     * 업로드별 입금 줄 수·확정에 쓰인 줄 수. 이미 읽은 공구의 입금 줄을 업로드별로 나눈다
+     * (전에는 업로드마다 따로 읽었음, 2026-10-20 점검. 대조 화면은 대조에 읽은 줄을 그대로 넘긴다, 2026-10-21)
+     */
+    private List<UploadSummary> uploadSummaries(Long groupBuyId, List<DepositRow> rows, Set<Long> usedRows) {
+        Map<Long, List<DepositRow>> rowsByUpload = rows.stream().collect(Collectors.groupingBy(DepositRow::getUploadId));
+        return uploadRepository.findByGroupBuyIdOrderByIdDesc(groupBuyId).stream().map(u -> {
+            List<DepositRow> uploadRows = rowsByUpload.getOrDefault(u.getId(), List.of());
+            int used = (int) uploadRows.stream().filter(r -> usedRows.contains(r.getId())).count();
+            return new UploadSummary(u.getId(), u.getSource(), u.getFileName(), u.getUploadedAt(), uploadRows.size(), used);
         }).toList();
     }
 
@@ -243,6 +250,7 @@ public class DepositService {
         // 판매자가 직접 고를 수 있는 주문: 다른 입금에 추천된 주문까지 포함한 모든 미입금 선입금 주문
         List<OrderBrief> openOrders = payees.stream().map(p -> brief(orderById.get(p.orderId()))).toList();
         return MatchResponse.builder()
+                .uploads(uploadSummaries(groupBuy.getId(), rows, orderByRow.keySet()))
                 .rows(matchRows)
                 .unpaid(unpaid)
                 .openOrders(openOrders)
@@ -395,6 +403,13 @@ public class DepositService {
 
     public List<PresetResponse> presets(Long sellerId) {
         return presetRepository.findBySellerIdOrderByNameAsc(sellerId).stream().map(PresetResponse::of).toList();
+    }
+
+    /** 은행 열 설정 화면: 자동 탐지 열 이름 후보(화면 안내용) + 저장된 열 설정 + 입금자 별칭 */
+    public BankSettingsResponse bankSettings(Long sellerId) {
+        DefaultColumns defaults = new DefaultColumns(BankStatementReader.DATE_CANDIDATES, BankStatementReader.NAME_CANDIDATES,
+                BankStatementReader.AMOUNT_CANDIDATES, BankStatementReader.TYPE_CANDIDATES);
+        return new BankSettingsResponse(defaults, presets(sellerId), aliases(sellerId));
     }
 
     /** 같은 이름이 있으면 덮어쓴다. */

@@ -137,12 +137,12 @@ class M2OrderFormTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.products[0].remaining").value(7));
 
-        mvc.perform(get("/api/seller/group-buys/" + created.get("id").asLong() + "/dashboard").cookie(seller))
-                .andExpect(jsonPath("$.orderCount").value(1))
-                .andExpect(jsonPath("$.totalQuantity").value(3))
-                .andExpect(jsonPath("$.totalAmount").value(5700))
-                .andExpect(jsonPath("$.unpaidCount").value(1))
-                .andExpect(jsonPath("$.cancelledCount").value(1));
+        mvc.perform(get("/api/seller/group-buys/" + created.get("id").asLong() + "/detail").cookie(seller))
+                .andExpect(jsonPath("$.dashboard.orderCount").value(1))
+                .andExpect(jsonPath("$.dashboard.totalQuantity").value(3))
+                .andExpect(jsonPath("$.dashboard.totalAmount").value(5700))
+                .andExpect(jsonPath("$.dashboard.unpaidCount").value(1))
+                .andExpect(jsonPath("$.dashboard.cancelledCount").value(1));
     }
 
     @Test

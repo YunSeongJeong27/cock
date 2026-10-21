@@ -180,6 +180,13 @@ export interface SellerOrder {
   sameNicknameOrderNos: number[]
 }
 
+/** 판매자 공구 상세 화면 한 번에 (GET /api/seller/group-buys/{id}/detail) */
+export interface GroupBuyDetailResponse {
+  groupBuy: GroupBuy
+  dashboard: Dashboard
+  orders: SellerOrder[]
+}
+
 export interface ColumnMapping {
   dateColumn: string | null
   nameColumn: string | null
@@ -238,6 +245,8 @@ export interface MatchRow {
 }
 
 export interface MatchResponse {
+  /** 올린 거래내역 파일 목록 (대조와 같은 입금 행을 한 번 읽어 함께 내려옴) */
+  uploads: UploadSummary[]
   rows: MatchRow[]
   unpaid: OrderBrief[]
   /** 판매자가 직접 고를 수 있는 모든 미입금 선입금 주문 (다른 입금에 추천된 주문 포함) */

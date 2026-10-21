@@ -123,7 +123,7 @@ class CancelRefundPauseTest extends IntegrationTest {
         assertThat(o.get("refundAccount").asText()).isEqualTo("110123456789");
         assertThat(o.get("refundBank").asText()).isEqualTo("국민");
         assertThat(o.get("refundRequestedAt").isNull()).isFalse();
-        mvc.perform(get(g.sellerBase() + "/dashboard").cookie(g.seller())).andExpect(jsonPath("$.refundRequestCount").value(1));
+        mvc.perform(get(g.sellerBase() + "/detail").cookie(g.seller())).andExpect(jsonPath("$.dashboard.refundRequestCount").value(1));
 
         // 판매자 [취소 안 함]: 주문 그대로, 고객 화면 "반려", 계좌 삭제, 다시 신청 불가
         long orderId = o.get("id").asLong();

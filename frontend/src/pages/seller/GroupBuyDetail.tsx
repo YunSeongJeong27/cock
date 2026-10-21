@@ -4,7 +4,7 @@ import { api, dateTime, errorMessage, storageGet, storageSet, won } from '../../
 import { useAuth } from '../../auth'
 import { CopyButton, ErrorBox, Stat, StatusBadge } from '../../components/Ui'
 import { groupBuyText as T } from '../../texts/groupBuy'
-import type { Dashboard, GroupBuy, Product, SellerOrder } from '../../types'
+import type { Dashboard, GroupBuy, GroupBuyDetailResponse, Product, SellerOrder } from '../../types'
 import OrdersTab from './OrdersTab'
 import DepositTab from './DepositTab'
 import PickupTab from './PickupTab'
@@ -25,14 +25,10 @@ export default function GroupBuyDetail() {
 
   const reload = useCallback(async () => {
     try {
-      const [g, d, o] = await Promise.all([
-        api.get<GroupBuy>(`/api/seller/group-buys/${id}`),
-        api.get<Dashboard>(`/api/seller/group-buys/${id}/dashboard`),
-        api.get<SellerOrder[]>(`/api/seller/group-buys/${id}/orders`),
-      ])
-      setGroupBuy(g)
-      setDashboard(d)
-      setOrders(o)
+      const d = await api.get<GroupBuyDetailResponse>(`/api/seller/group-buys/${id}/detail`)
+      setGroupBuy(d.groupBuy)
+      setDashboard(d.dashboard)
+      setOrders(d.orders)
     } catch (e) {
       setError(errorMessage(e))
     }

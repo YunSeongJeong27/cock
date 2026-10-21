@@ -32,9 +32,9 @@ export default function DepositTab({ groupBuy, reload }: Props) {
 
   const loadMatch = useCallback(async () => {
     try {
-      const [m, u] = await Promise.all([api.get<MatchResponse>(`${base}/match`), api.get<UploadSummary[]>(`${base}/uploads`)])
+      const m = await api.get<MatchResponse>(`${base}/match`)
       setMatch(m)
-      setUploads(u)
+      setUploads(m.uploads)
       const initial: Record<number, string> = {}
       m.rows.forEach((r) => {
         if (r.order) initial[r.rowId] = String(r.order.orderId)

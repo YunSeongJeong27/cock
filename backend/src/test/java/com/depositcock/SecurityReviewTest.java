@@ -95,7 +95,7 @@ class SecurityReviewTest extends IntegrationTest {
         mvc.perform(get(a + "/comments").cookie(bob)).andExpect(status().isNotFound());
         mvc.perform(get(a + "/announcement").cookie(bob)).andExpect(status().isNotFound());
         mvc.perform(get(a + "/export.xlsx").cookie(bob)).andExpect(status().isNotFound());
-        mvc.perform(get(a + "/dashboard").cookie(bob)).andExpect(status().isNotFound());
+        mvc.perform(get(a + "/detail").cookie(bob)).andExpect(status().isNotFound());
         mvc.perform(multipart(a + "/deposits/screenshots/extract")
                 .file(new MockMultipartFile("files", "x.png", "image/png", new byte[]{1})).cookie(bob))
                 .andExpect(status().isNotFound());
@@ -115,6 +115,9 @@ class SecurityReviewTest extends IntegrationTest {
                 .andExpect(status().isNotFound());
         assertThat(read(mvc.perform(get("/api/seller/bank-columns/presets").cookie(bob)).andReturn())).isEmpty();
         assertThat(read(mvc.perform(get("/api/seller/aliases").cookie(bob)).andReturn())).isEmpty();
+        JsonNode bobSettings = read(mvc.perform(get("/api/seller/bank-settings").cookie(bob)).andReturn());
+        assertThat(bobSettings.get("presets")).isEmpty();
+        assertThat(bobSettings.get("aliases")).isEmpty();
     }
 
     @Test

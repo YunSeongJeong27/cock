@@ -10,6 +10,8 @@ import com.depositcock.common.DataCipher;
 import com.depositcock.common.ErrorCode;
 import com.depositcock.common.Texts;
 import com.depositcock.groupbuy.GroupBuy;
+import com.depositcock.groupbuy.GroupBuyDtos.GroupBuyDetail;
+import com.depositcock.groupbuy.GroupBuyDtos.GroupBuyResponse;
 import com.depositcock.groupbuy.GroupBuyService;
 import com.depositcock.groupbuy.PickupPoint;
 import com.depositcock.groupbuy.ProductRepository;
@@ -22,7 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 판매자 주문 관리: 목록, 수령 체크, 취소, 환불 완료, 수동 입금 확정/확정 취소.
+ * 판매자 주문 관리: 목록(공구 상세 화면 포함), 수령 체크, 취소, 환불 완료, 수동 입금 확정/확정 취소.
  */
 @Service
 @Transactional(readOnly = true)
@@ -40,6 +42,14 @@ public class SellerOrderService {
     public List<SellerOrder> list(Long sellerId, Long groupBuyId) {
         GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
         return OrderMapper.toSellerOrders(orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId()), cipher);
+    }
+
+    /** 공구 상세 화면: 공구·대시보드·주문 목록. 대시보드와 목록이 같은 주문을 쓰므로 주문은 한 번만 읽는다 */
+    public GroupBuyDetail detail(Long sellerId, Long groupBuyId) {
+        GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
+        List<CustomerOrder> orders = orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId());
+        return new GroupBuyDetail(GroupBuyResponse.of(groupBuy, LocalDateTime.now(clock)),
+                GroupBuyService.dashboard(orders), OrderMapper.toSellerOrders(orders, cipher));
     }
 
     /** 다른 판매자의 주문이면 404. 주문을 바꾸는 요청이므로 공구를 잠근 뒤 최신 주문을 읽는다 */

@@ -56,11 +56,13 @@ public final class DepositDtos {
     }
 
     /**
+     * @param uploads    올린 거래내역 파일 목록 (대조와 같은 입금 줄로 만든다. 화면이 따로 부르지 않게 함께 내려 줌)
      * @param unpaid     어떤 입금과도 연결되지 않은 미입금 주문
      * @param openOrders 판매자가 직접 고를 수 있는 모든 미입금 선입금 주문 (다른 입금에 추천된 주문 포함)
      */
     @Builder
     public record MatchResponse(
+            List<UploadSummary> uploads,
             List<MatchRow> rows,
             List<OrderBrief> unpaid,
             List<OrderBrief> openOrders,
@@ -104,6 +106,10 @@ public final class DepositDtos {
     }
 
     public record DefaultColumns(List<String> date, List<String> name, List<String> amount, List<String> type) {
+    }
+
+    /** 은행 열 설정 화면 한 번에: 자동 탐지 열 이름 후보 + 저장된 열 설정 + 입금자 별칭 */
+    public record BankSettingsResponse(DefaultColumns defaults, List<PresetResponse> presets, List<AliasResponse> aliases) {
     }
 
     /** 입금 확인 문구 (밴드·카톡에 붙여넣기용) + 닉네임 목록 */

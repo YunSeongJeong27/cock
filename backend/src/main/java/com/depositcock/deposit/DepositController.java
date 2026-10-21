@@ -3,9 +3,9 @@ package com.depositcock.deposit;
 import java.util.List;
 
 import com.depositcock.deposit.DepositDtos.AliasResponse;
+import com.depositcock.deposit.DepositDtos.BankSettingsResponse;
 import com.depositcock.deposit.DepositDtos.ConfirmRequest;
 import com.depositcock.deposit.DepositDtos.ConfirmResponse;
-import com.depositcock.deposit.DepositDtos.DefaultColumns;
 import com.depositcock.deposit.DepositDtos.MatchResponse;
 import com.depositcock.deposit.DepositDtos.PresetRequest;
 import com.depositcock.deposit.DepositDtos.PresetResponse;
@@ -34,11 +34,13 @@ public class DepositController {
 
     private final DepositService service;
 
-    /** 자동 탐지에 쓰는 기본 열 이름 후보 (화면 안내용) */
-    @GetMapping("/api/seller/bank-columns/defaults")
-    public DefaultColumns defaults() {
-        return new DefaultColumns(BankStatementReader.DATE_CANDIDATES, BankStatementReader.NAME_CANDIDATES,
-                BankStatementReader.AMOUNT_CANDIDATES, BankStatementReader.TYPE_CANDIDATES);
+    /**
+     * 은행 열 설정 화면 한 번에: 자동 탐지 열 이름 후보 + 저장된 열 설정 + 입금자 별칭.
+     * 전에는 화면이 열 이름 후보(/bank-columns/defaults)·열 설정·별칭을 따로 세 번 불렀음 (2026-10-21)
+     */
+    @GetMapping("/api/seller/bank-settings")
+    public BankSettingsResponse bankSettings() {
+        return service.bankSettings(CurrentSeller.id());
     }
 
     /**

@@ -117,9 +117,9 @@ class M3DepositFlowTest extends IntegrationTest {
                 .andExpect(jsonPath("$[?(@.depositorName == '박서준맘')].customerLabel").value("휴대폰 010-1000-0002"));
 
         // 고객 화면에도 입금 확인됨
-        mvc.perform(get("/api/seller/group-buys/" + id + "/dashboard").cookie(seller))
-                .andExpect(jsonPath("$.paidCount").value(2))
-                .andExpect(jsonPath("$.unpaidCount").value(1));
+        mvc.perform(get("/api/seller/group-buys/" + id + "/detail").cookie(seller))
+                .andExpect(jsonPath("$.dashboard.paidCount").value(2))
+                .andExpect(jsonPath("$.dashboard.unpaidCount").value(1));
 
         // 다음 공구: 같은 고객(같은 휴대폰)이 "박서준맘"으로 입금 → 별칭으로 자동 매칭
         long next = openGroupBuy(seller, "다음 공구", 8900);

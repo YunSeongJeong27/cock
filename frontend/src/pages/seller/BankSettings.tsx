@@ -6,6 +6,8 @@ import type { Preset } from '../../types'
 
 interface Defaults { date: string[]; name: string[]; amount: string[]; type: string[] }
 interface Alias { id: number; depositorName: string; customerId: number; customerLabel: string; createdAt: string }
+/** GET /api/seller/bank-settings: 화면에 필요한 세 가지를 한 번에 */
+interface Settings { defaults: Defaults; presets: Preset[]; aliases: Alias[] }
 
 /** 은행 거래내역 열 설정 (은행마다 열 이름이 달라서) + 저장된 입금자 별칭 관리 */
 const emptyPreset = { name: '', nameColumn: '', amountColumn: '', dateColumn: '', typeColumn: '' }
@@ -18,9 +20,13 @@ export default function BankSettings() {
   const [error, setError] = useState<string | null>(null)
 
   const load = () => {
-    api.get<Defaults>('/api/seller/bank-columns/defaults').then(setDefaults).catch(() => undefined)
-    api.get<Preset[]>('/api/seller/bank-columns/presets').then(setPresets).catch((e) => setError(errorMessage(e)))
-    api.get<Alias[]>('/api/seller/aliases').then(setAliases).catch(() => undefined)
+    api.get<Settings>('/api/seller/bank-settings')
+      .then((s) => {
+        setDefaults(s.defaults)
+        setPresets(s.presets)
+        setAliases(s.aliases)
+      })
+      .catch((e) => setError(errorMessage(e)))
   }
   useEffect(load, [])
 

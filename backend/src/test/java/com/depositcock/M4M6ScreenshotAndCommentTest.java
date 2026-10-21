@@ -127,9 +127,9 @@ class M4M6ScreenshotAndCommentTest extends IntegrationTest {
         mvc.perform(withJson(post(base + "/apply").cookie(seller), Map.of("productId", productId)))
                 .andExpect(jsonPath("$.createdCount").value(0))
                 .andExpect(jsonPath("$.reviewCount").value(0));
-        mvc.perform(get("/api/seller/group-buys/" + id + "/dashboard").cookie(seller))
-                .andExpect(jsonPath("$.orderCount").value(7))
-                .andExpect(jsonPath("$.totalAmount").value(13300));
+        mvc.perform(get("/api/seller/group-buys/" + id + "/detail").cookie(seller))
+                .andExpect(jsonPath("$.dashboard.orderCount").value(7))
+                .andExpect(jsonPath("$.dashboard.totalAmount").value(13300));
 
         // 댓글 주문도 입금 대조: 닉네임 숫자 "2171505" → 꼭지맘 217-1505
         mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/uploads")
