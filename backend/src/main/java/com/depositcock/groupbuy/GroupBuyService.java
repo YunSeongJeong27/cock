@@ -27,6 +27,7 @@ import com.depositcock.order.CustomerOrder;
 import com.depositcock.order.CustomerOrderRepository;
 import com.depositcock.order.OrderSource;
 import com.depositcock.order.OrderStatus;
+import com.depositcock.order.OrderTotals;
 import com.depositcock.seller.FeatureAccess;
 import com.depositcock.seller.Seller;
 import com.depositcock.seller.SellerRepository;
@@ -83,9 +84,11 @@ public class GroupBuyService {
 
     public List<GroupBuySummary> list(Long sellerId) {
         LocalDateTime now = LocalDateTime.now(clock);
-        // 공구마다 주문을 따로 읽던 것(공구 수만큼 조회)을 판매자 주문 한 번 조회로
-        Map<Long, List<CustomerOrder>> ordersByGroupBuy = orderRepository.findByGroupBuySellerId(sellerId).stream()
-                .collect(Collectors.groupingBy(o -> o.getGroupBuy().getId()));
+        // 요약 숫자는 DB 가 공구마다 센다 (주문을 읽어 세면 판매자의 누적 주문 수만큼 느려짐, 2026-10-21)
+        Map<Long, OrderTotals> totals = orderRepository.totalsBySeller(sellerId).stream()
+                .collect(Collectors.toMap(OrderTotals::groupBuyId, t -> t));
+        Map<Long, Long> quantities = new HashMap<>();
+        orderRepository.quantitiesBySeller(sellerId).forEach(r -> quantities.put((Long) r[0], ((Number) r[1]).longValue()));
         return groupBuyRepository.findBySellerIdOrderByIdDesc(sellerId).stream()
                 .map(g -> GroupBuySummary.builder()
                         .id(g.getId())
@@ -96,7 +99,7 @@ public class GroupBuyService {
                         .closeAt(g.getCloseAt())
                         .publicToken(g.getPublicToken())
                         .createdAt(g.getCreatedAt())
-                        .dashboard(dashboard(ordersByGroupBuy.getOrDefault(g.getId(), List.of())))
+                        .dashboard(dashboard(totals.get(g.getId()), quantities.getOrDefault(g.getId(), 0L)))
                         .paused(g.isPaused())
                         .build())
                 .toList();
@@ -320,6 +323,30 @@ public class GroupBuyService {
         }
     }
 
+    /** 공구 목록 요약: DB 집계(CustomerOrderRepository.totalsBySeller)로 만든다. 주문이 없는 공구는 totals 가 null */
+    private static Dashboard dashboard(OrderTotals t, long totalQuantity) {
+        if (t == null) {
+            return dashboard(List.of());
+        }
+        return Dashboard.builder()
+                .orderCount(t.orderCount().intValue())
+                .totalQuantity((int) totalQuantity)
+                .totalAmount(t.totalAmount())
+                .prepaidCount(t.prepaidCount().intValue())
+                .paidCount(t.paidCount().intValue())
+                .unpaidCount((int) (t.prepaidCount() - t.paidCount()))
+                .onsiteCount(t.onsiteCount().intValue())
+                .pickedUpCount(t.pickedUpCount().intValue())
+                .refundPendingCount(t.refundPendingCount().intValue())
+                .refundRequestCount(t.refundRequestCount().intValue())
+                .cancelledCount(t.cancelledCount().intValue())
+                .build();
+    }
+
+    /**
+     * 공구 상세의 요약 숫자 (읽어 온 주문으로 센다). 규칙을 바꾸면 공구 목록의 DB 집계(CustomerOrderRepository.totalsBySeller·
+     * quantitiesBySeller)도 같이 바꾼다. 둘이 같은지는 GroupBuyListTotalsTest 가 확인한다
+     */
     public static Dashboard dashboard(List<CustomerOrder> orders) {
         int orderCount = 0;
         int totalQuantity = 0;

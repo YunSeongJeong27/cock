@@ -12,8 +12,37 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     List<CustomerOrder> findByGroupBuyIdOrderByOrderNoAsc(Long groupBuyId);
 
-    /** 판매자의 모든 공구 주문 (공구 목록 요약을 공구마다 따로 읽지 않고 한 번에 계산할 때) */
-    List<CustomerOrder> findByGroupBuySellerId(Long sellerId);
+    /**
+     * 공구 목록 요약: 판매자의 공구마다 주문 집계 한 줄 (주문이 없는 공구는 빠짐).
+     * 전에는 판매자의 모든 주문(지난 공구 포함)과 주문 상품·입금 확정을 읽어 자바에서 셌는데, 판매자의 누적 주문이 늘수록
+     * 목록이 느려져서 DB 가 세게 했다 (2026-10-21, 주문 1만 2천 건에서 0.8초·쿼리 242번).
+     * 규칙은 GroupBuyService.dashboard(공구 상세가 씀)와 같아야 한다: 살아 있는 주문 = ORDERED, 입금 확인 = 살아 있는 입금 확정
+     * (취소 안 된 deposit_confirmation, 주문당 최대 1건이라 붙여도 줄이 늘지 않음). 같은지는 GroupBuyListTotalsTest 가 확인한다
+     */
+    @Query("select new com.depositcock.order.OrderTotals(o.groupBuy.id,"
+            + " sum(case when o.status = com.depositcock.order.OrderStatus.ORDERED then 1 else 0 end),"
+            + " sum(case when o.status = com.depositcock.order.OrderStatus.ORDERED then o.expectedAmount else 0 end),"
+            + " sum(case when o.status = com.depositcock.order.OrderStatus.ORDERED"
+            + "     and o.paymentMethod = com.depositcock.order.PaymentMethod.PREPAID then 1 else 0 end),"
+            + " sum(case when o.status = com.depositcock.order.OrderStatus.ORDERED"
+            + "     and o.paymentMethod = com.depositcock.order.PaymentMethod.PREPAID and c.id is not null then 1 else 0 end),"
+            + " sum(case when o.status = com.depositcock.order.OrderStatus.ORDERED"
+            + "     and o.paymentMethod <> com.depositcock.order.PaymentMethod.PREPAID then 1 else 0 end),"
+            + " sum(case when o.status = com.depositcock.order.OrderStatus.ORDERED and o.pickedUp = true then 1 else 0 end),"
+            + " sum(case when o.status <> com.depositcock.order.OrderStatus.ORDERED"
+            + "     and o.refundRequired = true and o.refundedAt is null then 1 else 0 end),"
+            + " sum(case when o.status = com.depositcock.order.OrderStatus.ORDERED"
+            + "     and o.refundRequestedAt is not null and o.refundRejectedAt is null then 1 else 0 end),"
+            + " sum(case when o.status <> com.depositcock.order.OrderStatus.ORDERED then 1 else 0 end))"
+            + " from CustomerOrder o left join DepositConfirmation c on c.order = o and c.cancelledAt is null"
+            + " where o.groupBuy.seller.id = :sellerId group by o.groupBuy.id")
+    List<OrderTotals> totalsBySeller(@Param("sellerId") Long sellerId);
+
+    /** 공구 목록 요약: 공구마다 살아 있는 주문의 상품 수량 합계 [공구 id, 합계] (규칙은 GroupBuyService.dashboard 의 totalQuantity) */
+    @Query("select o.groupBuy.id, sum(i.quantity) from OrderItem i join i.order o"
+            + " where o.groupBuy.seller.id = :sellerId and o.status = com.depositcock.order.OrderStatus.ORDERED"
+            + " group by o.groupBuy.id")
+    List<Object[]> quantitiesBySeller(@Param("sellerId") Long sellerId);
 
     List<CustomerOrder> findByGroupBuyIdAndCustomer_IdOrderByOrderNoAsc(Long groupBuyId, Long customerId);
 
