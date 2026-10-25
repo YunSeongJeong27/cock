@@ -96,12 +96,13 @@ export default function BankSettings() {
         <h3>저장된 입금자 별칭 ({aliases.length})</h3>
         <p className="muted small">{T.aliasHelp}</p>
         <div className="table-wrap">
-          <table>
+          <table className="stack">
             <thead><tr><th>입금자명</th><th>고객</th><th>저장</th><th></th></tr></thead>
             <tbody>
               {aliases.map((a) => (
-                <tr key={a.id}><td>{a.depositorName}</td><td>{a.customerLabel}</td><td className="small">{dateTime(a.createdAt)}</td>
-                  <td><button className="btn small danger" onClick={() => remove(`/api/seller/aliases/${a.id}`)}>삭제</button></td></tr>
+                <tr key={a.id}><td className="stack-title">{a.depositorName}</td><td data-label="고객">{a.customerLabel}</td>
+                  <td className="small" data-label="저장" style={{ whiteSpace: 'nowrap' }}>{dateTime(a.createdAt)}</td>
+                  <td className="stack-action"><button className="btn small danger" onClick={() => remove(`/api/seller/aliases/${a.id}`)}>삭제</button></td></tr>
               ))}
             </tbody>
           </table>

@@ -148,7 +148,7 @@ export default function GroupBuyForm() {
       <div className="card">
         <h3>기본 정보</h3>
         <label className="field"><span>공구 제목 *</span>
-          <input type="text" value={form.title} onChange={(e) => set('title', e.target.value)} required placeholder="예: 동해기정떡 2차 공구 (10/15 목 입고)" />
+          <input type="text" value={form.title} onChange={(e) => set('title', e.target.value)} required placeholder="예: 동해기정떡 2차 (10/15 입고)" />
         </label>
         <label className="field"><span>설명</span>
           <textarea value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="픽업 날짜·시간, 상품 설명 등" />
@@ -174,11 +174,12 @@ export default function GroupBuyForm() {
             <label className="field" style={{ width: 100, marginBottom: 0 }}><span>준비 수량</span>
               <input type="number" min={1} value={p.stockLimit} placeholder="무제한" onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, stockLimit: e.target.value } : x)))} />
             </label>
-            <label className="field" style={{ width: 110, marginBottom: 0 }} title={T.stockAlertTitle}><span>알림 (남은 수량)</span>
+            {/* 숫자 칸은 오른쪽에 올리고 내리는 화살표 자리가 있어 placeholder("준비 수량 먼저"·"제한없음")가 들어가게 넓힌다 */}
+            <label className="field" style={{ width: 156, marginBottom: 0 }} title={T.stockAlertTitle}><span>알림 (남은 수량)</span>
               <input type="number" min={0} value={p.stockAlertThreshold} placeholder={p.stockLimit ? '알림 없음' : '준비 수량 먼저'} disabled={!p.stockLimit}
                 onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, stockAlertThreshold: e.target.value } : x)))} />
             </label>
-            <label className="field" style={{ width: 100, marginBottom: 0 }}><span>1인 최대</span>
+            <label className="field" style={{ width: 116, marginBottom: 0 }}><span>1인 최대</span>
               <input type="number" min={1} value={p.perOrderLimit} placeholder="제한없음" onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, perOrderLimit: e.target.value } : x)))} />
             </label>
             <label className="check small" style={{ whiteSpace: 'nowrap', margin: 0 }} title={T.blockWhenSoldOutTitle}>
@@ -204,8 +205,9 @@ export default function GroupBuyForm() {
             <div className="muted small mt">픽업 지점 (2개 이상이면 고객이 고릅니다)</div>
             {form.pickupPoints.map((p, i) => (
               <div key={i} className="row mb">
-                <input type="text" className="grow" placeholder="지점 이름" value={p.name} onChange={(e) => set('pickupPoints', form.pickupPoints.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} style={{ flex: 1 }} />
-                <input type="text" placeholder="안내 (주소·시간)" value={p.info} onChange={(e) => set('pickupPoints', form.pickupPoints.map((x, j) => (j === i ? { ...x, info: e.target.value } : x)))} style={{ flex: 2 }} />
+                {/* 폰처럼 좁으면 지점 이름이 한 줄을 다 쓰고 안내·삭제가 다음 줄로 (이름 칸이 몇 글자 폭으로 줄던 문제) */}
+                <input type="text" placeholder="지점 이름" value={p.name} onChange={(e) => set('pickupPoints', form.pickupPoints.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} style={{ flex: '1 1 160px' }} />
+                <input type="text" placeholder="안내 (주소·시간)" value={p.info} onChange={(e) => set('pickupPoints', form.pickupPoints.map((x, j) => (j === i ? { ...x, info: e.target.value } : x)))} style={{ flex: '2 1 180px', width: 'auto', minWidth: 0 }} />
                 <button type="button" className="btn small danger" onClick={() => set('pickupPoints', form.pickupPoints.filter((_, j) => j !== i))}>삭제</button>
               </div>
             ))}

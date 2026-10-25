@@ -87,8 +87,9 @@ export default function GroupBuyDetail() {
         ) : (
           <>
             <div className="muted small">{T.linkHint}</div>
+            {/* 폰처럼 좁으면 링크가 한 줄을 다 쓰고 버튼이 아래로 (전에는 버튼 옆 좁은 칸에서 몇 글자씩 꺾였음) */}
             <div className="row">
-              <code className="grow" style={{ wordBreak: 'break-all' }}>{link}</code>
+              <code style={{ wordBreak: 'break-all', flex: '1 1 260px' }}>{link}</code>
               <CopyButton text={link} label="링크 복사" />
               <a className="btn small" href={link} target="_blank" rel="noreferrer">열어보기</a>
             </div>

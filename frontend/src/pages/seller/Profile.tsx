@@ -96,9 +96,10 @@ export default function Profile() {
         </label>
         <h3>기본 입금 계좌 (새 공구에 자동으로 채움)</h3>
         <div className="row">
-          <input type="text" placeholder="은행" value={form.defaultBankName} onChange={(e) => setForm({ ...form, defaultBankName: e.target.value })} style={{ flex: 1 }} />
-          <input type="text" placeholder="계좌번호" value={form.defaultAccountNumber} onChange={(e) => setForm({ ...form, defaultAccountNumber: e.target.value })} style={{ flex: 2 }} />
-          <input type="text" placeholder="예금주" value={form.defaultAccountHolder} onChange={(e) => setForm({ ...form, defaultAccountHolder: e.target.value })} style={{ flex: 1 }} />
+          {/* 공구 만들기의 입금 계좌 칸과 같은 폭 규칙: 좁으면 예금주가 다음 줄로 */}
+          <input type="text" placeholder="은행" value={form.defaultBankName} onChange={(e) => setForm({ ...form, defaultBankName: e.target.value })} style={{ flex: 1, minWidth: 100 }} />
+          <input type="text" placeholder="계좌번호" value={form.defaultAccountNumber} onChange={(e) => setForm({ ...form, defaultAccountNumber: e.target.value })} style={{ flex: 2, minWidth: 160 }} />
+          <input type="text" placeholder="예금주" value={form.defaultAccountHolder} onChange={(e) => setForm({ ...form, defaultAccountHolder: e.target.value })} style={{ flex: 1, minWidth: 100 }} />
         </div>
         <ErrorBox message={error} />
         {saved && <div className="success-box">저장했습니다.</div>}

@@ -311,11 +311,11 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
                 <td className="stack-title">
                   {checkBox(o)}<span className="muted">{o.orderNo}번 · </span>
                   <b>{o.nickname || o.depositorName}</b>
+                  {o.source === 'COMMENT' && <> <span className="chip">댓글</span></>}
+                  {o.changes.length > 0 && <> <span className="chip">변경됨</span></>}
                   {o.nickname && o.depositorName && <div className="small muted">입금자 {o.depositorName}</div>}
                   {o.phone && <div className="small muted">{maskPhone(o.phone)}</div>}
                   {warnings(o)}
-                  {o.source === 'COMMENT' && <span className="chip">댓글</span>}
-                  {o.changes.length > 0 && <span className="chip">변경됨</span>}
                 </td>
                 <td className="small" data-label="상품">{itemsText(o.items)}</td>
                 <td data-label="금액">{won(o.expectedAmount)}</td>
@@ -375,7 +375,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             <option value="amount:desc">금액 큰 순</option>
           </select>
         )}
-        <input type="text" placeholder="닉네임·입금자명·전화 뒷자리·주문번호 검색" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1, minWidth: 180 }} />
+        <input type="text" placeholder="닉네임·입금자명·전화 뒷자리·주문번호 검색" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: '1 1 280px', minWidth: 0 }} />
       </div>
       {deleting && (
         <div className="row mb">

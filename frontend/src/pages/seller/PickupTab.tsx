@@ -36,7 +36,7 @@ export default function PickupTab({ groupBuy, orders, reload }: Props) {
   return (
     <div>
       <div className="row mb">
-        <input type="text" placeholder="이름·닉네임·전화 뒷자리·동호수 검색" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1, minWidth: 180 }} />
+        <input type="text" placeholder="이름·닉네임·전화 뒷자리·동호수 검색" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: '1 1 280px', minWidth: 0 }} />
         {groupBuy.pickupPoints.length > 1 && (
           <select value={point} onChange={(e) => setPoint(e.target.value)} style={{ width: 150 }}>
             <option value="all">모든 지점</option>

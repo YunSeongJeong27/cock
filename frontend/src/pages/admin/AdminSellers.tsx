@@ -25,6 +25,12 @@ interface Row {
   commentFeatureEnabled: boolean
 }
 
+/** 이메일이 칸보다 길면 "@" 앞에서 줄을 바꾼다 (글자 중간에서 끊기지 않게) */
+const emailWithBreak = (email: string) => {
+  const at = email.indexOf('@')
+  return at > 0 ? <>{email.slice(0, at)}<wbr />{email.slice(at)}</> : email
+}
+
 /** 슈퍼 관리자: 판매자 목록, 플랜(무료 체험/유료)·유료 만료일·사용 제한 수동 변경 */
 export default function AdminSellers() {
   const [rows, setRows] = useState<Row[]>([])
@@ -126,7 +132,7 @@ export default function AdminSellers() {
               const update = (patch: Partial<Row>) => setEditing((e) => ({ ...e, [row.id]: { ...r, ...patch } }))
               return (
                 <tr key={row.id}>
-                  <td className="stack-title">{row.displayName}<div className="muted small">{row.email}{row.role === 'ADMIN' && ' (관리자)'}</div>
+                  <td className="stack-title">{row.displayName}<div className="muted small">{emailWithBreak(row.email)}{row.role === 'ADMIN' && ' (관리자)'}</div>
                     <div className="muted small">가입 {row.createdAt.substring(0, 10)} · 공구 {row.groupBuyCount}개</div></td>
                   <td data-label="플랜">
                     <select value={r.plan} onChange={(e) => update({ plan: e.target.value as Plan })} disabled={row.role === 'ADMIN'} style={{ minWidth: 120 }}>
@@ -139,21 +145,26 @@ export default function AdminSellers() {
                     if (e.target.value) update({ trialEndsAt: e.target.value + 'T23:59:59' })
                   }} disabled={row.role === 'ADMIN'} /></td>
                   <td data-label="유료 만료일"><input type="date" className="date-compact" value={r.paidUntil ?? ''} onChange={(e) => update({ paidUntil: e.target.value })} disabled={row.role === 'ADMIN'} /></td>
+                  {/* 폰 카드에서는 칸 이름 옆이 좁아서, 체크 두 개·사용량과 입력칸을 한 덩어리로 묶어 넘치면 다음 줄로 보낸다 */}
                   <td data-label="상태">
-                    {row.expired && <div className="badge badge-CLOSED">만료</div>}
-                    <label className="check small" style={{ whiteSpace: 'nowrap' }}><input type="checkbox" checked={r.suspended} onChange={(e) => update({ suspended: e.target.checked })} disabled={row.role === 'ADMIN'} /> 사용 제한</label>
-                    <label className="check small" style={{ whiteSpace: 'nowrap' }} title={T.commentFeatureTitle}>
-                      <input type="checkbox" checked={r.commentFeatureEnabled} onChange={(e) => update({ commentFeatureEnabled: e.target.checked })} disabled={row.role === 'ADMIN'} /> 댓글 기능
-                    </label>
+                    <div className="row" style={{ gap: '0 12px' }}>
+                      {row.expired && <div className="badge badge-CLOSED">만료</div>}
+                      <label className="check small" style={{ whiteSpace: 'nowrap' }}><input type="checkbox" checked={r.suspended} onChange={(e) => update({ suspended: e.target.checked })} disabled={row.role === 'ADMIN'} /> 사용 제한</label>
+                      <label className="check small" style={{ whiteSpace: 'nowrap' }} title={T.commentFeatureTitle}>
+                        <input type="checkbox" checked={r.commentFeatureEnabled} onChange={(e) => update({ commentFeatureEnabled: e.target.checked })} disabled={row.role === 'ADMIN'} /> 댓글 기능
+                      </label>
+                    </div>
                   </td>
                   <td data-label="캡처">
-                    <div className="small" style={{ whiteSpace: 'nowrap' }}>오늘 {row.captureToday} / 이번 달 {row.captureThisMonth}장</div>
-                    <input type="number" min={0} style={{ width: 110 }} aria-label="캡처 하루 제한"
-                      value={r.customCaptureLimit ? r.dailyCaptureLimit : ''}
-                      placeholder="기본값"
-                      onChange={(e) => update(e.target.value === ''
-                        ? { customCaptureLimit: false }
-                        : { customCaptureLimit: true, dailyCaptureLimit: Number(e.target.value) })} />
+                    <div className="row" style={{ gap: '4px 10px' }}>
+                      <div className="small" style={{ whiteSpace: 'nowrap' }}>오늘 {row.captureToday} / 이번 달 {row.captureThisMonth}장</div>
+                      <input type="number" min={0} className="capture-limit" aria-label="캡처 하루 제한"
+                        value={r.customCaptureLimit ? r.dailyCaptureLimit : ''}
+                        placeholder="기본값"
+                        onChange={(e) => update(e.target.value === ''
+                          ? { customCaptureLimit: false }
+                          : { customCaptureLimit: true, dailyCaptureLimit: Number(e.target.value) })} />
+                    </div>
                   </td>
                   <td data-label="메모"><input type="text" value={r.adminMemo ?? ''} onChange={(e) => update({ adminMemo: e.target.value })} placeholder="입금 기록 등" style={{ minWidth: 120 }} /></td>
                   <td className="stack-action">

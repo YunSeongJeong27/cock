@@ -196,7 +196,7 @@ function IdentifyCard({ base, kakaoInquiryUrl, onFound }: { base: string; kakaoI
         <form onSubmit={doIdentify}>
           <h3>내 주문 찾기</h3>
           <div className="row">
-            <input type="tel" placeholder="휴대폰 번호 (010-0000-0000)" value={identify.phone} onChange={(e) => setIdentify({ ...identify, phone: e.target.value })} required style={{ flex: 1, minWidth: 160 }} />
+            <input type="tel" placeholder="010-0000-0000" value={identify.phone} onChange={(e) => setIdentify({ ...identify, phone: e.target.value })} required style={{ flex: 1, minWidth: 160 }} aria-label="휴대폰 번호" />
             <button className="btn primary">찾기</button>
           </div>
           <p className="small muted">{T.identifyHint}</p>
