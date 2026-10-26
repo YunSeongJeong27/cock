@@ -89,7 +89,7 @@ class ConcurrencyTest extends IntegrationTest {
         List<Integer> codes = runTogether(tasks);
         assertThat(codes.stream().filter(c -> c == 200).count()).isEqualTo(1);
         // 2개만 돌아와야 한다 (두 번 복구되면 4 이상)
-        JsonNode view = read(mvc.perform(get("/api/public/g/" + g.token())).andReturn());
+        JsonNode view = read(mvc.perform(get("/api/seller/group-buys/" + g.id()).cookie(g.seller())).andReturn());
         assertThat(view.get("products").get(0).get("remaining").asInt()).isEqualTo(2);
     }
 

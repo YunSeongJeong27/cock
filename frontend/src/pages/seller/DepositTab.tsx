@@ -255,6 +255,21 @@ export default function DepositTab({ groupBuy, reload }: Props) {
         </div>
       )}
 
+      {match && match.used.length > 0 && (
+        <div className="card">
+          <h3>④ 확정한 입금 ({match.used.length})</h3>
+          {match.used.map((u) => (
+            <div key={u.orderId} className="small" style={{ borderTop: '1px solid var(--line)', padding: '6px 0' }}>
+              <div>
+                <b>{u.depositorName}</b> {won(u.amount)} <span className="muted">{u.datetimeText ?? ''}</span>
+                {u.manual && <span className="chip">수동 확정</span>}
+              </div>
+              <div className="muted">→ {u.order ? orderLabel(u.order) : `${u.orderNo}번`}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {uploads.length > 0 && (
         <div className="card">
           <h3>올린 파일</h3>

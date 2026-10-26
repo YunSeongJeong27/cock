@@ -6,8 +6,8 @@ import { orderText as T } from '../../texts/order'
 import type { PaymentMethod, ReceiveMethod, ShippingFeeType } from '../../types'
 
 /**
- * remaining: 1개 이상일 때만 값이 있음. blockWhenSoldOut 이면 남은 수량까지만 주문 가능하고 soldOut 이면 품절,
- * 아니면 0 이하에서 수량 표시만 숨기고 주문은 받음
+ * 손님 화면에는 남은 수량을 보여 주지 않는다 (2026-10-26 사용자 결정. 품절 표시는 그대로).
+ * remaining: blockWhenSoldOut 상품만, 1개 이상일 때만 값이 있음 (수량 칸 상한에만 씀). soldOut 이면 품절
  */
 interface PublicProduct { id: number; name: string; unitPrice: number; remaining: number | null; perOrderLimit: number | null; blockWhenSoldOut: boolean; soldOut: boolean }
 interface Account { bankName: string; accountNumber: string; accountHolder: string }
@@ -136,6 +136,12 @@ function OrderSummary({ o, title, f }: { o: MyOrder; title: ReactNode; f?: Final
 /** 확정된 주문(판매자가 대조해서 입금 확정): 수정·바로 취소 대신 환불 신청 */
 const confirmedOrder = (o: MyOrder) => o.refundRequestable && o.status === 'PAID'
 
+/**
+ * 판매자 변경 안내("위 내용·금액을 확인해 주세요")는 주문 확정 전·예약됨일 때만 보인다 (2026-10-26).
+ * 판매자는 입금 확정된 주문을 바꿀 수 없으므로 확정·수령·취소 뒤에는 확인할 것이 없다
+ */
+const sellerChangeToCheck = (o: MyOrder) => o.status === 'AWAITING_DEPOSIT' || o.status === 'RESERVED'
+
 /** 내 주문: 상태·변경 표시와 [주문 수정]·[주문 취소]·[환불 신청] (멈춤 중에는 버튼 없음) */
 function MyOrdersCard({ view, onEdit, onCancel }: {
   view: View; onEdit: (o: MyOrder) => void; onCancel: (orderNo: number, mode: CancelMode) => void
@@ -151,7 +157,7 @@ function MyOrdersCard({ view, onEdit, onCancel }: {
           </div>
           <div className="small">{itemsText(o.items)}</div>
           <div className="small muted">{receiveText(o)} · {o.paymentMethod === 'PREPAID' ? `선입금 · 입금자명 ${o.depositorName}` : '현장결제'} · {dateTime(o.orderedAt)}</div>
-          {o.changedAt && <div className="small" style={{ color: 'var(--warn)' }}>{T.changedBySeller(dateTime(o.changedAt))}</div>}
+          {o.changedAt && sellerChangeToCheck(o) && <div className="small" style={{ color: 'var(--warn)' }}>{T.changedBySeller(dateTime(o.changedAt))}</div>}
           {o.customerChangedAt && <div className="small muted">주문 수정됨 · {dateTime(o.customerChangedAt)}</div>}
           {o.refundRequired && <div className="small" style={{ color: 'var(--danger)' }}>{T.refundPlanned}</div>}
           {o.refundedAt && <div className="small muted">취소됨 · 환불 완료 · {dateTime(o.refundedAt)}</div>}
@@ -470,7 +476,7 @@ export default function PublicOrder() {
             <div key={p.id} className="product-row">
               <div>
                 <div><b>{p.name}</b></div>
-                <div className="small">{won(p.unitPrice)}{p.remaining !== null && <span className="muted"> · 남은 수량 {p.remaining}</span>}{p.perOrderLimit && <span className="muted"> · 1인 최대 {p.perOrderLimit}</span>}</div>
+                <div className="small">{won(p.unitPrice)}{p.perOrderLimit && <span className="muted"> · 1인 최대 {p.perOrderLimit}</span>}</div>
               </div>
               {p.soldOut && !mine[p.id] ? <span className="badge badge-CANCELLED">품절</span> : (
                 <div className="qty">

@@ -1,10 +1,12 @@
 package com.depositcock.comment;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -21,7 +23,8 @@ import lombok.NoArgsConstructor;
  * 5) 수량 후보 0개 → NOT_ORDER, 2개 이상 → REVIEW
  * 6) "수정|변경|바꿔|말고" → REVIEW
  * 7) 수량 0 또는 30 초과 → REVIEW
- * 8) 메모 = 원문에서 수량 부분을 뺀 나머지
+ * 8) 메모 = 원문에서 수량 부분을 뺀 나머지. 주문 말끝("1박스요"의 "요", "주세요", "부탁드려요" 등)과
+ *    단어 앞뒤 기호·이모티콘은 뺀다 (2026-10-26, 전에는 "1박스요" → 메모 "요")
  * 알려진 한계: "10/8"(날짜)을 18로 오인할 수 있다.
  * </pre>
  */
@@ -55,6 +58,17 @@ public final class CommentOrderParser {
 
     /** 단독 "하나/둘/셋/넷" (앞뒤가 한글이 아님) */
     private static final Pattern KOREAN_ALONE = Pattern.compile("(?<![가-힣])(하나|둘|셋|넷)(?![가-힣])");
+
+    /** 수량 바로 뒤에 붙는 말끝 ("1박스요", "2개만", "1개씩이요") */
+    private static final Pattern ATTACHED_ENDING = Pattern.compile("^(?:씩|만)?(?:이요|요)?(?![가-힣])");
+
+    /** 메모에서 뺄 주문 말 (띄어 쓴 한 단어 전체가 이것일 때만) */
+    private static final Pattern FILLER_WORD = Pattern.compile(
+            "(?:주문|신청|구매|예약|부탁)(?:이요|요|해요|합니다|할게요|할께요|드려요|드립니다)?"
+                    + "|드려요|드립니다|요|이요|주세요|주셔요|줘요|할게요|할께요|감사합니다|감사해요|고맙습니다");
+
+    /** 단어 앞뒤의 기호·이모티콘 (한글·영문·숫자가 아닌 것) */
+    private static final Pattern EDGE_SYMBOLS = Pattern.compile("^[^\\p{L}\\p{N}]+|[^\\p{L}\\p{N}]+$");
 
     private static final Pattern CANCEL = Pattern.compile("취소|캔슬");
     private static final Pattern MODIFY = Pattern.compile("수정|변경|바꿔|말고");
@@ -131,7 +145,15 @@ public final class CommentOrderParser {
     }
 
     private static String memo(String original, Candidate c) {
-        return clean(original.substring(0, c.start()) + " " + original.substring(c.end()));
+        String after = original.substring(c.end());
+        Matcher ending = ATTACHED_ENDING.matcher(after);
+        if (ending.find()) {
+            after = after.substring(ending.end());
+        }
+        return Arrays.stream(clean(original.substring(0, c.start()) + " " + after).split(" "))
+                .map(word -> EDGE_SYMBOLS.matcher(word).replaceAll(""))
+                .filter(word -> !word.isEmpty() && !FILLER_WORD.matcher(word).matches())
+                .collect(Collectors.joining(" "));
     }
 
     private static String clean(String text) {

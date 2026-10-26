@@ -4,7 +4,7 @@ import { api, errorMessage } from '../../api'
 import { useAuth } from '../../auth'
 import { ErrorBox } from '../../components/Ui'
 import { groupBuyText as T } from '../../texts/groupBuy'
-import type { GroupBuy, OrderChannel, ShippingFeeType } from '../../types'
+import type { GroupBuy, GroupBuyStatus, OrderChannel, ShippingFeeType } from '../../types'
 
 interface ProductInput { id?: number; name: string; unitPrice: string; stockLimit: string; perOrderLimit: string; stockAlertThreshold: string; blockWhenSoldOut: boolean; sold?: number }
 interface PointInput { id?: number; name: string; info: string }
@@ -62,13 +62,16 @@ export default function GroupBuyForm() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const editing = Boolean(id)
+  const [status, setStatus] = useState<GroupBuyStatus | null>(null)
+  // [저장하고 주문 받기 시작]은 새 공구와 아직 시작 전(DRAFT)인 공구에만 (2026-10-26). 마감한 공구는 공구 화면의 [다시 열기]
+  const canStart = !editing || status === 'DRAFT'
   // 댓글 주문 기능이 닫힌 판매자는 "주문 받는 방법"을 고르지 않고 주문 링크만 쓴다 (관리자가 연다, 2026-10-15).
   // 이미 "링크 + 댓글"인 공구를 고칠 때는 선택을 보여 준다 (그대로 두거나 링크만으로 바꿀 수 있게)
   const showChannel = Boolean(me?.commentFeatureEnabled) || form.orderChannel === 'LINK_AND_COMMENT'
 
   useEffect(() => {
     if (id) {
-      api.get<GroupBuy>(`/api/seller/group-buys/${id}`).then((g) => setForm(toForm(g))).catch((e) => setError(errorMessage(e)))
+      api.get<GroupBuy>(`/api/seller/group-buys/${id}`).then((g) => { setForm(toForm(g)); setStatus(g.status) }).catch((e) => setError(errorMessage(e)))
     } else if (me) {
       setForm((f) => ({ ...f, bankName: me.defaultBankName ?? '', accountNumber: me.defaultAccountNumber ?? '', accountHolder: me.defaultAccountHolder ?? '' }))
     }
@@ -254,8 +257,8 @@ export default function GroupBuyForm() {
 
       <ErrorBox message={error} />
       <div className="row sticky-bottom">
-        <button className="btn" disabled={busy}>저장</button>
-        <button type="button" className="btn primary" disabled={busy} onClick={(e) => submit(e as unknown as FormEvent, true)}>저장하고 주문 받기 시작</button>
+        <button className={canStart ? 'btn' : 'btn primary'} disabled={busy}>저장</button>
+        {canStart && <button type="button" className="btn primary" disabled={busy} onClick={(e) => submit(e as unknown as FormEvent, true)}>저장하고 주문 받기 시작</button>}
         <button type="button" className="btn" onClick={() => navigate(-1)}>취소</button>
       </div>
     </form>

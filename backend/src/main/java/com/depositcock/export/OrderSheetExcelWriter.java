@@ -51,7 +51,8 @@ public class OrderSheetExcelWriter {
             moneyStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0"));
 
             List<Product> products = groupBuy.sortedProducts();
-            String mainName = WorkbookUtil.createSafeSheetName(safeTitle(groupBuy.getTitle()));
+            // 엑셀 시트 이름에는 "/"·"\"를 쓸 수 없다. 빈칸 대신 "-"로 ("10/30 픽업" → "10-30 픽업", 2026-10-26)
+            String mainName = WorkbookUtil.createSafeSheetName(safeTitle(groupBuy.getTitle()).replaceAll("[/\\\\]", "-"));
             writeSheet(workbook.createSheet(mainName),
                     products, orders.stream().filter(CustomerOrder::isActive).toList(), includeContact,
                     headerStyle, moneyStyle);

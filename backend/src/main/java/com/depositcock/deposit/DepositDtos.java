@@ -52,7 +52,12 @@ public final class DepositDtos {
             Long refundCheckOrderId) {
     }
 
-    public record UsedRow(Long rowId, String depositorName, int amount, String datetimeText, Long orderId, int orderNo) {
+    /**
+     * 확정한 입금. 대조 화면 "확정한 입금" 목록 (2026-10-26).
+     * rowId 는 거래내역 줄 (수동 확정이거나 올린 파일을 지웠으면 null). 이때 입금자명·금액은 확정할 때 적은 값
+     */
+    public record UsedRow(Long rowId, String depositorName, int amount, String datetimeText, Long orderId, int orderNo,
+                          OrderBrief order, boolean manual) {
     }
 
     /**

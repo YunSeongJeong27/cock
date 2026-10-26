@@ -209,6 +209,18 @@ class OrderLifecycleFixesTest extends IntegrationTest {
         }
     }
 
+    /** 시트 이름에 쓸 수 없는 "/"는 빈칸이 아니라 "-"로 (2026-10-26) */
+    @Test
+    void excelSheetNameKeepsSlashAsDash() throws Exception {
+        Opened g = open(groupBuyBody("10/30 목 픽업", List.of(product("상품", 1000, null))));
+        place(g, "010-9100-0009", "엑셀");
+        byte[] xlsx = mvc.perform(get(g.base() + "/export.xlsx").cookie(g.seller())).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        try (Workbook wb = new XSSFWorkbook(new ByteArrayInputStream(xlsx))) {
+            assertThat(wb.getSheetName(0)).isEqualTo("10-30 목 픽업");
+        }
+    }
+
     @Test
     void pickupCanBeTurnedOffWhenPickupOrdersExist() throws Exception {
         Map<String, Object> body = groupBuyBody("픽업 끄기", List.of(product("상품", 1000, null)));

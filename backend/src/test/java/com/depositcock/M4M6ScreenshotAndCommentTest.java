@@ -131,14 +131,22 @@ class M4M6ScreenshotAndCommentTest extends IntegrationTest {
                 .andExpect(jsonPath("$.dashboard.orderCount").value(7))
                 .andExpect(jsonPath("$.dashboard.totalAmount").value(13300));
 
-        // 댓글 주문도 입금 대조: 닉네임 숫자 "2171505" → 꼭지맘 217-1505
+        // 댓글 닉네임에 붙은 동·호수는 주문의 동·호수 칸으로 뗀다. 닉네임이 동·호수뿐이면 닉네임은 그대로 (2026-10-26)
+        JsonNode orders = read(mvc.perform(get("/api/seller/group-buys/" + id + "/orders").cookie(seller)).andReturn());
+        Map<String, String> unitByNickname = new HashMap<>();
+        orders.forEach(o -> unitByNickname.put(o.get("nickname").asText(),
+                o.path("unitAddress").isTextual() ? o.path("unitAddress").asText() : null));
+        assertThat(unitByNickname).containsEntry("꼭지맘", "217-1505").containsEntry("캐파", "101동")
+                .containsEntry("205-1205", "205-1205").containsEntry("망고맘", null);
+
+        // 댓글 주문도 입금 대조: 입금자명 숫자 "2171505" → 꼭지맘 (동·호수 217-1505)
         mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/uploads")
                         .file(new MockMultipartFile("file", "x.csv", "text/csv", "입금자명,입금액\n2171505,1900\n".getBytes()))
                         .cookie(seller))
                 .andExpect(status().isOk());
         mvc.perform(get("/api/seller/group-buys/" + id + "/deposits/match").cookie(seller))
                 .andExpect(jsonPath("$.rows[0].status").value("MATCHED"))
-                .andExpect(jsonPath("$.rows[0].order.nickname").value("꼭지맘 217-1505"));
+                .andExpect(jsonPath("$.rows[0].order.nickname").value("꼭지맘"));
     }
 
     @Test

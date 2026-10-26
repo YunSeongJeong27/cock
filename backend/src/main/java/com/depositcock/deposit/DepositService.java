@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -46,6 +47,7 @@ import com.depositcock.order.CustomerOrder;
 import com.depositcock.order.CustomerOrderRepository;
 import com.depositcock.order.DepositConfirmation;
 import com.depositcock.order.DepositConfirmationRepository;
+import com.depositcock.order.OrderSource;
 import com.depositcock.order.PhoneNumbers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -193,7 +195,8 @@ public class DepositService {
                 .toList();
         List<DepositRow> rows = rowRepository.findByGroupBuyId(groupBuy.getId());
         Map<Long, Long> orderByRow = new HashMap<>();
-        confirmationRepository.findActiveByGroupBuyId(groupBuy.getId()).stream()
+        List<DepositConfirmation> confirmations = confirmationRepository.findActiveByGroupBuyId(groupBuy.getId());
+        confirmations.stream()
                 .filter(c -> c.getDepositRowId() != null)
                 .forEach(c -> orderByRow.put(c.getDepositRowId(), c.getOrder().getId()));
         List<DepositRow> unused = rows.stream().filter(r -> !orderByRow.containsKey(r.getId())).toList();
@@ -239,13 +242,18 @@ public class DepositService {
                     .refundCheckOrderId(refundCheckOrderId(r.related(), orderById))
                     .build());
         }
-        List<UsedRow> used = rows.stream().filter(r -> orderByRow.containsKey(r.getId()))
-                .map(r -> {
-                    Long orderId = orderByRow.get(r.getId());
-                    CustomerOrder o = orderById.get(orderId);
-                    return new UsedRow(r.getId(), r.getDepositorName(), r.getAmount(), r.getDatetimeText(),
-                            orderId, o == null ? 0 : o.getOrderNo());
-                }).toList();
+        // 확정한 입금: 거래내역 줄로 확정한 것 + 거래내역 없이 수동으로 확정한 것 (주문번호 순, 2026-10-26)
+        Map<Long, DepositRow> allRowById = rows.stream().collect(Collectors.toMap(DepositRow::getId, Function.identity()));
+        List<UsedRow> used = confirmations.stream()
+                .map(c -> {
+                    DepositRow r = c.getDepositRowId() == null ? null : allRowById.get(c.getDepositRowId());
+                    CustomerOrder o = orderById.get(c.getOrder().getId());
+                    return new UsedRow(c.getDepositRowId(), r == null ? c.getDepositorName() : r.getDepositorName(),
+                            r == null ? c.getAmount() : r.getAmount(), r == null ? null : r.getDatetimeText(),
+                            c.getOrder().getId(), o == null ? 0 : o.getOrderNo(), brief(o), c.isManual());
+                })
+                .sorted(Comparator.comparingInt(UsedRow::orderNo))
+                .toList();
         List<OrderBrief> unpaid = outcome.unpaid().stream().map(p -> brief(orderById.get(p.orderId()))).toList();
         // 판매자가 직접 고를 수 있는 주문: 다른 입금에 추천된 주문까지 포함한 모든 미입금 선입금 주문
         List<OrderBrief> openOrders = payees.stream().map(p -> brief(orderById.get(p.orderId()))).toList();
@@ -479,8 +487,21 @@ public class DepositService {
 
     /** 대조에 쓰는 주문 모양 (대조 대상 주문·이미 입금 확인된 주문·취소된 주문 모두 같음) */
     private static Payee payee(CustomerOrder o) {
-        return new Payee(o.getId(), o.getCustomerId(), o.getDepositorName(), o.getNickname(), o.getExpectedAmount(),
+        return new Payee(o.getId(), o.getCustomerId(), o.getDepositorName(), matchNickname(o), o.getExpectedAmount(),
                 o.getOrderedAt());
+    }
+
+    /**
+     * 댓글 주문은 닉네임에서 뗀 동·호수도 닉네임처럼 비교한다. 입금자명에 "2171505"처럼 동·호수만 적는 경우가 있어서
+     * (2026-10-26 동·호수를 닉네임에서 떼기 전과 같은 결과)
+     */
+    private static String matchNickname(CustomerOrder o) {
+        String unit = o.getUnitAddress();
+        if (o.getSource() != OrderSource.COMMENT || unit == null || unit.isBlank()) {
+            return o.getNickname();
+        }
+        String nickname = o.getNickname() == null ? "" : o.getNickname();
+        return nickname.contains(unit) ? nickname : (nickname + " " + unit).trim();
     }
 
     static OrderBrief brief(CustomerOrder o) {

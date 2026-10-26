@@ -251,7 +251,8 @@ export interface MatchResponse {
   unpaid: OrderBrief[]
   /** 판매자가 직접 고를 수 있는 모든 미입금 선입금 주문 (다른 입금에 추천된 주문 포함) */
   openOrders: OrderBrief[]
-  used: { rowId: number; depositorName: string; amount: number; datetimeText: string | null; orderId: number; orderNo: number }[]
+  /** 확정한 입금 (주문번호 순). rowId 는 수동 확정이거나 올린 파일을 지웠으면 null */
+  used: { rowId: number | null; depositorName: string; amount: number; datetimeText: string | null; orderId: number; orderNo: number; order: OrderBrief | null; manual: boolean }[]
   matchedCount: number
   suggestedCount: number
   ambiguousCount: number

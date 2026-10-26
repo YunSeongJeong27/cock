@@ -83,13 +83,15 @@ public final class OrderDtos {
     }
 
     /**
-     * 손님용. remaining 은 1개 이상일 때만 값이 있고 0 이하면 null.
-     * blockWhenSoldOut 이면 남은 수량까지만 주문할 수 있고 soldOut 이면 품절(주문 막힘). 아니면 수량 표시만 숨기고 주문을 받음
+     * 손님용. 손님 화면에는 남은 수량을 보여 주지 않는다 (2026-10-26 사용자 결정. 품절 표시는 그대로).
+     * remaining 은 blockWhenSoldOut 상품의 수량 칸 상한에만 쓰므로 그 상품에만, 1개 이상일 때만 값이 있다.
+     * blockWhenSoldOut 이면 남은 수량까지만 주문할 수 있고 soldOut 이면 품절(주문 막힘). 아니면 재고와 관계없이 주문을 받음
      */
     public record PublicProduct(Long id, String name, int unitPrice, Integer remaining, Integer perOrderLimit,
                                 boolean blockWhenSoldOut, boolean soldOut) {
         public static PublicProduct of(Product p) {
-            return new PublicProduct(p.getId(), p.getName(), p.getUnitPrice(), p.publicRemaining(), p.getPerOrderLimit(),
+            return new PublicProduct(p.getId(), p.getName(), p.getUnitPrice(),
+                    p.isBlockWhenSoldOut() ? p.publicRemaining() : null, p.getPerOrderLimit(),
                     p.isBlockWhenSoldOut(), p.isSoldOut());
         }
     }
