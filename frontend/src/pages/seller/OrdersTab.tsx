@@ -358,7 +358,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
       <div className="row mb">
         <select value={filter} onChange={(e) => { setFilter(e.target.value); setChecked(new Set()) }} style={{ width: 170 }}>
           <option value="all">전체 ({orders.length - finishedCount})</option>
-          <option value="active">취소 제외</option>
+          <option value="active">주문 중 (취소 제외)</option>
           <option value="unpaid">선입금 미입금</option>
           <option value="refundreq">환불 신청 ({refundRequests})</option>
           <option value="refund">환불 필요</option>

@@ -538,11 +538,13 @@ export default function PublicOrder() {
           <div className="mt">
             <label className="field"><span>휴대폰 번호 *</span><input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} required placeholder="010-0000-0000"
               readOnly={!!(editing && editing.editValues?.phone)} /></label>
-            <label className="field"><span>입금자명 *</span><input type="text" value={form.depositorName} onChange={(e) => set('depositorName', e.target.value)} required placeholder="통장에 찍힐 이름"
+            <label className="field"><span>입금자명 *</span><input type="text" value={form.depositorName} onChange={(e) => set('depositorName', e.target.value)} required
               readOnly={!!(editing && editing.editValues?.depositorName)} />
-              <span className="muted small" style={{ fontWeight: 400 }}>{payment === 'ONSITE' ? T.depositorHintOnsite : T.depositorHintTransfer}</span>
+              {payment === 'ONSITE'
+                ? <span className="muted small" style={{ fontWeight: 400 }}>{T.depositorHintOnsite}</span>
+                : <span className="small" style={{ color: 'var(--danger)' }}>{T.depositorHintTransfer}</span>}
             </label>
-            <label className="field"><span>{view.nicknameRequired ? '밴드·카톡 닉네임 *' : '밴드·카톡 닉네임'}</span><input type="text" value={form.nickname} onChange={(e) => set('nickname', e.target.value)} required={view.nicknameRequired} /></label>
+            <label className="field"><span>{view.nicknameRequired ? '닉네임 *' : '닉네임 (선택)'}</span><input type="text" value={form.nickname} onChange={(e) => set('nickname', e.target.value)} required={view.nicknameRequired} /></label>
             {view.unitAddressFieldEnabled && <label className="field"><span>동·호수 *</span><input type="text" value={form.unitAddress} onChange={(e) => set('unitAddress', e.target.value)} required placeholder="예: 101동 1203호" /></label>}
           </div>
 

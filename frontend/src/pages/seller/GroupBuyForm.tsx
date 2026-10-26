@@ -169,14 +169,14 @@ export default function GroupBuyForm() {
             <label className="field grow" style={{ minWidth: 160, marginBottom: 0 }}><span>상품명</span>
               <input type="text" value={p.name} onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="예: 1box(30조각)" />
             </label>
-            <label className="field" style={{ width: 110, marginBottom: 0 }}><span>단가</span>
+            <label className="field" style={{ width: 110, marginBottom: 0 }}><span>단가(원)</span>
               <input type="number" min={0} value={p.unitPrice} onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, unitPrice: e.target.value } : x)))} />
             </label>
             <label className="field" style={{ width: 100, marginBottom: 0 }}><span>준비 수량</span>
               <input type="number" min={1} value={p.stockLimit} placeholder="무제한" onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, stockLimit: e.target.value } : x)))} />
             </label>
             {/* 숫자 칸은 오른쪽에 올리고 내리는 화살표 자리가 있어 placeholder("준비 수량 먼저"·"제한없음")가 들어가게 넓힌다 */}
-            <label className="field" style={{ width: 156, marginBottom: 0 }} title={T.stockAlertTitle}><span>알림 기준</span>
+            <label className="field" style={{ width: 156, marginBottom: 0 }} title={T.stockAlertTitle}><span>알림 (남은 수량)</span>
               <input type="number" min={0} value={p.stockAlertThreshold} placeholder={p.stockLimit ? '알림 없음' : '준비 수량 먼저'} disabled={!p.stockLimit}
                 onChange={(e) => set('products', form.products.map((x, j) => (j === i ? { ...x, stockAlertThreshold: e.target.value } : x)))} />
             </label>
@@ -223,7 +223,7 @@ export default function GroupBuyForm() {
               <option value="FIXED">고정 배송비</option>
             </select>
             {form.shippingFeeType === 'FIXED' && (
-              <input type="number" min={0} placeholder="배송비" value={form.shippingFee} onChange={(e) => set('shippingFee', e.target.value)} style={{ width: 140 }} />
+              <input type="number" min={0} placeholder="배송비(원)" value={form.shippingFee} onChange={(e) => set('shippingFee', e.target.value)} style={{ width: 140 }} />
             )}
           </div>
         )}
@@ -243,7 +243,7 @@ export default function GroupBuyForm() {
       <div className="card">
         <h3>고객 입력 항목·기타</h3>
         <label className="check"><input type="checkbox" checked={form.unitAddressFieldEnabled} onChange={(e) => set('unitAddressFieldEnabled', e.target.checked)} /> 동·호수 받기</label>
-        <label className="field mt"><span>카톡 문의 링크</span>
+        <label className="field mt"><span>카톡 문의 링크 (선택)</span>
           <input type="text" value={form.kakaoInquiryUrl} onChange={(e) => set('kakaoInquiryUrl', e.target.value)} placeholder="https://pf.kakao.com/..." />
         </label>
         <label className="field"><span>관리자 닉네임</span>

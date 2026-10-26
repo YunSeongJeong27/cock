@@ -213,8 +213,8 @@ function PauseCard({ groupBuy, onChange }: { groupBuy: GroupBuy; onChange: (g: G
       <label className="field mt"><span>고객 화면 문구</span>
         <textarea rows={2} maxLength={300} value={message} onChange={(e) => setMessage(e.target.value)} />
       </label>
-      <label className="field"><span>링크</span>
-        <input type="url" placeholder="https:// 밴드 공지 글 주소 등" value={link} onChange={(e) => setLink(e.target.value)} />
+      <label className="field"><span>링크 (선택)</span>
+        <input type="url" placeholder="https://" value={link} onChange={(e) => setLink(e.target.value)} />
       </label>
     </>
   )

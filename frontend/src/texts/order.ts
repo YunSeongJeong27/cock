@@ -34,7 +34,7 @@ export const orderText = {
     : '주문을 고치려면 위 **주문 수정**을 눌러 주세요.',
   otherDevicePrefill: '개인정보 보호를 위해 다른 기기에서 입력한 휴대폰 번호·주소는 채우지 않습니다. 다시 입력해 주세요.',
   depositorHintOnsite: '주문 확인용 이름입니다.',
-  depositorHintTransfer: '계좌이체할 때 받는 분 통장 표시에 이 이름을 적어주세요.',
+  depositorHintTransfer: '계좌이체한 입금자명과 반드시 같아야 합니다.',
   refundThenReorder: '입금하신 경우에는 환불 후 재주문 하셔야 합니다.',
   consent: '주문하면 [개인정보처리방침](/privacy)에 따라 주문 처리에 필요한 연락처·입금자명·배송지를 판매자에게 전달하는 데 동의하는 것으로 봅니다. 주문 후 이 링크에서 내 주문 상태를 볼 수 있도록 이 기기에 쿠키를 저장합니다.',
 
