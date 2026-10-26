@@ -159,7 +159,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             <div key={i} className="change-log">{c.changedBy === 'CUSTOMER' ? '고객 변경' : '판매자 변경'} {dateTime(c.changedAt)} · {c.summary}</div>
           ))}
           {o.cancelledAt && <div>취소: {dateTime(o.cancelledAt)}</div>}
-          {o.refundRejectedAt && <div className="muted">환불 신청 {dateTime(o.refundRequestedAt)} → {dateTime(o.refundRejectedAt)} 취소 안 함</div>}
+          {o.refundRejectedAt && <div className="muted">환불 신청 {dateTime(o.refundRequestedAt)} → {dateTime(o.refundRejectedAt)} 반려</div>}
         </div>
         {refundPending(o) && (
           <div className="edit-box mt">
@@ -168,9 +168,9 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             {!o.paid && <div className="small mt" style={{ color: 'var(--warn)' }}>{T.refundBeforeConfirm}</div>}
             <div className="row mt">
               <button className="btn small danger" onClick={() => post(`${o.id}/refund-request/approve`, undefined,
-                T.confirmApproveRefund(o.orderNo))}>주문취소 진행(환불)</button>
+                T.confirmApproveRefund(o.orderNo))}>주문 취소 후 환불 진행</button>
               <button className="btn small" onClick={() => post(`${o.id}/refund-request/reject`, undefined,
-                T.confirmRejectRefund)}>취소 안 함</button>
+                T.confirmRejectRefund(o.orderNo))}>환불 신청 반려</button>
             </div>
           </div>
         )}

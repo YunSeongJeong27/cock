@@ -60,7 +60,7 @@ export default function PickupTab({ groupBuy, orders, reload }: Props) {
             </div>
           </div>
           {refundPending(o) ? (
-            // 환불 신청이 기다리는 주문은 주문 목록에서 [주문취소 진행(환불)]·[취소 안 함]을 먼저 (2026-10-19)
+            // 환불 신청이 기다리는 주문은 주문 목록에서 [주문 취소 후 환불 진행]·[환불 신청 반려]를 먼저 (2026-10-19)
             <span className="small" style={{ color: 'var(--warn)', minWidth: 96, textAlign: 'right' }}>환불 신청 중<br />주문 목록에서 먼저 처리</span>
           ) : (
             <button className={`btn ${o.pickedUp ? 'ok' : ''}`} onClick={() => toggle(o)} style={{ minWidth: 96 }}>

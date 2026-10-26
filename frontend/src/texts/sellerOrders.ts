@@ -14,9 +14,10 @@ export const sellerOrderText = {
   refundBeforeConfirm: '아직 주문 확정 전입니다. 통장에서 입금을 확인한 뒤 처리해 주세요.',
   confirmApproveRefund: (orderNo: number) =>
     `${orderNo}번 주문이 취소된 후 "환불 필요" 상태로 바뀝니다. 진행하시겠습니까?\n\n고객 계좌로 직접 돈을 보낸 뒤 [환불 완료]를 눌러 주세요.`,
-  confirmRejectRefund: '환불 신청을 받지 않을까요? 주문은 그대로 남고 고객 화면에 "환불 신청이 반려됐어요"가 보입니다.',
+  confirmRejectRefund: (orderNo: number) =>
+    `${orderNo}번 주문의 환불 신청을 반려합니다. 진행하시겠습니까?\n\n주문은 취소되지 않고 그대로 남습니다. 고객 화면에 "환불 신청이 반려됐어요"가 뜨고 고객은 다시 신청할 수 없습니다.`,
   refundRequestsBanner: (count: number) =>
-    `고객 환불 신청이 ${count}건 있습니다. 상세에서 [주문취소 진행(환불)] 또는 [취소 안 함]을 눌러 주세요.`,
+    `고객 환불 신청이 ${count}건 있습니다. 상세에서 [주문 취소 후 환불 진행] 또는 [환불 신청 반려]를 눌러 주세요.`,
 
   // 주문 처리
   changedReplyHead: '**변경했습니다.** 아래 댓글 답글 예시를 고쳐서 복사해 쓰세요.',

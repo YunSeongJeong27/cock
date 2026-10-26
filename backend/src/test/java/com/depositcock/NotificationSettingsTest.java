@@ -167,7 +167,7 @@ class NotificationSettingsTest extends IntegrationTest {
         assertThat(refund.type()).isEqualTo(NotificationType.MAIL_REFUND_REQUEST);
         assertThat(refund.headline()).isEqualTo("1번 주문에 환불 신청이 들어왔습니다.");
         assertThat(refund.lines()).containsExactly("상품 2개 · 2,000원", "주문 확정 전 주문입니다. 입금 내역을 먼저 확인해 주세요.",
-                "주문 목록에서 [주문취소 진행(환불)] 또는 [취소 안 함]을 눌러 주세요. 환불 계좌는 판매자 화면에서 볼 수 있습니다.");
+                "주문 목록에서 [주문 취소 후 환불 진행] 또는 [환불 신청 반려]를 눌러 주세요. 환불 계좌는 판매자 화면에서 볼 수 있습니다.");
         // 메일에는 이름·연락처·계좌를 넣지 않는다
         assertThat(String.join(" ", refund.lines())).doesNotContain("김알림").doesNotContain("8900").doesNotContain("110123456789");
     }
