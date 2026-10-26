@@ -169,7 +169,8 @@ function MyOrdersCard({ view, onEdit, onCancel }: {
           <div className="row mt">
             {!view.paused && o.replaceable && o.editValues && <button className="btn small" onClick={() => onEdit(o)}>주문 수정</button>}
             {!view.paused && o.cancellable && <button className="btn small danger" onClick={() => onCancel(o.orderNo, 'cancel')}>주문 취소</button>}
-            {!view.paused && confirmedOrder(o) && <button className="btn small danger" onClick={() => onCancel(o.orderNo, 'refund')}>환불 신청</button>}
+            {/* 바로 취소가 안 되는 선입금 주문(주문 확정 뒤, 또는 마감 뒤)은 환불 신청. 아래 취소·환불 칸의 버튼은 내 주문이 있으면 숨김 (2026-10-26) */}
+            {!view.paused && o.refundRequestable && !o.cancellable && <button className="btn small danger" onClick={() => onCancel(o.orderNo, 'refund')}>환불 신청</button>}
           </div>
           {o.replaceable && o.paymentMethod === 'PREPAID' && <div className="small muted mt">{T.editableUntilConfirm}</div>}
           {confirmedOrder(o) && <div className="small muted mt">{T.confirmedCannotEdit}</div>}
@@ -422,7 +423,8 @@ export default function PublicOrder() {
               ? <span style={{ color: 'var(--ok)', fontWeight: 700 }}>주문 받는 중{view.closeAt ? ` · ${dateTime(view.closeAt)} 마감` : ''}</span>
               : <span style={{ color: 'var(--danger)', fontWeight: 700 }}>{view.closedReason}</span>}
         </div>
-        {view.kakaoInquiryUrl && <a className="btn small mt" href={view.kakaoInquiryUrl} target="_blank" rel="noreferrer">💬 카톡 문의</a>}
+        {/* 멈춤 중에는 아래 멈춤 안내에 같은 버튼이 있어 숨김 (2026-10-26) */}
+        {view.kakaoInquiryUrl && !view.paused && <a className="btn small mt" href={view.kakaoInquiryUrl} target="_blank" rel="noreferrer">💬 카톡 문의</a>}
       </div>
 
       {/* 판매자가 주문을 잠시 멈춤 (입금 대조 중 등). 문구·링크는 판매자가 정함 */}
@@ -598,17 +600,18 @@ export default function PublicOrder() {
         </form>
       )}
 
-      <div className="card" id="cancel-form">
-        {view.paused ? (
-          <div className="small muted">{T.pausedNoCancel}</div>
-        ) : !cancel.open ? (
+      {/* 멈춤 중에는 위 멈춤 안내가 같은 내용이라 이 칸을 숨김. 내 주문이 있으면 주문마다 버튼이 있어 여기 버튼은 숨김 (2026-10-26) */}
+      {!view.paused && <div className="card" id="cancel-form">
+        {!cancel.open ? (
           <>
             <div className="row between">
               <b className="small">주문 취소·환불 신청</b>
-              <div className="row">
-                {view.acceptingOrders && <button className="btn small danger" onClick={() => openCancel()}>주문 취소</button>}
-                {view.account && <button className="btn small" onClick={() => openCancel(undefined, 'refund')}>환불 신청</button>}
-              </div>
+              {view.myOrders.length === 0 && (
+                <div className="row">
+                  {view.acceptingOrders && <button className="btn small danger" onClick={() => openCancel()}>주문 취소</button>}
+                  {view.account && <button className="btn small" onClick={() => openCancel(undefined, 'refund')}>환불 신청</button>}
+                </div>
+              )}
             </div>
             <p className="small muted mt" style={{ marginBottom: 0 }}>
               {view.acceptingOrders && view.account && <>{T.cancelIfNotPaid}<br /></>}
@@ -667,7 +670,7 @@ export default function PublicOrder() {
             )}
           </form>
         )}
-      </div>
+      </div>}
       <footer className="footer">📌 입금콕 · <a href="/privacy">개인정보처리방침</a></footer>
     </div>
   )

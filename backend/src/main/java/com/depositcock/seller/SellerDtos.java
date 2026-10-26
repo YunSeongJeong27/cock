@@ -51,6 +51,8 @@ public final class SellerDtos {
             String defaultAccountHolder,
             /** 댓글 주문 기능을 쓸 수 있는지 (전체 공개 또는 판매자별 허용) */
             boolean commentFeatureEnabled,
+            /** 공구를 만든 뒤 뜨는 "제품 판매 TIP" 안내를 다시 보지 않기로 했는지 */
+            boolean salesTipHidden,
             /** 알림 켜짐/꺼짐 (모든 종류, 안 정한 것은 기본값) */
             Map<NotificationType, Boolean> notifications) {
 
@@ -69,6 +71,7 @@ public final class SellerDtos {
                     .defaultAccountNumber(s.getDefaultAccountNumber())
                     .defaultAccountHolder(s.getDefaultAccountHolder())
                     .commentFeatureEnabled(commentFeatureEnabled)
+                    .salesTipHidden(s.isSalesTipHidden())
                     .notifications(s.notificationSettings())
                     .build();
         }

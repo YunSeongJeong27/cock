@@ -24,6 +24,8 @@ CREATE TABLE seller (
     daily_capture_limit    INTEGER,
     -- 판매자별 댓글 주문 기능 허용 (관리자가 켬). 전체 공개(app_setting comment_feature_open)면 이 값과 상관없이 쓸 수 있다
     comment_feature_enabled BOOLEAN     NOT NULL DEFAULT FALSE,
+    -- 공구를 만든 뒤 뜨는 "제품 판매 TIP" 안내를 다시 보지 않기로 했는지 (2026-10-26)
+    sales_tip_hidden       BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at             TIMESTAMP    NOT NULL,
     row_created_at         TIMESTAMP    NOT NULL DEFAULT LOCALTIMESTAMP,
     row_updated_at         TIMESTAMP    NOT NULL DEFAULT LOCALTIMESTAMP

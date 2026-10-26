@@ -78,6 +78,13 @@ public class SellerService {
         return seller;
     }
 
+    @Transactional
+    public Seller hideSalesTip(Long sellerId) {
+        Seller seller = get(sellerId);
+        seller.setSalesTipHidden(true);
+        return seller;
+    }
+
     public List<AdminSellerRow> listForAdmin() {
         LocalDateTime now = LocalDateTime.now(clock);
         List<Seller> sellers = sellerRepository.findAllByOrderByIdDesc();

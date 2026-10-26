@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, dateTime, errorMessage, storageGet, storageSet, won } from '../../api'
 import { useAuth } from '../../auth'
 import { CopyButton, ErrorBox, Stat, StatusBadge } from '../../components/Ui'
@@ -10,6 +10,7 @@ import DepositTab from './DepositTab'
 import PickupTab from './PickupTab'
 import AnnounceTab from './AnnounceTab'
 import CommentsTab from './CommentsTab'
+import SalesTipModal from './SalesTipModal'
 
 type Tab = 'orders' | 'deposit' | 'pickup' | 'announce' | 'comments'
 
@@ -17,6 +18,10 @@ export default function GroupBuyDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { me } = useAuth()
+  const [params, setParams] = useSearchParams()
+  // 공구를 막 만든 뒤(?created=1)에만, 판매자가 "다시 보지 않기"를 안 눌렀으면 띄운다
+  const showSalesTip = params.get('created') === '1' && me !== null && !me.salesTipHidden
+  const closeSalesTip = useCallback(() => setParams({}, { replace: true }), [setParams])
   const [groupBuy, setGroupBuy] = useState<GroupBuy | null>(null)
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
   const [orders, setOrders] = useState<SellerOrder[]>([])
@@ -72,6 +77,7 @@ export default function GroupBuyDetail() {
 
   return (
     <div>
+      {showSalesTip && <SalesTipModal onClose={closeSalesTip} />}
       <div className="row between">
         <h1>{groupBuy.title}</h1>
         <StatusBadge status={groupBuy.status} label={groupBuy.statusLabel} />

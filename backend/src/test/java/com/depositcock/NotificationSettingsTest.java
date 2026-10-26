@@ -112,6 +112,18 @@ class NotificationSettingsTest extends IntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /** 공구를 만든 뒤 뜨는 "제품 판매 TIP": 다시 보지 않기는 판매자 계정에 저장되고 다른 판매자에게는 영향 없음 (2026-10-26) */
+    @Test
+    void salesTipCanBeHiddenPerSeller() throws Exception {
+        Cookie seller = signup(uniqueEmail());
+        Cookie other = signup(uniqueEmail());
+        mvc.perform(get("/api/me").cookie(seller)).andExpect(jsonPath("$.salesTipHidden").value(false));
+        mvc.perform(post("/api/seller/sales-tip/hide").cookie(seller)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.salesTipHidden").value(true));
+        mvc.perform(get("/api/me").cookie(seller)).andExpect(jsonPath("$.salesTipHidden").value(true));
+        mvc.perform(get("/api/me").cookie(other)).andExpect(jsonPath("$.salesTipHidden").value(false));
+    }
+
     @Test
     void defaultsAreEssentialOnlyAndSellerCanToggleEach() throws Exception {
         Cookie seller = signup(uniqueEmail());

@@ -148,20 +148,20 @@ export default function DepositTab({ groupBuy, reload }: Props) {
         <input key={inputKey} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setParsed(null) }} />
         <div className="row mt">
           <select value={presetId} onChange={(e) => { setPresetId(e.target.value); setManual(false) }} style={{ width: 220 }}>
-            <option value="">열 자동 인식</option>
+            <option value="">헤더(컬럼) 자동 인식</option>
             {presets.map((p) => <option key={p.id} value={p.id}>저장한 설정: {p.name}</option>)}
           </select>
-          <label className="check"><input type="checkbox" checked={manual} onChange={(e) => { setManual(e.target.checked); setPresetId('') }} /> 열 이름 직접 지정</label>
+          <label className="check"><input type="checkbox" checked={manual} onChange={(e) => { setManual(e.target.checked); setPresetId('') }} /> 헤더(컬럼)명 직접 지정</label>
         </div>
         {manual && (
           <div className="mt">
             <p className="small muted">{T.manualColumnsHelp}</p>
             <datalist id="column-options">{parsed?.columnOptions.map((c) => <option key={c} value={c} />)}</datalist>
             <div className="mapping-grid">
-              <label className="field"><span>입금자명 열 *</span><input type="text" list="column-options" value={mapping.nameColumn ?? ''} onChange={(e) => setMapping({ ...mapping, nameColumn: e.target.value })} placeholder="예: 기재내용" /></label>
-              <label className="field"><span>금액 열 *</span><input type="text" list="column-options" value={mapping.amountColumn ?? ''} onChange={(e) => setMapping({ ...mapping, amountColumn: e.target.value })} placeholder="예: 입금액" /></label>
-              <label className="field"><span>날짜 열</span><input type="text" list="column-options" value={mapping.dateColumn ?? ''} onChange={(e) => setMapping({ ...mapping, dateColumn: e.target.value })} placeholder="예: 거래일시" /></label>
-              <label className="field"><span>거래 유형 열</span><input type="text" list="column-options" value={mapping.typeColumn ?? ''} onChange={(e) => setMapping({ ...mapping, typeColumn: e.target.value })} placeholder="예: 구분" /></label>
+              <label className="field"><span>입금자명 헤더(컬럼) *</span><input type="text" list="column-options" value={mapping.nameColumn ?? ''} onChange={(e) => setMapping({ ...mapping, nameColumn: e.target.value })} placeholder="예: 기재내용" /></label>
+              <label className="field"><span>금액 헤더(컬럼) *</span><input type="text" list="column-options" value={mapping.amountColumn ?? ''} onChange={(e) => setMapping({ ...mapping, amountColumn: e.target.value })} placeholder="예: 입금액" /></label>
+              <label className="field"><span>날짜 헤더(컬럼)</span><input type="text" list="column-options" value={mapping.dateColumn ?? ''} onChange={(e) => setMapping({ ...mapping, dateColumn: e.target.value })} placeholder="예: 거래일시" /></label>
+              <label className="field"><span>거래 유형 헤더(컬럼)</span><input type="text" list="column-options" value={mapping.typeColumn ?? ''} onChange={(e) => setMapping({ ...mapping, typeColumn: e.target.value })} placeholder="예: 구분" /></label>
             </div>
           </div>
         )}
@@ -185,7 +185,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
                   <div className="small mt">{T.previewCounts(parsed.deposits.length, parsed.skippedRows, duplicates)}</div>
                   <div className="small">{T.wrongColumnsHint}</div>
                 </div>
-                {manual && <button className="btn small" onClick={savePreset}>이 열 설정을 은행별로 저장</button>}
+                {manual && <button className="btn small" onClick={savePreset}>이 헤더(컬럼) 설정을 은행별로 저장</button>}
                 <div className="table-wrap mt">
                   <table>
                     <thead><tr><th>행</th><th>입금자명</th><th className="right">금액</th><th>일시</th></tr></thead>

@@ -39,7 +39,6 @@ export const orderText = {
   consent: '주문하면 [개인정보처리방침](/privacy)에 따라 주문 처리에 필요한 연락처·입금자명·배송지를 판매자에게 전달하는 데 동의하는 것으로 봅니다.',
 
   // 취소·환불 신청
-  pausedNoCancel: '판매자가 주문을 잠시 멈춰서 지금은 취소·환불 신청을 할 수 없습니다.',
   cancelIfNotPaid: '입금을 안 하셨다면 바로 주문 취소할 수 있습니다.',
   cancelBeforeConfirm: '주문 확정 전에는 바로 취소할 수 있습니다. ',
   cancelClosed: '주문이 마감되어 바로 취소는 할 수 없습니다. 판매자에게 문의해 주세요. ',

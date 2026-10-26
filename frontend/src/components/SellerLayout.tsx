@@ -15,7 +15,7 @@ export default function SellerLayout() {
         <Link to="/seller" className="brand">📌 입금콕</Link>
         <nav>
           <NavLink to="/seller" end>공구</NavLink>
-          <NavLink to="/seller/bank">은행 열 설정</NavLink>
+          <NavLink to="/seller/bank">은행 헤더(컬럼) 설정</NavLink>
           <NavLink to="/seller/profile">내 정보</NavLink>
           {me?.role === 'ADMIN' && <NavLink to="/admin">관리자</NavLink>}
           <button

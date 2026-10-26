@@ -71,6 +71,12 @@ public class AuthController {
         return toMe(sellerService.updateNotifications(CurrentSeller.id(), request.notifications()));
     }
 
+    /** "제품 판매 TIP" 안내 다시 보지 않기 (2026-10-26) */
+    @PostMapping("/api/seller/sales-tip/hide")
+    public MeResponse hideSalesTip() {
+        return toMe(sellerService.hideSalesTip(CurrentSeller.id()));
+    }
+
     private MeResponse toMe(Seller seller) {
         return MeResponse.of(seller, LocalDateTime.now(clock), featureAccess.commentsAllowed(seller));
     }

@@ -9,7 +9,7 @@ interface Alias { id: number; depositorName: string; customerId: number; custome
 /** GET /api/seller/bank-settings: 화면에 필요한 세 가지를 한 번에 */
 interface Settings { defaults: Defaults; presets: Preset[]; aliases: Alias[] }
 
-/** 은행 거래내역 열 설정 (은행마다 열 이름이 달라서) + 저장된 입금자 별칭 관리 */
+/** 은행 거래내역 헤더(컬럼) 설정 (은행마다 헤더(컬럼)명이 달라서) + 저장된 입금자 별칭 관리 */
 const emptyPreset = { name: '', nameColumn: '', amountColumn: '', dateColumn: '', typeColumn: '' }
 
 export default function BankSettings() {
@@ -54,7 +54,7 @@ export default function BankSettings() {
 
   return (
     <div>
-      <h1>은행 거래내역 열 설정</h1>
+      <h1>은행 거래내역 헤더(컬럼) 설정</h1>
       <div className="card">
         <h3>자동 인식 기본값</h3>
         <p className="muted small">{T.defaultsHelp}</p>
@@ -70,13 +70,13 @@ export default function BankSettings() {
         )}
       </div>
       <form className="card" onSubmit={submit}>
-        <h3>은행별 열 이름 저장</h3>
+        <h3>은행별 헤더(컬럼) 명칭 저장</h3>
         <div className="mapping-grid">
           <label className="field"><span>은행 이름 *</span><input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="예: 신협" /></label>
-          <label className="field"><span>입금자명 열 *</span><input type="text" value={form.nameColumn} onChange={(e) => setForm({ ...form, nameColumn: e.target.value })} required /></label>
-          <label className="field"><span>금액 열 *</span><input type="text" value={form.amountColumn} onChange={(e) => setForm({ ...form, amountColumn: e.target.value })} required /></label>
-          <label className="field"><span>날짜 열</span><input type="text" value={form.dateColumn} onChange={(e) => setForm({ ...form, dateColumn: e.target.value })} /></label>
-          <label className="field"><span>거래 유형 열</span><input type="text" value={form.typeColumn} onChange={(e) => setForm({ ...form, typeColumn: e.target.value })} /></label>
+          <label className="field"><span>입금자명 헤더(컬럼) *</span><input type="text" value={form.nameColumn} onChange={(e) => setForm({ ...form, nameColumn: e.target.value })} required /></label>
+          <label className="field"><span>금액 헤더(컬럼) *</span><input type="text" value={form.amountColumn} onChange={(e) => setForm({ ...form, amountColumn: e.target.value })} required /></label>
+          <label className="field"><span>날짜 헤더(컬럼)</span><input type="text" value={form.dateColumn} onChange={(e) => setForm({ ...form, dateColumn: e.target.value })} /></label>
+          <label className="field"><span>거래 유형 헤더(컬럼)</span><input type="text" value={form.typeColumn} onChange={(e) => setForm({ ...form, typeColumn: e.target.value })} /></label>
         </div>
         <ErrorBox message={error} />
         <button className="btn primary">저장</button>

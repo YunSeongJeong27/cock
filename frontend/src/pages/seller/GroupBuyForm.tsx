@@ -120,7 +120,8 @@ export default function GroupBuyForm() {
       }
     }
     setBusy(false)
-    navigate(`/seller/group-buys/${saved.id}`)
+    // 새로 만든 공구면 공구 화면에서 "제품 판매 TIP"을 띄운다 (2026-10-26)
+    navigate(`/seller/group-buys/${saved.id}${editing ? '' : '?created=1'}`)
   }
 
   return (

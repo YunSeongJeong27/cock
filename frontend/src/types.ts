@@ -16,6 +16,8 @@ export interface Me {
   defaultAccountHolder: string | null
   /** 댓글 주문 기능을 쓸 수 있는지 (관리자가 전체 공개했거나 이 판매자에게 허용) */
   commentFeatureEnabled: boolean
+  /** 공구를 만든 뒤 뜨는 "제품 판매 TIP"을 다시 보지 않기로 했는지 (2026-10-26) */
+  salesTipHidden: boolean
   /** 알림 켜짐/꺼짐 (2026-10-19, 모든 종류가 옴) */
   notifications: Record<NotificationType, boolean>
 }

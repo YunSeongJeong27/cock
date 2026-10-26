@@ -150,9 +150,9 @@ public enum ErrorCode {
     // ---- 입금 대조 ----
     STATEMENT_PDF_NOT_SUPPORTED(BAD_REQUEST, "PDF 거래내역은 아직 읽을 수 없습니다. 은행 앱에서 엑셀이나 CSV 파일로 받아 올려주세요."),
     STATEMENT_EXCEL_UNREADABLE(BAD_REQUEST, "엑셀 파일을 읽을 수 없습니다. 파일이 손상되었거나 암호가 걸려 있는지 확인해 주세요."),
-    STATEMENT_GIVEN_COLUMNS_NOT_FOUND(BAD_REQUEST, "위쪽 %3$d줄 안에서 지정한 열을 찾지 못했습니다. 열 이름을 다시 확인해 주세요. 입금자명 열: %1$s · 금액 열: %2$s"),
-    STATEMENT_COLUMNS_NOT_FOUND(BAD_REQUEST, "입금자명·금액 열을 자동으로 찾지 못했습니다. 은행마다 열 이름이 달라서 그렇습니다. "
-            + "아래에서 입금자명 열과 금액 열을 직접 골라주세요."),
+    STATEMENT_GIVEN_COLUMNS_NOT_FOUND(BAD_REQUEST, "위쪽 %3$d줄 안에서 지정한 헤더(컬럼)를 찾지 못했습니다. 헤더(컬럼)명을 다시 확인해 주세요. 입금자명 헤더(컬럼): %1$s · 금액 헤더(컬럼): %2$s"),
+    STATEMENT_COLUMNS_NOT_FOUND(BAD_REQUEST, "입금자명·금액 헤더(컬럼)를 자동으로 찾지 못했습니다. 은행마다 헤더(컬럼)명이 달라서 그렇습니다. "
+            + "아래에서 입금자명 헤더(컬럼)와 금액 헤더(컬럼)를 직접 골라주세요."),
     FILE_REQUIRED(BAD_REQUEST, "파일을 선택해 주세요."),
     FILE_UNREADABLE(BAD_REQUEST, "파일을 읽을 수 없습니다."),
     UPLOAD_NOT_FOUND(NOT_FOUND, "업로드를 찾을 수 없습니다."),
@@ -164,7 +164,7 @@ public enum ErrorCode {
     NOT_PAID(BAD_REQUEST, "입금 확정된 주문이 아닙니다."),
     REFUNDED_CANNOT_UNCONFIRM(BAD_REQUEST, "환불 완료된 주문은 입금 확정을 취소할 수 없습니다."),
     ALIAS_NOT_FOUND(NOT_FOUND, "별칭을 찾을 수 없습니다."),
-    PRESET_NOT_FOUND(NOT_FOUND, "저장된 열 설정을 찾을 수 없습니다."),
+    PRESET_NOT_FOUND(NOT_FOUND, "저장된 헤더(컬럼) 설정을 찾을 수 없습니다."),
 
     // ---- 댓글 집계 ----
     COMMENT_AUTHOR_EMPTY(BAD_REQUEST, "작성자가 비어 있는 댓글이 있습니다: %s"),
@@ -237,9 +237,9 @@ public enum ErrorCode {
     CONFIRM_NOTHING_SELECTED(BAD_REQUEST, "확정할 입금을 골라 주세요."),
     PRESET_NAME_REQUIRED(BAD_REQUEST, "설정 이름을 입력해 주세요."),
     PRESET_NAME_TOO_LONG(BAD_REQUEST, "설정 이름은 100자까지 입력할 수 있습니다."),
-    COLUMN_NAME_TOO_LONG(BAD_REQUEST, "열 이름은 100자까지 입력할 수 있습니다."),
-    NAME_COLUMN_REQUIRED(BAD_REQUEST, "입금자명 열을 골라 주세요."),
-    AMOUNT_COLUMN_REQUIRED(BAD_REQUEST, "금액 열을 골라 주세요."),
+    COLUMN_NAME_TOO_LONG(BAD_REQUEST, "헤더(컬럼)명은 100자까지 입력할 수 있습니다."),
+    NAME_COLUMN_REQUIRED(BAD_REQUEST, "입금자명 헤더(컬럼)를 골라 주세요."),
+    AMOUNT_COLUMN_REQUIRED(BAD_REQUEST, "금액 헤더(컬럼)를 골라 주세요."),
     COMMENT_SOURCE_REQUIRED(BAD_REQUEST, "댓글을 어디서 가져왔는지 골라 주세요."),
     COMMENTS_MISSING(BAD_REQUEST, "저장할 댓글이 없습니다."),
     COMMENT_AUTHOR_REQUIRED(BAD_REQUEST, "작성자를 입력해 주세요."),

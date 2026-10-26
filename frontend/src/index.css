@@ -121,8 +121,17 @@ button.link { background: none; border: none; color: var(--muted); cursor: point
 
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; background: var(--card); }
-th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: center; vertical-align: top; }
 th { background: #f9fafb; font-weight: 700; white-space: nowrap; }
+/*
+ * 표 정렬 (2026-10-26 사용자 "중앙정렬할 거면 다 하고"): 머리줄·칸 모두 가운데. 숫자·금액(.right·.num)도 가운데.
+ * 펼친 상세와 칸 안에 입력하는 글자는 왼쪽. 폰 카드(table.stack)는 아래 미디어 쿼리에서 왼쪽
+ */
+th.right, td.right { text-align: center; }
+td { font-variant-numeric: tabular-nums; }
+tr:not(.detail):not(.stack-detail) > td > .row { justify-content: center; }
+td input[type=text], td input[type=number], td textarea { text-align: left; }
+tr.detail td, tr.stack-detail td { text-align: left; }
 tr.dim td { color: var(--muted); }
 
 .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
@@ -156,6 +165,16 @@ tr.dim td { color: var(--muted); }
 .hero { text-align: center; padding: 48px 16px 24px; }
 .hero h1 { font-size: 1.9rem; }
 .hero p { color: var(--muted); }
+/* 안내 창 (공구 만든 뒤 "제품 판매 TIP", 2026-10-26) */
+.modal-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(17, 24, 39, 0.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.modal { background: var(--card); border-radius: 14px; padding: 20px; width: 100%; max-width: 440px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); }
+.modal h3 { margin: 0 0 10px; }
+.modal-foot { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
+.tip-example { background: var(--primary-weak); border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+.link-button { background: none; border: none; padding: 4px 0; color: var(--muted); font-size: 0.88rem; text-decoration: underline; cursor: pointer; }
+/* 첫 화면 무료 안내 강조 (2026-10-26) */
+.hero .promo { display: inline-block; margin-top: 20px; padding: 7px 16px; border-radius: 999px; background: var(--primary-weak); color: var(--primary); font-weight: 700; font-size: 1.05rem; }
+.hero .promo + p { margin-top: 8px; }
 .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 
 .sticky-bottom { position: sticky; bottom: 0; background: var(--card); padding: 12px 0; border-top: 1px solid var(--line); }
@@ -178,7 +197,7 @@ table.grid th, table.grid td { padding: 7px 10px; vertical-align: middle; }
 table.grid thead th { position: sticky; top: 0; z-index: 2; background: #f3f4f6; }
 table.grid th.sortable { cursor: pointer; user-select: none; }
 table.grid th.sortable:hover { background: #e5e7eb; }
-table.grid .num { text-align: right; }
+table.grid .num { text-align: center; }
 table.grid tbody tr.grid-row:hover td { background: #f9fafb; }
 table.grid tbody tr.open td { background: var(--primary-weak); }
 table.grid tr.detail td { white-space: normal; background: #fafafa; }
@@ -223,6 +242,7 @@ input.capture-limit { width: 110px; }
   table.stack tr { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
   table.stack tr.stack-detail { margin-top: -8px; border-top: none; border-radius: 0 0 10px 10px; }
   table.stack td { border: none; padding: 3px 0; text-align: left; }
+  table.stack tr:not(.stack-detail) > td > .row { justify-content: flex-start; }
   table.stack td.hide-mobile { display: none; }
   table.stack td[data-label] { display: flex; gap: 10px; align-items: baseline; }
   table.stack td[data-label]::before { content: attr(data-label); flex: 0 0 84px; color: var(--muted); font-size: 0.8rem; }
