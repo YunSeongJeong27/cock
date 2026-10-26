@@ -60,7 +60,7 @@ public class SellerOrderService {
     }
 
     /**
-     * 고객 환불 신청이 기다리는 주문은 판매자가 [취소하고 환불]·[취소 안 함]으로 먼저 처리해야 한다 (2026-10-19).
+     * 고객 환불 신청이 기다리는 주문은 판매자가 [주문취소 진행(환불)]·[취소 안 함]으로 먼저 처리해야 한다 (2026-10-19).
      * 그 전에 수령 체크·주문 변경·일반 취소를 하면 환불 기록이 사라지거나, 물건을 받은 주문이 환불로 취소될 수 있다
      */
     private static void requireNoRefundPending(CustomerOrder order) {

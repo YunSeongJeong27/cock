@@ -58,7 +58,7 @@ public class SellerOrderController {
         return service.markRefunded(CurrentSeller.id(), groupBuyId, orderId);
     }
 
-    /** 고객의 환불 신청: [취소하고 환불] */
+    /** 고객의 환불 신청: [주문취소 진행(환불)] */
     @PostMapping("/{orderId}/refund-request/approve")
     public SellerOrder approveRefund(@PathVariable Long groupBuyId, @PathVariable Long orderId) {
         return service.decideRefund(CurrentSeller.id(), groupBuyId, orderId, true);

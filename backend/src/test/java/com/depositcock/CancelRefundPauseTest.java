@@ -141,7 +141,7 @@ class CancelRefundPauseTest extends IntegrationTest {
 
     /**
      * 환불 신청 중인 주문은 판매자가 처리할 때까지 그대로: 같은 번호로 다시 주문하면 새 주문으로 쌓이고, 수정·바로 취소는 안 됨.
-     * 판매자가 [취소하고 환불]하면 그 주문은 취소(환불 필요)로 남고 새 주문은 그대로 (2026-10-19)
+     * 판매자가 [주문취소 진행(환불)]하면 그 주문은 취소(환불 필요)로 남고 새 주문은 그대로 (2026-10-19)
      */
     @Test
     void reorderWhileRefundPendingAddsNewOrder() throws Exception {

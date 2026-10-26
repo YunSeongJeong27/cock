@@ -168,7 +168,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             {!o.paid && <div className="small mt" style={{ color: 'var(--warn)' }}>{T.refundBeforeConfirm}</div>}
             <div className="row mt">
               <button className="btn small danger" onClick={() => post(`${o.id}/refund-request/approve`, undefined,
-                T.confirmApproveRefund(o.orderNo))}>취소하고 환불</button>
+                T.confirmApproveRefund(o.orderNo))}>주문취소 진행(환불)</button>
               <button className="btn small" onClick={() => post(`${o.id}/refund-request/reject`, undefined,
                 T.confirmRejectRefund)}>취소 안 함</button>
             </div>
@@ -189,7 +189,12 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
           <div className="row mt">
             {o.active && !o.pickedUp && !refundPending(o) && <button className="btn small" onClick={() => startEdit(o)}>주문 변경</button>}
             {o.active && o.paymentMethod === 'PREPAID' && !o.paid && <button className="btn small" onClick={() => manualPaid(o)}>수동 입금 확정</button>}
-            {o.paid && !o.refundedAt && <button className="btn small" onClick={() => post(`${o.id}/unconfirm-paid`, undefined, T.confirmUnconfirmPaid)}>입금 확정 취소</button>}
+            {/* 선입금 주문에는 늘 보이고 주문 확정 상태일 때만 누를 수 있다. 환불 신청이 기다리는 동안은 환불 처리부터 (2026-10-26) */}
+            {o.paymentMethod === 'PREPAID' && (o.active || o.paid) && !o.refundedAt && (
+              <button className="btn small" disabled={!o.paid || refundPending(o)}
+                title={!o.paid ? T.unconfirmOnlyWhenPaid : refundPending(o) ? T.unconfirmAfterRefundDecision : undefined}
+                onClick={() => post(`${o.id}/unconfirm-paid`, undefined, T.confirmUnconfirmPaid)}>입금 확정 취소</button>
+            )}
             {o.refundRequired && !o.refundedAt && <button className="btn small ok" onClick={() => post(`${o.id}/refunded`)}>환불 완료</button>}
             {o.active && !refundPending(o) && !o.pickedUp && <button className="btn small danger" onClick={() => post(`${o.id}/cancel`, undefined, T.confirmCancel(o.orderNo, o.paid))}>주문 취소</button>}
           </div>

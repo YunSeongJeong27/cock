@@ -130,7 +130,7 @@ public class CustomerOrder extends BaseTimeEntity {
     private LocalDateTime refundedAt;
 
     /**
-     * 고객의 환불 신청 (입금 후 취소, 2026-10-18). 판매자가 [취소하고 환불]하면 취소 + 환불 필요,
+     * 고객의 환불 신청 (입금 후 취소, 2026-10-18). 판매자가 [주문취소 진행(환불)]하면 취소 + 환불 필요,
      * [취소 안 함]이면 refundRejectedAt (주문은 그대로)
      */
     private LocalDateTime refundRequestedAt;

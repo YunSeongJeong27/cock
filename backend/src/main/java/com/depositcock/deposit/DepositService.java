@@ -355,6 +355,11 @@ public class DepositService {
         if (order.getRefundedAt() != null) {
             throw new ApiException(ErrorCode.REFUNDED_CANNOT_UNCONFIRM);
         }
+        // 환불 신청이 기다리는 동안 확정을 취소하면 "주문 확정 전 + 환불 신청 중"으로 꼬인다. 수령 체크·주문 변경·취소처럼
+        // 환불 신청을 먼저 처리하게 한다 (2026-10-26)
+        if (order.isRefundPending()) {
+            throw new ApiException(ErrorCode.REFUND_PENDING_DECIDE_FIRST);
+        }
         aliasBook.undo(sellerId, order, Set.of(order.getId()));
         // 확정 기록은 지우지 않고 취소 시각만 남긴다. 취소된 주문이면 "입금 확정"이 잘못이었다는 뜻이므로 "환불 필요"도 함께 거둔다
         order.cancelPaid(LocalDateTime.now(clock));

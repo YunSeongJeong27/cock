@@ -13,14 +13,16 @@ export const sellerOrderText = {
   },
   refundBeforeConfirm: '아직 주문 확정 전입니다. 통장에서 입금을 확인한 뒤 처리해 주세요.',
   confirmApproveRefund: (orderNo: number) =>
-    `${orderNo}번 주문을 취소하고 "환불 필요"로 표시할까요? 위 계좌로 직접 돈을 보낸 뒤 [환불 완료]를 눌러 주세요.`,
+    `${orderNo}번 주문이 취소된 후 "환불 필요" 상태로 바뀝니다. 진행하시겠습니까?\n\n고객 계좌로 직접 돈을 보낸 뒤 [환불 완료]를 눌러 주세요.`,
   confirmRejectRefund: '환불 신청을 받지 않을까요? 주문은 그대로 남고 고객 화면에 "환불 신청이 반려됐어요"가 보입니다.',
   refundRequestsBanner: (count: number) =>
-    `고객 환불 신청이 ${count}건 있습니다. 상세에서 [취소하고 환불] 또는 [취소 안 함]을 눌러 주세요.`,
+    `고객 환불 신청이 ${count}건 있습니다. 상세에서 [주문취소 진행(환불)] 또는 [취소 안 함]을 눌러 주세요.`,
 
   // 주문 처리
   changedReplyHead: '**변경했습니다.** 아래 댓글 답글 예시를 고쳐서 복사해 쓰세요.',
   confirmUnconfirmPaid: '입금 확정을 취소할까요?',
+  unconfirmOnlyWhenPaid: '주문 확정 상태일 때만 누를 수 있습니다.',
+  unconfirmAfterRefundDecision: '환불 신청을 먼저 처리해 주세요.',
   manualAmountInvalid: '입금액은 숫자로 입력해 주세요. 예: 3800',
   confirmCancel: (orderNo: number, paid: boolean) =>
     `${orderNo}번 주문을 취소할까요?${paid ? ' 입금 확정된 주문이라 환불 필요로 표시됩니다.' : ''}`,
