@@ -19,7 +19,7 @@ export const orderText = {
   changedBySeller: (time: string) => `판매자가 ${time}에 주문을 변경했어요. 위 내용·금액을 확인해 주세요.`,
   refundPlanned: '취소됨 · 판매자가 환불할 예정입니다.',
   refundRequested: '환불 신청됨 · 판매자가 확인 중입니다.',
-  refundRejected: '환불 신청이 반려됐어요. 판매자에게 문의해 주세요.',
+  refundRejected: '환불 신청이 취소됐어요. 판매자에게 문의해 주세요.',
   editableUntilConfirm: '주문 확정 전까지 수정할 수 있어요.',
   confirmedCannotEdit: '확정된 주문은 수정할 수 없어요. 변경은 환불 신청 후 다시 주문해 주세요.',
 

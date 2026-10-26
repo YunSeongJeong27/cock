@@ -114,7 +114,7 @@ public enum ErrorCode {
     PICKED_UP_CANNOT_REFUND(BAD_REQUEST, "이미 수령한 주문은 환불 신청을 할 수 없습니다. 판매자에게 문의해 주세요."),
     ONSITE_NO_REFUND(BAD_REQUEST, "현장결제 주문은 입금이 없어 환불 신청이 필요 없습니다. 주문 취소를 눌러 주세요."),
     REFUND_ALREADY_REQUESTED(BAD_REQUEST, "이미 환불 신청한 주문입니다. 판매자가 확인 중입니다."),
-    REFUND_REJECTED(BAD_REQUEST, "환불 신청이 반려된 주문입니다. 판매자에게 문의해 주세요."),
+    REFUND_REJECTED(BAD_REQUEST, "환불 신청이 취소된 주문입니다. 판매자에게 문의해 주세요."),
 
     // ---- 수령·결제 규칙 ----
     RECEIVE_METHOD_REQUIRED(BAD_REQUEST, "수령 방법을 선택해 주세요."),
