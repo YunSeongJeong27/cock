@@ -189,7 +189,7 @@ final class OrderUpdate {
 
     private static void addIfChanged(List<String> changes, String label, String before, String after) {
         if (!Objects.equals(before, after)) {
-            changes.add(label + " " + (before == null ? "(없음)" : before) + "→" + (after == null ? "(없음)" : after));
+            changes.add(label + " " + (before == null ? "없음" : before) + "→" + (after == null ? "없음" : after));
         }
     }
 

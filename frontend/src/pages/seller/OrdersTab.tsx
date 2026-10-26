@@ -128,7 +128,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
     return (
       <>
         <div className="row">
-          <span>환불 계좌: <b>{o.refundBank} {o.refundAccount ?? '(읽을 수 없음)'}</b></span>
+          <span>환불 계좌: <b>{o.refundBank} {o.refundAccount ?? '읽을 수 없음'}</b></span>
           {o.refundAccount && <CopyButton text={o.refundAccount} label="계좌 복사" />}
         </div>
         {paidName && squash(paidName) !== squash(o.depositorName) && (
@@ -151,7 +151,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
           {o.shippingFee > 0 && <div>상품 {won(o.itemsAmount)} + 배송비 {won(o.shippingFee)}</div>}
           {o.payments.map((p, i) => (
             <div key={i} className={p.cancelledAt ? 'muted' : undefined}>
-              입금 확정{p.manual ? '(수동)' : ''}: {dateTime(p.confirmedAt)} · {p.depositorName} {won(p.amount)}
+              {p.manual ? '수동 입금 확정' : '입금 확정'}: {dateTime(p.confirmedAt)} · {p.depositorName} {won(p.amount)}
               {p.cancelledAt && <> → {dateTime(p.cancelledAt)} 확정 취소</>}
             </div>
           ))}
@@ -290,7 +290,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
         {active.length > 0 && (
           <tfoot>
             <tr>
-              <td colSpan={5}>합계 {active.length}건 <span className="muted">(보이는 주문 중 취소 제외)</span></td>
+              <td colSpan={5}>합계 {active.length}건 <span className="muted">· 취소 제외</span></td>
               {products.map((p) => <td key={p.id} className="num">{active.reduce((s, o) => s + qtyOf(o, p.id), 0)}</td>)}
               <td className="num">{won(active.reduce((s, o) => s + o.expectedAmount, 0))}</td>
               <td colSpan={6}></td>
@@ -358,8 +358,8 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
       <div className="row mb">
         <select value={filter} onChange={(e) => { setFilter(e.target.value); setChecked(new Set()) }} style={{ width: 170 }}>
           <option value="all">전체 ({orders.length - finishedCount})</option>
-          <option value="active">주문 중 (취소 제외)</option>
-          <option value="unpaid">미입금 (선입금)</option>
+          <option value="active">취소 제외</option>
+          <option value="unpaid">선입금 미입금</option>
           <option value="refundreq">환불 신청 ({refundRequests})</option>
           <option value="refund">환불 필요</option>
           <option value="finished">완료 ({finishedCount})</option>

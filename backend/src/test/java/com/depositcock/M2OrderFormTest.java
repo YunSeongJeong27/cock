@@ -222,7 +222,7 @@ class M2OrderFormTest extends IntegrationTest {
                 .andExpect(jsonPath("$.account").doesNotExist());
 
         JsonNode orders = read(mvc.perform(get("/api/seller/group-buys/" + g.id() + "/orders").cookie(g.seller())).andReturn());
-        assertThat(orders.get(0).get("statusLabel").asText()).isEqualTo("예약됨 (현장결제)");
+        assertThat(orders.get(0).get("statusLabel").asText()).isEqualTo("예약됨");
         assertThat(orders.get(0).get("pickupPointName").asText()).isEqualTo("2호점");
         long orderId = orders.get(0).get("id").asLong();
         mvc.perform(withJson(post("/api/seller/group-buys/" + g.id() + "/orders/" + orderId + "/picked-up").cookie(g.seller()),

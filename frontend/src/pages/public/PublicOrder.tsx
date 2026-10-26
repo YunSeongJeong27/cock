@@ -123,9 +123,9 @@ function OrderSummary({ o, title, f }: { o: MyOrder; title: ReactNode; f?: Final
       <div className="small mt">
         <div>수령: {receiveText(o)}</div>
         {o.receiveMethod === 'DELIVERY' && f && (
-          <div>배송지: {f.recipientName} · {f.recipientPhone} · {f.zipcode ? `(${f.zipcode}) ` : ''}{f.address}{f.addressDetail ? ' ' + f.addressDetail : ''}</div>
+          <div>배송지: {f.recipientName} · {f.recipientPhone} · {f.zipcode ? `${f.zipcode} ` : ''}{f.address}{f.addressDetail ? ' ' + f.addressDetail : ''}</div>
         )}
-        <div>결제: {o.paymentMethod === 'PREPAID' ? `선입금 (입금자명 ${o.depositorName})` : `현장결제 (이름 ${o.depositorName})`}</div>
+        <div>결제: {o.paymentMethod === 'PREPAID' ? `선입금 · 입금자명 ${o.depositorName}` : `현장결제 · 이름 ${o.depositorName}`}</div>
         {f?.nickname && <div>닉네임: {f.nickname}</div>}
         {f?.unitAddress && <div>동·호수: {f.unitAddress}</div>}
       </div>
@@ -150,15 +150,15 @@ function MyOrdersCard({ view, onEdit, onCancel }: {
             <StatusBadge status={o.status} label={o.statusLabel + (o.status === 'PAID' ? ' ✅' : '')} />
           </div>
           <div className="small">{itemsText(o.items)}</div>
-          <div className="small muted">{receiveText(o)} · {o.paymentMethod === 'PREPAID' ? `선입금 (입금자명 ${o.depositorName})` : '현장결제'} · {dateTime(o.orderedAt)}</div>
+          <div className="small muted">{receiveText(o)} · {o.paymentMethod === 'PREPAID' ? `선입금 · 입금자명 ${o.depositorName}` : '현장결제'} · {dateTime(o.orderedAt)}</div>
           {o.changedAt && <div className="small" style={{ color: 'var(--warn)' }}>{T.changedBySeller(dateTime(o.changedAt))}</div>}
-          {o.customerChangedAt && <div className="small muted">주문 수정됨 ({dateTime(o.customerChangedAt)})</div>}
+          {o.customerChangedAt && <div className="small muted">주문 수정됨 · {dateTime(o.customerChangedAt)}</div>}
           {o.refundRequired && <div className="small" style={{ color: 'var(--danger)' }}>{T.refundPlanned}</div>}
-          {o.refundedAt && <div className="small muted">취소됨 · 환불 완료 ({dateTime(o.refundedAt)})</div>}
+          {o.refundedAt && <div className="small muted">취소됨 · 환불 완료 · {dateTime(o.refundedAt)}</div>}
           {o.refundState === 'REQUESTED' && <div className="small" style={{ color: 'var(--warn)' }}>{T.refundRequested}</div>}
           {o.refundState === 'REJECTED' && <div className="small" style={{ color: 'var(--danger)' }}>{T.refundRejected}</div>}
           {o.awaitingConfirm && view.account && (
-            <div className="small mt">입금 계좌: {view.account.bankName} {view.account.accountNumber} ({view.account.accountHolder}) <CopyButton text={view.account.accountNumber} label="복사" /></div>
+            <div className="small mt">입금 계좌: {view.account.bankName} {view.account.accountNumber} · 예금주 {view.account.accountHolder} <CopyButton text={view.account.accountNumber} label="복사" /></div>
           )}
           <div className="row mt">
             {!view.paused && o.replaceable && o.editValues && <button className="btn small" onClick={() => onEdit(o)}>주문 수정</button>}
@@ -438,12 +438,12 @@ export default function PublicOrder() {
           <h2>{placed.changed ? '주문을 수정했어요 ✅' : '주문 완료 🎉'}</h2>
           {placed.changed
             ? <OrderSummary o={placed.finalOrder.order} f={placed.finalOrder}
-                title={<><b>최종 주문</b> <span className="muted">(이 내용으로 수정되었습니다)</span></>} />
+                title={<><b>최종 주문</b> <span className="muted">· 이 내용으로 수정되었습니다</span></>} />
             : <div>총 금액 <b>{won(placed.expectedAmount)}</b></div>}
           {placed.account ? (
             <div className="mt">
               <div><Rich text={T.sendTo(won(placed.expectedAmount))} /></div>
-              <div className="row mt"><b>{placed.account.bankName} {placed.account.accountNumber}</b> ({placed.account.accountHolder}) <CopyButton text={placed.account.accountNumber} label="계좌 복사" /></div>
+              <div className="row mt"><b>{placed.account.bankName} {placed.account.accountNumber}</b> 예금주 {placed.account.accountHolder} <CopyButton text={placed.account.accountNumber} label="계좌 복사" /></div>
               <div className="warn-box"><Rich text={T.depositorReminder(placed.depositorName)} /></div>
               <div className="small muted mt">{T.confirmAfterDeposit}</div>
             </div>
@@ -542,7 +542,7 @@ export default function PublicOrder() {
               readOnly={!!(editing && editing.editValues?.depositorName)} />
               <span className="muted small" style={{ fontWeight: 400 }}>{payment === 'ONSITE' ? T.depositorHintOnsite : T.depositorHintTransfer}</span>
             </label>
-            <label className="field"><span>{view.nicknameRequired ? '닉네임 (밴드·카톡) *' : '닉네임 (밴드·카톡, 선택)'}</span><input type="text" value={form.nickname} onChange={(e) => set('nickname', e.target.value)} required={view.nicknameRequired} /></label>
+            <label className="field"><span>{view.nicknameRequired ? '밴드·카톡 닉네임 *' : '밴드·카톡 닉네임'}</span><input type="text" value={form.nickname} onChange={(e) => set('nickname', e.target.value)} required={view.nicknameRequired} /></label>
             {view.unitAddressFieldEnabled && <label className="field"><span>동·호수 *</span><input type="text" value={form.unitAddress} onChange={(e) => set('unitAddress', e.target.value)} required placeholder="예: 101동 1203호" /></label>}
           </div>
 
@@ -558,14 +558,14 @@ export default function PublicOrder() {
               {warnings.replaceOrder?.paymentMethod === 'PREPAID' && <div className="small mt">{T.refundThenReorder}</div>}
               {warnings.replaceOrder && showExisting && (
                 <OrderSummary o={warnings.replaceOrder}
-                  title={<><b>기존 주문</b> <span className="muted">({warnings.replaceOrder.statusLabel})</span></>} />
+                  title={<><b>기존 주문</b> <span className="muted">· {warnings.replaceOrder.statusLabel}</span></>} />
               )}
               <div className="row mt">
                 {warnings.replaceOrder && !showExisting && (
                   <button type="button" className="btn small" onClick={() => setShowExisting(true)}>기존 주문 확인</button>
                 )}
                 <button type="button" className="btn small primary" disabled={busy} onClick={() => submit(null, true)}>
-                  {warnings.replaceOrder ? '수정하기' : '확인했어요, 주문하기'}
+                  {warnings.replaceOrder ? '수정하기' : '확인하고 주문하기'}
                 </button>
                 <button type="button" className="btn small" onClick={() => setWarnings(null)}>다시 입력</button>
               </div>
@@ -622,12 +622,12 @@ export default function PublicOrder() {
               </>
             )}
             {cancel.notice && <div className="warn-box">{cancel.notice}</div>}
-            <label className="field"><span>휴대폰 번호 (주문할 때 적은 번호)</span><input type="tel" value={cancel.phone} onChange={(e) => setCancel({ ...cancel, phone: e.target.value, choices: [] })} required /></label>
-            <label className="field"><span>입금자명 (주문할 때 적은 이름)</span><input type="text" value={cancel.depositorName} onChange={(e) => setCancel({ ...cancel, depositorName: e.target.value, choices: [] })} required /></label>
+            <label className="field"><span>주문할 때 적은 휴대폰 번호</span><input type="tel" value={cancel.phone} onChange={(e) => setCancel({ ...cancel, phone: e.target.value, choices: [] })} required /></label>
+            <label className="field"><span>주문할 때 적은 입금자명</span><input type="text" value={cancel.depositorName} onChange={(e) => setCancel({ ...cancel, depositorName: e.target.value, choices: [] })} required /></label>
             {cancel.mode === 'refund' && (
               <>
                 <label className="field"><span>환불받을 은행</span><input type="text" value={cancel.bankName} onChange={(e) => setCancel({ ...cancel, bankName: e.target.value })} required maxLength={30} placeholder="예: 국민은행" /></label>
-                <label className="field"><span>계좌번호</span><input type="text" inputMode="numeric" value={cancel.accountNumber} onChange={(e) => setCancel({ ...cancel, accountNumber: e.target.value })} required maxLength={30} placeholder="숫자만 (- 있어도 됨)" /></label>
+                <label className="field"><span>계좌번호</span><input type="text" inputMode="numeric" value={cancel.accountNumber} onChange={(e) => setCancel({ ...cancel, accountNumber: e.target.value })} required maxLength={30} placeholder="예: 123-456-789012" /></label>
               </>
             )}
             {cancelTarget && cancel.choices.length === 0 && (

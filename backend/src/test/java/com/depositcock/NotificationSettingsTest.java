@@ -192,7 +192,7 @@ class NotificationSettingsTest extends IntegrationTest {
         assertThat(sent.get(0).lines()).containsExactly("상품 1개 · 1,000원");
         assertThat(sent.get(1).headline()).isEqualTo("1번 주문을 고객이 수정했습니다.");
         // 테스트는 주문한 기기 쿠키 없이 바꿨으므로 판매자 기록과 같은 표시가 붙는다
-        assertThat(sent.get(1).lines()).containsExactly("상품 1→3개, 금액 1,000원→3,000원, (주문한 기기와 다른 기기에서 바꿈)");
+        assertThat(sent.get(1).lines()).containsExactly("상품 1→3개, 금액 1,000원→3,000원, 주문한 기기와 다른 기기에서 바꿈");
         assertThat(sent.get(2).headline()).isEqualTo("1번 주문을 고객이 취소했습니다.");
         assertThat(sent.get(3).headline()).isEqualTo("2번 새 주문이 들어왔습니다.");
     }

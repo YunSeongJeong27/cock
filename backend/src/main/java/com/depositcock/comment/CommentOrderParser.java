@@ -105,7 +105,7 @@ public final class CommentOrderParser {
         Candidate c = candidates.get(0);
         String memo = memo(original, c);
         if (c.korean()) {
-            return new ParseResult(ParseType.REVIEW, c.quantity(), memo, "한글 수량 (추정)");
+            return new ParseResult(ParseType.REVIEW, c.quantity(), memo, "한글 수량 추정");
         }
         if (MODIFY.matcher(original).find()) {
             return new ParseResult(ParseType.REVIEW, c.quantity(), memo, "수정·변경 요청");

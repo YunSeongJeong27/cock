@@ -19,7 +19,7 @@ export default function Home() {
         <div className="feature-grid">
           <div className="card">
             <h3>① 주문서 링크</h3>
-            <p className="muted">밴드·카톡 글에 링크 하나만 붙이세요. 고객은 로그인 없이 주문하고, 내 주문 상태도 확인합니다.</p>
+            <p className="muted">밴드·카톡 글에 링크 하나만 붙이세요. 고객은 로그인 없이 주문하고 내 주문 상태도 확인합니다.</p>
           </div>
           <div className="card">
             <h3>② 입금 대조</h3>

@@ -43,8 +43,9 @@ export default function AnnounceTab({ groupBuy }: { groupBuy: GroupBuy }) {
           <h3>입금 확인 문구</h3>
           {data && <CopyButton text={data.text} label="문구 복사" />}
         </div>
-        <label className="field small"><span>이 시각 이후 확정분만 (비우면 전체)</span>
+        <label className="field small"><span>이 시각 이후 확정분만</span>
           <input type="datetime-local" value={since} onChange={(e) => setSince(e.target.value)} style={{ maxWidth: 260 }} />
+          <span className="muted small" style={{ fontWeight: 400 }}>{T.sinceHint}</span>
         </label>
         <textarea readOnly value={data?.text ?? ''} style={{ minHeight: 180 }} />
       </div>

@@ -76,7 +76,7 @@ export default function GroupBuyDetail() {
         <h1>{groupBuy.title}</h1>
         <StatusBadge status={groupBuy.status} label={groupBuy.statusLabel} />
       </div>
-      <div className="muted small mb">{groupBuy.closeAt ? `마감 ${dateTime(groupBuy.closeAt)}` : '마감 시각 없음 (직접 마감)'}</div>
+      <div className="muted small mb">{groupBuy.closeAt ? `마감 ${dateTime(groupBuy.closeAt)}` : '마감 시각 없음 · 직접 마감'}</div>
 
       <div className="card">
         {groupBuy.status === 'DRAFT' ? (
@@ -100,7 +100,7 @@ export default function GroupBuyDetail() {
           {groupBuy.status === 'OPEN' && <button className="btn small" onClick={() => action('close', T.confirmClose)}>지금 마감</button>}
           {groupBuy.status === 'CLOSED' && <button className="btn small" onClick={() => action('open')}>다시 열기</button>}
           <a className="btn small" href={`/api/seller/group-buys/${id}/export.xlsx`}>주문 정리표 엑셀</a>
-          <a className="btn small" href={`/api/seller/group-buys/${id}/export.xlsx?includeContact=true`}>엑셀 (연락처·배송지 포함)</a>
+          <a className="btn small" href={`/api/seller/group-buys/${id}/export.xlsx?includeContact=true`}>연락처·배송지 포함 엑셀</a>
           <button className="btn small danger" onClick={remove}>공구 삭제</button>
         </div>
       </div>
@@ -171,10 +171,10 @@ function StockStatus({ products, warning, showAlert }: { products: Product[]; wa
                     <td className="right" data-label="준비">{p.stockLimit}</td>
                     <td className="right" data-label="주문">{p.sold}</td>
                     <td className="right" data-label="남은 수량" style={{ color: alert ? 'var(--danger)' : undefined, fontWeight: alert ? 700 : undefined }}>
-                      {r < 0 ? `${r} (${-r}개 초과)` : r}
+                      {r < 0 ? `${r} · ${-r}개 초과` : r}
                     </td>
                     <td className="right" data-label="알림 기준">{p.stockAlertThreshold != null ? `${p.stockAlertThreshold}개 이하` : <span className="muted">없음</span>}</td>
-                    <td data-label="다 팔리면">{p.soldOut ? <span className="badge badge-CANCELLED">품절 (주문 막는 중)</span> : p.blockWhenSoldOut ? '품절로 막음' : <span className="muted">계속 받음</span>}</td>
+                    <td data-label="다 팔리면">{p.soldOut ? <span className="badge badge-CANCELLED">품절 · 주문 막는 중</span> : p.blockWhenSoldOut ? '품절로 막음' : <span className="muted">계속 받음</span>}</td>
                   </tr>
                 )
               })}
@@ -213,8 +213,8 @@ function PauseCard({ groupBuy, onChange }: { groupBuy: GroupBuy; onChange: (g: G
       <label className="field mt"><span>고객 화면 문구</span>
         <textarea rows={2} maxLength={300} value={message} onChange={(e) => setMessage(e.target.value)} />
       </label>
-      <label className="field"><span>링크 (선택, 밴드 공지 글 등)</span>
-        <input type="url" placeholder="https://" value={link} onChange={(e) => setLink(e.target.value)} />
+      <label className="field"><span>링크</span>
+        <input type="url" placeholder="https:// 밴드 공지 글 주소 등" value={link} onChange={(e) => setLink(e.target.value)} />
       </label>
     </>
   )

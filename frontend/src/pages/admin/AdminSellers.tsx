@@ -98,7 +98,7 @@ export default function AdminSellers() {
       <div className="card">
         <div className="row between">
           <div>
-            <b>댓글 주문 기능</b> <span className="small muted">(댓글 캡처·집계·주문 반영, 공구의 "주문 링크 + 댓글")</span>
+            <b>댓글 주문 기능</b> <span className="small muted">· {T.commentFeatureNote}</span>
             <div className="small muted">
               {commentOpen === null ? '불러오는 중…' : commentOpen
                 ? T.commentOpenAll
@@ -123,7 +123,7 @@ export default function AdminSellers() {
       <div className="table-wrap">
         <table className="stack admin-table">
           <thead>
-            <tr><th>판매자</th><th>플랜</th><th>무료 체험 끝</th><th>유료 만료일</th><th>상태</th><th>캡처 (오늘/이번 달 · 하루 제한)</th><th>메모</th><th></th></tr>
+            <tr><th>판매자</th><th>플랜</th><th>무료 체험 끝</th><th>유료 만료일</th><th>상태</th><th>캡처 사용량·하루 제한</th><th>메모</th><th></th></tr>
           </thead>
           <tbody>
             {shown.map((row) => {
@@ -132,7 +132,7 @@ export default function AdminSellers() {
               const update = (patch: Partial<Row>) => setEditing((e) => ({ ...e, [row.id]: { ...r, ...patch } }))
               return (
                 <tr key={row.id}>
-                  <td className="stack-title">{row.displayName}<div className="muted small">{emailWithBreak(row.email)}{row.role === 'ADMIN' && ' (관리자)'}</div>
+                  <td className="stack-title">{row.displayName}<div className="muted small">{emailWithBreak(row.email)}{row.role === 'ADMIN' && ' · 관리자'}</div>
                     <div className="muted small">가입 {row.createdAt.substring(0, 10)} · 공구 {row.groupBuyCount}개</div></td>
                   <td data-label="플랜">
                     <select value={r.plan} onChange={(e) => update({ plan: e.target.value as Plan })} disabled={row.role === 'ADMIN'} style={{ minWidth: 120 }}>

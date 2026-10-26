@@ -56,21 +56,23 @@ export default function BankSettings() {
     <div>
       <h1>은행 거래내역 열 설정</h1>
       <div className="card">
-        <h3>기본값 (자동 인식)</h3>
+        <h3>자동 인식 기본값</h3>
         <p className="muted small">{T.defaultsHelp}</p>
         {defaults && (
           <div className="small">
             <div><b>입금자명</b>: {defaults.name.join(', ')}</div>
-            <div><b>금액</b>: {defaults.amount.join(', ')} <span className="muted">{T.amountOrderNote}</span></div>
+            <div><b>금액</b>: {defaults.amount.join(', ')}</div>
             <div><b>날짜</b>: {defaults.date.join(', ')}</div>
-            <div><b>거래 유형</b>: {defaults.type.join(', ')} <span className="muted">{T.typeExcludeNote}</span></div>
+            <div><b>거래 유형</b>: {defaults.type.join(', ')}</div>
+            <div className="muted mt">{T.amountOrderNote}</div>
+            <div className="muted">{T.typeExcludeNote}</div>
           </div>
         )}
       </div>
       <form className="card" onSubmit={submit}>
         <h3>은행별 열 이름 저장</h3>
         <div className="mapping-grid">
-          <label className="field"><span>이름 (예: 신협) *</span><input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></label>
+          <label className="field"><span>은행 이름 *</span><input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="예: 신협" /></label>
           <label className="field"><span>입금자명 열 *</span><input type="text" value={form.nameColumn} onChange={(e) => setForm({ ...form, nameColumn: e.target.value })} required /></label>
           <label className="field"><span>금액 열 *</span><input type="text" value={form.amountColumn} onChange={(e) => setForm({ ...form, amountColumn: e.target.value })} required /></label>
           <label className="field"><span>날짜 열</span><input type="text" value={form.dateColumn} onChange={(e) => setForm({ ...form, dateColumn: e.target.value })} /></label>

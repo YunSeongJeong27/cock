@@ -10,7 +10,7 @@ interface Props { groupBuy: GroupBuy; reload: () => void }
 const emptyMapping: ColumnMapping = { dateColumn: '', nameColumn: '', amountColumn: '', typeColumn: '' }
 
 function orderLabel(o: OrderBrief) {
-  return `${o.orderNo}번 ${o.nickname ? o.nickname + ' / ' : ''}${o.depositorName ?? ''} (${o.phoneLast4 || '-'}) ${won(o.expectedAmount)}`
+  return `${o.orderNo}번 ${o.nickname ? o.nickname + ' / ' : ''}${o.depositorName ?? ''} · 전화 뒷자리 ${o.phoneLast4 || '-'} · ${won(o.expectedAmount)}`
 }
 
 export default function DepositTab({ groupBuy, reload }: Props) {
@@ -143,7 +143,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
   return (
     <div>
       <div className="card">
-        <h3>① 거래내역 올리기 (엑셀·CSV)</h3>
+        <h3>① 거래내역 엑셀·CSV 올리기</h3>
         <p className="muted small">{T.uploadHelp}</p>
         <input key={inputKey} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setParsed(null) }} />
         <div className="row mt">
@@ -185,10 +185,10 @@ export default function DepositTab({ groupBuy, reload }: Props) {
                   <div className="small mt">{T.previewCounts(parsed.deposits.length, parsed.skippedRows, duplicates)}</div>
                   <div className="small">{T.wrongColumnsHint}</div>
                 </div>
-                {manual && <button className="btn small" onClick={savePreset}>이 열 설정 저장 (은행별)</button>}
+                {manual && <button className="btn small" onClick={savePreset}>이 열 설정을 은행별로 저장</button>}
                 <div className="table-wrap mt">
                   <table>
-                    <thead><tr><th>행</th><th>입금자명</th><th className="right">금액</th><th>일시(원문)</th></tr></thead>
+                    <thead><tr><th>행</th><th>입금자명</th><th className="right">금액</th><th>일시</th></tr></thead>
                     <tbody>
                       {parsed.deposits.slice(0, 20).map((d) => (
                         <tr key={d.rowNo}><td>{d.rowNo}</td><td>{d.name}</td><td className="right">{won(d.amount)}</td><td className="small">{d.dateText ?? '-'}</td></tr>
@@ -260,7 +260,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
           <h3>올린 파일</h3>
           {uploads.map((u) => (
             <div key={u.id} className="row between small" style={{ padding: '4px 0' }}>
-              <span>{u.fileName ?? (u.source === 'SCREENSHOT' ? '스크린샷' : '')} · 입금 {u.rowCount}건 (확정 {u.usedCount}) · {dateTime(u.uploadedAt)}</span>
+              <span>{u.fileName ?? (u.source === 'SCREENSHOT' ? '스크린샷' : '')} · 입금 {u.rowCount}건 · 확정 {u.usedCount}건 · {dateTime(u.uploadedAt)}</span>
               <button className="btn small danger" onClick={() => deleteUpload(u.id)} disabled={u.usedCount > 0}>지우기</button>
             </div>
           ))}
@@ -296,12 +296,12 @@ function MatchItem({ row, openOrders, value, busy, onChange, onConfirm, onRefund
       )}
       <div className="row mt">
         <select value={value} onChange={(e) => onChange(e.target.value)} style={{ flex: 1, minWidth: 220 }}>
-          <option value="">{row.status === 'AMBIGUOUS' ? '후보 중에서 고르세요' : '주문 선택 (확정하지 않으려면 비워두기)'}</option>
+          <option value="">{row.status === 'AMBIGUOUS' ? '후보 중에서 고르세요' : '주문 고르기'}</option>
           {row.candidates.length > 0 && (
             <optgroup label="후보">
               {row.candidates.map((c) => (
                 <option key={c.order.orderId} value={c.order.orderId}>
-                  {orderLabel(c.order)} · {c.evidence}{c.amountDiff ? ` (차이 ${c.amountDiff > 0 ? '+' : ''}${c.amountDiff}원)` : ''}
+                  {orderLabel(c.order)} · {c.evidence}{c.amountDiff ? ` · 차이 ${c.amountDiff > 0 ? '+' : ''}${c.amountDiff}원` : ''}
                 </option>
               ))}
             </optgroup>

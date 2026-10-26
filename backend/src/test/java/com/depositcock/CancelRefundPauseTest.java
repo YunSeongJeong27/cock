@@ -166,7 +166,7 @@ class CancelRefundPauseTest extends IntegrationTest {
         mvc.perform(withJson(post(g.pub() + "/orders").cookie(device), again))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.replaceOrderNo").isEmpty())
-                .andExpect(jsonPath("$.warnings[0]").value("이 번호로 환불 신청한 주문이 있어, 이번 주문은 새 주문으로 추가됩니다."));
+                .andExpect(jsonPath("$.warnings[0]").value("이 번호로 환불 신청한 주문이 있어 이번 주문은 새 주문으로 추가됩니다."));
         again.put("acknowledgeWarnings", true);
         mvc.perform(withJson(post(g.pub() + "/orders").cookie(device), again))
                 .andExpect(status().isOk())
