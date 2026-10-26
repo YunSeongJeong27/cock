@@ -19,7 +19,7 @@ public enum Notice {
     STOCK_LEFT("'%s' 재고가 %d개 남았습니다."),
     STOCK_ALL_ORDERED("'%s' 준비 수량이 모두 주문됐습니다."),
     STOCK_OVER("'%s' 재고보다 %d개 더 주문됐습니다."),
-    STOCK_ABUSE_WARNING("악용하는 고객이 있을 수 있으니 계좌 입금내역 대조를 통해 확인하십시오."),
+    STOCK_ABUSE_WARNING("중복 주문 고객이 있을 수 있으니 계좌 입금내역 대조로 확인해 주세요."),
 
     // 입금 대조 결과 (상태 이름)
     MATCH_AUTO("자동 매칭"),
