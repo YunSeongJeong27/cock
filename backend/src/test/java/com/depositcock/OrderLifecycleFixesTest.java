@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 2026-10-19 다른 에이전트 점검에서 나온 문제 수정
- * - 환불 신청이 기다리는 주문은 판매자가 먼저 [주문 취소 후 환불 진행]·[환불 신청 반려]를 해야 함 (일반 취소·수령 체크·주문 변경 막음)
+ * - 환불 신청이 기다리는 주문은 판매자가 먼저 [주문 취소 후 환불 진행]·[환불 신청 취소]를 해야 함 (일반 취소·수령 체크·주문 변경 막음)
  * - 처리가 끝난 주문(취소 + 환불 필요 없음/환불 완료)은 "취소·환불 완료"로 모으고 더 바꿀 수 없음
  * - 입금하고 바로 취소한 고객: 입금 대조에서 [환불 필요로 표시]
  * - 엑셀 시트 이름 겹침, 픽업 끄기
@@ -117,7 +117,7 @@ class OrderLifecycleFixesTest extends IntegrationTest {
 
         // 일반 취소·수령 체크·주문 변경은 막힘 (전에는 일반 취소로 환불 기록이 사라지고, 수령 뒤 환불 취소가 됐음)
         mvc.perform(post(orderPath(g, o, "cancel")).cookie(g.seller())).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("고객이 환불 신청한 주문입니다. 먼저 [주문 취소 후 환불 진행] 또는 [환불 신청 반려]를 눌러 주세요."));
+                .andExpect(jsonPath("$.detail").value("고객이 환불 신청한 주문입니다. 먼저 [주문 취소 후 환불 진행] 또는 [환불 신청 취소]를 눌러 주세요."));
         mvc.perform(withJson(post(orderPath(g, o, "picked-up")).cookie(g.seller()), Map.of("pickedUp", true)))
                 .andExpect(status().isBadRequest());
         mvc.perform(withJson(put(g.base() + "/orders/" + o.get("id").asLong()).cookie(g.seller()), Map.of(
@@ -125,7 +125,7 @@ class OrderLifecycleFixesTest extends IntegrationTest {
                 .andExpect(status().isBadRequest());
         assertThat(sellerOrder(g, 1).get("refundBank").asText()).isEqualTo("국민");
 
-        // [환불 신청 반려] 뒤에는 다시 할 수 있음
+        // [환불 신청 취소] 뒤에는 다시 할 수 있음
         mvc.perform(post(orderPath(g, o, "refund-request/reject")).cookie(g.seller())).andExpect(status().isOk());
         mvc.perform(withJson(post(orderPath(g, o, "picked-up")).cookie(g.seller()), Map.of("pickedUp", true)))
                 .andExpect(status().isOk());

@@ -125,7 +125,7 @@ class CancelRefundPauseTest extends IntegrationTest {
         assertThat(o.get("refundRequestedAt").isNull()).isFalse();
         mvc.perform(get(g.sellerBase() + "/detail").cookie(g.seller())).andExpect(jsonPath("$.dashboard.refundRequestCount").value(1));
 
-        // 판매자 [환불 신청 반려]: 주문 그대로, 고객 화면 "반려", 계좌 삭제, 다시 신청 불가
+        // 판매자 [환불 신청 취소]: 주문 그대로, 고객 화면 "반려", 계좌 삭제, 다시 신청 불가
         long orderId = o.get("id").asLong();
         mvc.perform(post(g.sellerBase() + "/orders/" + orderId + "/refund-request/reject").cookie(g.seller()))
                 .andExpect(status().isOk())

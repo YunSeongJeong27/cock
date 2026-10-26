@@ -134,7 +134,7 @@ public enum ErrorCode {
     // ---- 판매자 주문 관리 ----
     ORDER_NOT_FOUND(NOT_FOUND, "주문을 찾을 수 없습니다."),
     ORDER_CANCELLED(BAD_REQUEST, "취소된 주문입니다."),
-    REFUND_PENDING_DECIDE_FIRST(BAD_REQUEST, "고객이 환불 신청한 주문입니다. 먼저 [주문 취소 후 환불 진행] 또는 [환불 신청 반려]를 눌러 주세요."),
+    REFUND_PENDING_DECIDE_FIRST(BAD_REQUEST, "고객이 환불 신청한 주문입니다. 먼저 [주문 취소 후 환불 진행] 또는 [환불 신청 취소]를 눌러 주세요."),
     PICKED_UP_UNCHECK_FIRST(BAD_REQUEST, "수령 완료된 주문입니다. 취소하려면 수령 체크를 먼저 해제해 주세요."),
     NO_PENDING_REFUND(BAD_REQUEST, "확인을 기다리는 환불 신청이 없습니다."),
     REFUND_NOT_REQUIRED(BAD_REQUEST, "환불이 필요한 주문이 아닙니다."),
