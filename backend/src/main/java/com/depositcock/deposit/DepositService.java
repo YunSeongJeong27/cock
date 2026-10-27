@@ -80,12 +80,12 @@ public class DepositService {
     private record Read(BankHeaderView bank, ParsedStatement parsed) {
     }
 
-    private Read read(Long sellerId, GroupBuy groupBuy, MultipartFile file, String bankName) {
+    private Read read(Long sellerId, GroupBuy groupBuy, MultipartFile file, String bankName, String password) {
         BankHeaderView bank = bankName == null || bankName.isBlank()
                 ? bankHeaders.forAccountBank(sellerId, groupBuy.getBankName())
                 : bankHeaders.find(sellerId, bankName).orElseThrow(() -> new ApiException(ErrorCode.BANK_HEADER_NOT_FOUND));
         ParsedStatement parsed = reader.read(file.getOriginalFilename(), bytes(file), bank.values().toMapping(),
-                bank.values().accountLabel());
+                bank.values().accountLabel(), password);
         if (!parsed.ok()) {
             // 은행 헤더 설정과 파일이 안 맞으면 대조를 멈춘다 (2026-10-27 사용자 결정)
             throw new ApiException(ErrorCode.STATEMENT_HEADER_MISMATCH, bank.bankName(), String.join(", ", parsed.missingColumns()));
@@ -107,18 +107,19 @@ public class DepositService {
         return new AccountCheckView(parsed.accountNumber(), check, notice);
     }
 
-    public PreviewResponse preview(Long sellerId, Long groupBuyId, MultipartFile file, String bankName) {
+    /** password: 암호 걸린 PDF·엑셀의 비밀번호. 파일을 여는 데만 쓰고 저장·기록하지 않는다 (2026-10-27) */
+    public PreviewResponse preview(Long sellerId, Long groupBuyId, MultipartFile file, String bankName, String password) {
         GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
-        Read read = read(sellerId, groupBuy, file, bankName);
+        Read read = read(sellerId, groupBuy, file, bankName, password);
         int duplicates = countDuplicates(pools.of(groupBuy), read.parsed().deposits());
         return new PreviewResponse(trim(read.parsed()), duplicates, read.bank().bankName(),
                 accountCheck(read.bank(), read.parsed(), groupBuy));
     }
 
     @Transactional
-    public UploadResponse upload(Long sellerId, Long groupBuyId, MultipartFile file, String bankName) {
+    public UploadResponse upload(Long sellerId, Long groupBuyId, MultipartFile file, String bankName, String password) {
         GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
-        Read read = read(sellerId, groupBuy, file, bankName);
+        Read read = read(sellerId, groupBuy, file, bankName, password);
         String fileName = file.getOriginalFilename();
         String lower = fileName == null ? "" : fileName.toLowerCase(Locale.ROOT);
         DepositSource source = lower.endsWith(".csv") ? DepositSource.CSV : lower.endsWith(".pdf") ? DepositSource.PDF : DepositSource.EXCEL;

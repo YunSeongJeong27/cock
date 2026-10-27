@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
 import com.depositcock.common.Texts;
+import org.apache.poi.EncryptedDocumentException;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -82,14 +83,19 @@ public class BankStatementReader {
         return read(fileName, content, requested, null);
     }
 
+    public ParsedStatement read(String fileName, byte[] content, ColumnMapping requested, String accountLabel) {
+        return read(fileName, content, requested, accountLabel, null);
+    }
+
     /**
      * @param requested    은행별 헤더(컬럼)명 (null 이면 후보 목록으로 자동 인식, 테스트용)
      * @param accountLabel 거래내역서 위쪽의 계좌번호 칸 이름 (null 이면 계좌번호를 찾지 않음, 2026-10-27)
+     * @param password     암호 걸린 PDF·엑셀의 비밀번호 (없으면 null). 파일을 여는 데만 쓰고 저장하지 않는다 (2026-10-27)
      */
-    public ParsedStatement read(String fileName, byte[] content, ColumnMapping requested, String accountLabel) {
+    public ParsedStatement read(String fileName, byte[] content, ColumnMapping requested, String accountLabel, String password) {
         List<List<String>> rows = isPdf(fileName, content)
-                ? PdfTableReader.read(content, header -> isPdfHeader(header, requested))
-                : readRows(fileName, content);
+                ? PdfTableReader.read(content, password, header -> isPdfHeader(header, requested))
+                : readRows(fileName, content, password);
         ParsedStatement parsed = parse(rows, requested);
         if (accountLabel == null || accountLabel.isBlank()) {
             return parsed;
@@ -151,13 +157,13 @@ public class BankStatementReader {
 
     // ---------- 파일 → 문자열 표 ----------
 
-    List<List<String>> readRows(String fileName, byte[] content) {
+    List<List<String>> readRows(String fileName, byte[] content, String password) {
         String lower = fileName == null ? "" : fileName.toLowerCase(Locale.ROOT);
         if (lower.endsWith(".csv") || lower.endsWith(".txt")) {
             return readCsv(content);
         }
         if (lower.endsWith(".xlsx") || lower.endsWith(".xls") || looksLikeExcel(content)) {
-            return readExcel(content);
+            return readExcel(content, password);
         }
         return readCsv(content);
     }
@@ -171,8 +177,13 @@ public class BankStatementReader {
         return zip || ole;
     }
 
-    private List<List<String>> readExcel(byte[] content) {
-        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(content))) {
+    /**
+     * 엑셀 읽기. 암호 걸린 엑셀(xlsx: Agile·Standard, xls: RC4 등 POI 가 지원하는 방식)은 비밀번호로 연다.
+     * 비밀번호가 없는 파일에 비밀번호를 넣어도 그냥 열린다
+     */
+    private List<List<String>> readExcel(byte[] content, String password) {
+        boolean noPassword = password == null || password.isEmpty();
+        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(content), noPassword ? null : password)) {
             Sheet sheet = workbook.getSheetAt(0);
             DataFormatter formatter = new DataFormatter(Locale.KOREA);
             List<List<String>> rows = new ArrayList<>();
@@ -189,6 +200,8 @@ public class BankStatementReader {
                 rows.add(values);
             }
             return rows;
+        } catch (EncryptedDocumentException e) {
+            throw new ApiException(noPassword ? ErrorCode.STATEMENT_FILE_PASSWORD_REQUIRED : ErrorCode.STATEMENT_FILE_PASSWORD_WRONG);
         } catch (IOException | RuntimeException e) {
             throw new ApiException(ErrorCode.STATEMENT_EXCEL_UNREADABLE);
         }

@@ -7,6 +7,7 @@ export const depositText = {
   mixedAccountWarning: '입금 받는 계좌를 공구 판매 말고 다른 용도로도 쓰면 대조가 잘 안 될 수 있습니다.',
   // 2026-10-27 사용자 요청 문구
   visibleInfoTip: '거래내역서에 계좌번호와 이름이 가려지지 않고 보이면 대조가 잘 됩니다.',
+  filePasswordHelp: '암호가 걸린 PDF나 엑셀이면 올리기 전에 비밀번호를 입력하세요. 비밀번호는 파일을 여는 데만 쓰고 저장하지 않습니다.',
   bankSelectHelp: '고른 은행의 헤더(컬럼)명으로 입금을 읽습니다. 처음에는 공구 입금 계좌의 은행이 골라져 있고 목록에 없는 은행이면 토스뱅크가 골라져 있습니다.',
   uploaded: (saved: number, duplicates: number) =>
     `입금 ${saved}건을 올렸습니다.${duplicates ? ` 이미 올린 입금 ${duplicates}건은 건너뛰었습니다.` : ''}`,

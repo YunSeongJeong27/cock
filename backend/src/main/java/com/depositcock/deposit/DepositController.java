@@ -44,18 +44,21 @@ public class DepositController {
 
     /**
      * bankName: 어느 은행의 헤더(컬럼)명으로 읽을지 (은행 헤더 설정 목록의 이름). 없으면 공구 입금 계좌의 은행 (2026-10-27).
-     * 전에는 열 이름을 요청마다 직접 지정하거나 저장한 설정(presetId)을 골랐음
+     * 전에는 열 이름을 요청마다 직접 지정하거나 저장한 설정(presetId)을 골랐음.
+     * password: 암호 걸린 PDF·엑셀의 비밀번호 (요청 칸, 저장 안 함)
      */
     @PostMapping(BASE + "/preview")
     public PreviewResponse preview(@PathVariable Long groupBuyId, @RequestPart("file") MultipartFile file,
-                                   @RequestParam(required = false) String bankName) {
-        return service.preview(CurrentSeller.id(), groupBuyId, file, bankName);
+                                   @RequestParam(required = false) String bankName,
+                                   @RequestParam(required = false) String password) {
+        return service.preview(CurrentSeller.id(), groupBuyId, file, bankName, password);
     }
 
     @PostMapping(BASE + "/uploads")
     public UploadResponse upload(@PathVariable Long groupBuyId, @RequestPart("file") MultipartFile file,
-                                 @RequestParam(required = false) String bankName) {
-        return service.upload(CurrentSeller.id(), groupBuyId, file, bankName);
+                                 @RequestParam(required = false) String bankName,
+                                 @RequestParam(required = false) String password) {
+        return service.upload(CurrentSeller.id(), groupBuyId, file, bankName, password);
     }
 
     @GetMapping(BASE + "/uploads")

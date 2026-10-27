@@ -310,6 +310,59 @@ class M3DepositFlowTest extends IntegrationTest {
                 .param("bankName", "우리동네은행").cookie(other)).andExpect(status().isNotFound());
     }
 
+    /**
+     * 암호 걸린 엑셀 올리기 (2026-10-27 사용자 요청): 비밀번호 없으면 "입력하세요", 틀리면 "맞지 않습니다", 맞으면 저장.
+     * 토스 이메일 엑셀처럼 헤더(컬럼)명이 PDF 와 달라서 판매자가 추가한 은행으로 읽는다
+     */
+    @Test
+    void encryptedExcelUploadWithPassword() throws Exception {
+        Cookie seller = signup(uniqueEmail());
+        long id = openGroupBuy(seller, "암호 엑셀", 5000);
+        String base = "/api/seller/group-buys/" + id;
+        placeOrder(seller, id, "010-2100-0001", "홍길동");
+        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(seller), Map.of("bankName", "토스 엑셀",
+                "nameColumn", "적요", "amountColumn", "거래 금액", "dateColumn", "거래 일시", "typeColumn", "거래 유형")))
+                .andExpect(status().isOk());
+
+        byte[] locked;
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+             org.apache.poi.poifs.filesystem.POIFSFileSystem fs = new org.apache.poi.poifs.filesystem.POIFSFileSystem();
+             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet();
+            String[][] rows = {{"거래 일시", "적요", "거래 유형", "거래 금액"}, {"2026.10.27 10:00:00", "홍길동", "입금", "5000"}};
+            for (int r = 0; r < rows.length; r++) {
+                var row = sheet.createRow(r);
+                for (int c = 0; c < rows[r].length; c++) {
+                    row.createCell(c).setCellValue(rows[r][c]);
+                }
+            }
+            var encryptor = new org.apache.poi.poifs.crypt.EncryptionInfo(org.apache.poi.poifs.crypt.EncryptionMode.agile).getEncryptor();
+            encryptor.confirmPassword("900101");
+            try (var os = encryptor.getDataStream(fs)) {
+                wb.write(os);
+            }
+            fs.writeFilesystem(out);
+            locked = out.toByteArray();
+        }
+        MockMultipartFile file = new MockMultipartFile("file", "토스뱅크_거래내역.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", locked);
+
+        mvc.perform(multipart(base + "/deposits/preview").file(file).param("bankName", "토스 엑셀").cookie(seller))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("STATEMENT_FILE_PASSWORD_REQUIRED"));
+        mvc.perform(multipart(base + "/deposits/uploads").file(file).param("bankName", "토스 엑셀").param("password", "000000")
+                        .cookie(seller))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("STATEMENT_FILE_PASSWORD_WRONG"));
+        assertThat(read(mvc.perform(get(base + "/deposits/uploads").cookie(seller)).andReturn())).isEmpty();
+        mvc.perform(multipart(base + "/deposits/uploads").file(file).param("bankName", "토스 엑셀").param("password", "900101")
+                        .cookie(seller))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.savedCount").value(1));
+        mvc.perform(get(base + "/deposits/match").cookie(seller))
+                .andExpect(jsonPath("$.rows[0].status").value("MATCHED"));
+    }
+
     /** 날짜만 있는 파일: 같은 사람이 같은 날 같은 금액을 두 번 입금(주문 2건) → 같은 파일 안의 두 줄은 둘 다 저장 */
     @Test
     void sameDaySameAmountTwiceIsKept() throws Exception {

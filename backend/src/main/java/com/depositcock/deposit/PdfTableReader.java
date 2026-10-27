@@ -56,10 +56,11 @@ final class PdfTableReader {
     }
 
     /**
+     * @param password 파일 비밀번호 (암호가 없으면 null·빈 값)
      * @param isHeader 머리줄인지 (칸 글자 목록을 받아 판단). 자동 인식이면 헤더(컬럼) 후보, 직접 지정이면 지정한 이름
      */
-    static List<List<String>> read(byte[] content, Predicate<List<String>> isHeader) {
-        List<Line> lines = lines(glyphs(content));
+    static List<List<String>> read(byte[] content, String password, Predicate<List<String>> isHeader) {
+        List<Line> lines = lines(glyphs(content, password));
         if (lines.isEmpty()) {
             throw new ApiException(ErrorCode.STATEMENT_PDF_NO_TEXT);
         }
@@ -113,8 +114,9 @@ final class PdfTableReader {
         return values.stream().map(StringBuilder::toString).toList();
     }
 
-    private static List<Glyph> glyphs(byte[] content) {
-        try (PDDocument doc = Loader.loadPDF(content)) {
+    private static List<Glyph> glyphs(byte[] content, String password) {
+        boolean noPassword = password == null || password.isEmpty();
+        try (PDDocument doc = Loader.loadPDF(content, noPassword ? "" : password)) {
             if (doc.getNumberOfPages() > MAX_PAGES) {
                 throw new ApiException(ErrorCode.STATEMENT_PDF_TOO_MANY_PAGES, MAX_PAGES);
             }
@@ -136,7 +138,8 @@ final class PdfTableReader {
             stripper.getText(doc);
             return glyphs;
         } catch (InvalidPasswordException e) {
-            throw new ApiException(ErrorCode.STATEMENT_PDF_PASSWORD);
+            // 열기 비밀번호가 걸린 PDF (보기만 막는 권한 비밀번호는 비밀번호 없이 열린다)
+            throw new ApiException(noPassword ? ErrorCode.STATEMENT_FILE_PASSWORD_REQUIRED : ErrorCode.STATEMENT_FILE_PASSWORD_WRONG);
         } catch (IOException e) {
             throw new ApiException(ErrorCode.STATEMENT_PDF_UNREADABLE);
         }

@@ -9,7 +9,7 @@ import ScreenshotDeposits from './ScreenshotDeposits'
 interface Props { groupBuy: GroupBuy; reload: () => void }
 
 /** 거래내역을 올릴 때 알림창으로도 띄우는 서버 오류 */
-const ALERT_CODES = ['STATEMENT_HEADER_MISMATCH', 'STATEMENT_PDF_NO_TEXT']
+const ALERT_CODES = ['STATEMENT_HEADER_MISMATCH', 'STATEMENT_PDF_NO_TEXT', 'STATEMENT_FILE_PASSWORD_REQUIRED', 'STATEMENT_FILE_PASSWORD_WRONG']
 
 /** 같은 입금 계좌를 쓰는 다른 공구의 주문이면 앞에 공구 제목을 붙인다 (2026-10-27) */
 function orderLabel(o: OrderBrief, groupBuyId: number) {
@@ -21,6 +21,8 @@ export default function DepositTab({ groupBuy, reload }: Props) {
   const [file, setFile] = useState<File | null>(null)
   const [banks, setBanks] = useState<BankHeaderView[]>([])
   const [bankName, setBankName] = useState('')
+  /** 암호 걸린 PDF·엑셀의 비밀번호 (2026-10-27). 서버에 저장하지 않고 올리면 비운다 */
+  const [password, setPassword] = useState('')
   const [checked, setChecked] = useState<PreviewResponse | null>(null)
   const [match, setMatch] = useState<MatchResponse | null>(null)
   const [uploads, setUploads] = useState<UploadSummary[]>([])
@@ -60,6 +62,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
     const fd = new FormData()
     fd.append('file', file as File)
     if (bankName) fd.append('bankName', bankName)
+    if (password) fd.append('password', password)
     return fd
   }
 
@@ -101,6 +104,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
       setNotice(T.uploaded(saved.savedCount, saved.duplicateCount))
       setChecked(null)
       setFile(null)
+      setPassword('')
       setInputKey((k) => k + 1)
       await loadMatch()
     } catch (e) {
@@ -165,6 +169,13 @@ export default function DepositTab({ groupBuy, reload }: Props) {
         <div className="warn-box"><b>⚠ {T.mixedAccountWarning}</b></div>
         <p className="small">{T.visibleInfoTip}</p>
         <input key={inputKey} type="file" accept=".xlsx,.xls,.csv,.pdf" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setChecked(null) }} />
+        <div className="mt">
+          <label className="field" style={{ maxWidth: 320 }}>
+            <span>파일 비밀번호 (선택)</span>
+            <input type="password" autoComplete="off" value={password} onChange={(e) => { setPassword(e.target.value); setChecked(null) }} />
+          </label>
+          <p className="small muted">{T.filePasswordHelp}</p>
+        </div>
         <div className="mt">
           <label className="field" style={{ maxWidth: 320 }}>
             <span>거래내역 은행</span>
