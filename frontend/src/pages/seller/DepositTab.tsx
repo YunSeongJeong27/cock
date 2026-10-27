@@ -12,7 +12,7 @@ interface Props { groupBuy: GroupBuy; reload: () => void }
 /** 거래내역을 올릴 때 알림창으로도 띄우는 서버 오류 */
 const ALERT_CODES = ['STATEMENT_HEADER_MISMATCH', 'STATEMENT_BANK_TYPE_MISSING', 'STATEMENT_PDF_NO_TEXT', 'STATEMENT_FILE_PASSWORD_REQUIRED', 'STATEMENT_FILE_PASSWORD_WRONG']
 
-/** 고른 파일의 종류: .pdf 면 PDF, 나머지(엑셀·CSV)는 엑셀 */
+/** 고른 파일의 종류: .pdf 면 PDF, 나머지는 엑셀 (CSV 도 엑셀로 본다) */
 function typeOf(file: File | null): StatementType {
   return file && file.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EXCEL'
 }
@@ -175,7 +175,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
     <div>
       <div className="card">
         <div className="row between">
-          <h3>① 거래내역 엑셀·CSV·PDF 올리기</h3>
+          <h3>① 거래내역 엑셀·PDF 올리기</h3>
           <button type="button" className="btn small" onClick={() => setShowTossGuide(true)}>토스 모바일 파일다운 예시</button>
         </div>
         <p className="muted small">{T.uploadHelp}</p>

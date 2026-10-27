@@ -11,12 +11,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum StatementType {
     PDF("PDF"),
-    EXCEL("엑셀·CSV");
+    EXCEL("엑셀");
 
     /** 화면·안내 문구에 보이는 이름 */
     private final String label;
 
-    /** 올린 파일의 종류 (이름이 .pdf 이거나 내용이 PDF 면 PDF, 나머지는 엑셀·CSV) */
+    /** 올린 파일의 종류 (이름이 .pdf 이거나 내용이 PDF 면 PDF, 나머지는 엑셀. CSV 도 엑셀로 본다) */
     public static StatementType of(String fileName, byte[] content) {
         return BankStatementReader.isPdf(fileName, content) ? PDF : EXCEL;
     }

@@ -225,7 +225,7 @@ export interface AccountCheckView { statementAccount: string | null; check: 'SAM
 
 /** 거래내역 파일 종류 (2026-10-27): 같은 은행도 PDF·엑셀의 헤더(컬럼)명이 달라서 따로 둔다. CSV 는 엑셀과 같이 */
 export type StatementType = 'PDF' | 'EXCEL'
-export const STATEMENT_TYPE_LABEL: Record<StatementType, string> = { PDF: 'PDF', EXCEL: '엑셀·CSV' }
+export const STATEMENT_TYPE_LABEL: Record<StatementType, string> = { PDF: 'PDF', EXCEL: '엑셀' }
 
 /** bankName·fileType: 이 은행·파일 종류의 헤더(컬럼)명으로 읽었다 */
 export interface PreviewResponse { parsed: ParsedStatement; duplicateCount: number; bankName: string; fileType: StatementType; account: AccountCheckView }

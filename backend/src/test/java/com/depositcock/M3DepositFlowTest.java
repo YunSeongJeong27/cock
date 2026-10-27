@@ -266,7 +266,7 @@ class M3DepositFlowTest extends IntegrationTest {
         mvc.perform(multipart(base + "/deposits/preview").file(csv(content)).cookie(seller))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("STATEMENT_HEADER_MISMATCH"))
-                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("'토스뱅크 엑셀·CSV'")))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("'토스뱅크 엑셀'")))
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("적요, 거래 금액, 거래 일시")));
         mvc.perform(multipart(base + "/deposits/uploads").file(csv(content)).cookie(seller))
                 .andExpect(status().isBadRequest());
@@ -323,7 +323,7 @@ class M3DepositFlowTest extends IntegrationTest {
 
     /**
      * 암호 걸린 엑셀 올리기 (2026-10-27 사용자 요청): 비밀번호 없으면 "입력하세요", 틀리면 "맞지 않습니다", 맞으면 저장.
-     * 토스 이메일 엑셀은 운영자 기본값 "토스뱅크 · 엑셀·CSV" 헤더(컬럼)명으로 읽는다 (은행·파일 종류를 안 골라도 공구 계좌 은행·파일로)
+     * 토스 이메일 엑셀은 운영자 기본값 "토스뱅크 엑셀" 헤더(컬럼)명으로 읽는다 (은행과 파일 종류를 안 골라도 공구 계좌 은행과 올린 파일로)
      */
     @Test
     void encryptedExcelUploadWithPassword() throws Exception {
