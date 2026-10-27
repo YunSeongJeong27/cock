@@ -24,12 +24,13 @@ public final class DepositDtos {
     public record AccountCheckView(String statementAccount, AccountNumbers.Check check, String notice) {
     }
 
-    /** @param bankName 이 은행의 헤더(컬럼)명으로 읽었다 */
-    public record PreviewResponse(ParsedStatement parsed, int duplicateCount, String bankName, AccountCheckView account) {
+    /** @param bankName·fileType 이 은행·파일 종류의 헤더(컬럼)명으로 읽었다 */
+    public record PreviewResponse(ParsedStatement parsed, int duplicateCount, String bankName, StatementType fileType,
+                                  AccountCheckView account) {
     }
 
     public record UploadResponse(Long uploadId, int savedCount, int duplicateCount, ParsedStatement parsed, String bankName,
-                                 AccountCheckView account) {
+                                 StatementType fileType, AccountCheckView account) {
     }
 
     public record UploadSummary(Long id, DepositSource source, String fileName, LocalDateTime uploadedAt, int rowCount,
@@ -119,7 +120,7 @@ public final class DepositDtos {
     public record ConfirmResponse(int confirmedCount, List<String> errors) {
     }
 
-    /** 은행별 헤더(컬럼)명이 어디서 왔는지: 운영자 값 그대로 / 판매자가 바꿈 / 판매자가 추가한 은행 */
+    /** 헤더(컬럼)명이 어디서 왔는지: 운영자 값 그대로 / 판매자가 바꿈 / 판매자가 추가한 은행·파일 종류 */
     public enum BankHeaderSource { SYSTEM, CHANGED, CUSTOM }
 
     /** 헤더(컬럼)명 값 묶음 */
@@ -132,17 +133,18 @@ public final class DepositDtos {
     }
 
     /**
-     * 판매자에게 적용되는 은행별 헤더(컬럼)명 (2026-10-27).
+     * 판매자에게 적용되는 은행·파일 종류별 헤더(컬럼)명 (2026-10-27).
      * @param values   지금 쓰는 값 (판매자가 바꿨으면 바꾼 값)
-     * @param original 운영자가 넣은 원래 값 (판매자가 추가한 은행이면 null)
+     * @param original 운영자가 넣은 원래 값 (판매자가 추가한 값이면 null)
      */
-    public record BankHeaderView(String bankName, BankHeaderValues values, BankHeaderSource source, boolean defaultBank,
-                                 BankHeaderValues original) {
+    public record BankHeaderView(String bankName, StatementType fileType, BankHeaderValues values, BankHeaderSource source,
+                                 boolean defaultBank, BankHeaderValues original) {
     }
 
-    /** 은행별 헤더(컬럼)명 저장: 목록에 있는 은행이면 판매자 값으로 바꾸고, 없는 은행이면 새로 추가 */
+    /** 은행·파일 종류별 헤더(컬럼)명 저장: 운영자 값이 있으면 판매자 값으로 바꾸고, 없으면 새로 추가 */
     public record BankHeaderRequest(
             @NotBlank(message = "BANK_NAME_REQUIRED") @Size(max = 50, message = "BANK_NAME_TOO_LONG") String bankName,
+            @NotNull(message = "FILE_TYPE_REQUIRED") StatementType fileType,
             @NotBlank(message = "NAME_COLUMN_REQUIRED") @Size(max = 100, message = "COLUMN_NAME_TOO_LONG") String nameColumn,
             @NotBlank(message = "AMOUNT_COLUMN_REQUIRED") @Size(max = 100, message = "COLUMN_NAME_TOO_LONG") String amountColumn,
             @NotBlank(message = "DATE_COLUMN_REQUIRED") @Size(max = 100, message = "COLUMN_NAME_TOO_LONG") String dateColumn,

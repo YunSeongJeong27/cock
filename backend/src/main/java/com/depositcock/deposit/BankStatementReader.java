@@ -136,7 +136,7 @@ public class BankStatementReader {
         return null;
     }
 
-    private static boolean isPdf(String fileName, byte[] content) {
+    static boolean isPdf(String fileName, byte[] content) {
         boolean pdfName = fileName != null && fileName.toLowerCase(Locale.ROOT).endsWith(".pdf");
         boolean pdfBytes = content.length >= 5 && content[0] == '%' && content[1] == 'P' && content[2] == 'D' && content[3] == 'F';
         return pdfName || pdfBytes;

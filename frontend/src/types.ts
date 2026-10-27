@@ -223,8 +223,12 @@ export interface ParsedStatement {
 /** 거래내역서 계좌번호와 공구 입금 계좌 비교 (2026-10-27). notice 는 같으면 null */
 export interface AccountCheckView { statementAccount: string | null; check: 'SAME' | 'DIFFERENT' | 'UNKNOWN'; notice: string | null }
 
-/** bankName: 이 은행의 헤더(컬럼)명으로 읽었다 */
-export interface PreviewResponse { parsed: ParsedStatement; duplicateCount: number; bankName: string; account: AccountCheckView }
+/** 거래내역 파일 종류 (2026-10-27): 같은 은행도 PDF·엑셀의 헤더(컬럼)명이 달라서 따로 둔다. CSV 는 엑셀과 같이 */
+export type StatementType = 'PDF' | 'EXCEL'
+export const STATEMENT_TYPE_LABEL: Record<StatementType, string> = { PDF: 'PDF', EXCEL: '엑셀·CSV' }
+
+/** bankName·fileType: 이 은행·파일 종류의 헤더(컬럼)명으로 읽었다 */
+export interface PreviewResponse { parsed: ParsedStatement; duplicateCount: number; bankName: string; fileType: StatementType; account: AccountCheckView }
 
 export interface UploadResponse {
   uploadId: number | null
@@ -232,6 +236,7 @@ export interface UploadResponse {
   duplicateCount: number
   parsed: ParsedStatement
   bankName: string
+  fileType: StatementType
   account: AccountCheckView
 }
 
@@ -312,11 +317,12 @@ export interface BankHeaderValues {
 }
 
 /**
- * 판매자에게 적용되는 은행별 헤더(컬럼)명. source: 운영자 값 그대로 / 판매자가 바꿈 / 판매자가 추가한 은행.
+ * 판매자에게 적용되는 은행·파일 종류별 헤더(컬럼)명. source: 운영자 값 그대로 / 판매자가 바꿈 / 판매자가 추가한 값.
  * original 은 운영자가 넣은 원래 값 (추가한 은행이면 null)
  */
 export interface BankHeaderView {
   bankName: string
+  fileType: StatementType
   values: BankHeaderValues
   source: 'SYSTEM' | 'CHANGED' | 'CUSTOM'
   defaultBank: boolean

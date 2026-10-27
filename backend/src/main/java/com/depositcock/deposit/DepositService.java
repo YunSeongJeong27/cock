@@ -76,19 +76,29 @@ public class DepositService {
 
     // ---------- 업로드 ----------
 
-    /** 거래내역을 은행별 헤더(컬럼)명으로 읽는다. bankName 이 없으면 공구 입금 계좌의 은행 (2026-10-27) */
+    /**
+     * 거래내역을 은행·파일 종류별 헤더(컬럼)명으로 읽는다 (2026-10-27).
+     * bankName 이 없으면 공구 입금 계좌의 은행, fileType 이 없으면 올린 파일의 종류(PDF / 엑셀·CSV)
+     */
     private record Read(BankHeaderView bank, ParsedStatement parsed) {
     }
 
-    private Read read(Long sellerId, GroupBuy groupBuy, MultipartFile file, String bankName, String password) {
-        BankHeaderView bank = bankName == null || bankName.isBlank()
-                ? bankHeaders.forAccountBank(sellerId, groupBuy.getBankName())
-                : bankHeaders.find(sellerId, bankName).orElseThrow(() -> new ApiException(ErrorCode.BANK_HEADER_NOT_FOUND));
-        ParsedStatement parsed = reader.read(file.getOriginalFilename(), bytes(file), bank.values().toMapping(),
+    private Read read(Long sellerId, GroupBuy groupBuy, MultipartFile file, String bankName, StatementType fileType,
+                      String password) {
+        byte[] content = bytes(file);
+        StatementType type = fileType != null ? fileType : StatementType.of(file.getOriginalFilename(), content);
+        String name = bankName == null || bankName.isBlank() ? bankHeaders.bankFor(sellerId, groupBuy.getBankName()) : bankName.trim();
+        if (!bankHeaders.bankNames(sellerId).contains(name)) {
+            throw new ApiException(ErrorCode.BANK_HEADER_NOT_FOUND);
+        }
+        BankHeaderView bank = bankHeaders.find(sellerId, name, type)
+                .orElseThrow(() -> new ApiException(ErrorCode.STATEMENT_BANK_TYPE_MISSING, name, type.getLabel()));
+        ParsedStatement parsed = reader.read(file.getOriginalFilename(), content, bank.values().toMapping(),
                 bank.values().accountLabel(), password);
         if (!parsed.ok()) {
             // 은행 헤더 설정과 파일이 안 맞으면 대조를 멈춘다 (2026-10-27 사용자 결정)
-            throw new ApiException(ErrorCode.STATEMENT_HEADER_MISMATCH, bank.bankName(), String.join(", ", parsed.missingColumns()));
+            throw new ApiException(ErrorCode.STATEMENT_HEADER_MISMATCH, name + " " + type.getLabel(),
+                    String.join(", ", parsed.missingColumns()));
         }
         return new Read(bank, parsed);
     }
@@ -108,24 +118,26 @@ public class DepositService {
     }
 
     /** password: 암호 걸린 PDF·엑셀의 비밀번호. 파일을 여는 데만 쓰고 저장·기록하지 않는다 (2026-10-27) */
-    public PreviewResponse preview(Long sellerId, Long groupBuyId, MultipartFile file, String bankName, String password) {
+    public PreviewResponse preview(Long sellerId, Long groupBuyId, MultipartFile file, String bankName, StatementType fileType,
+                                   String password) {
         GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
-        Read read = read(sellerId, groupBuy, file, bankName, password);
+        Read read = read(sellerId, groupBuy, file, bankName, fileType, password);
         int duplicates = countDuplicates(pools.of(groupBuy), read.parsed().deposits());
-        return new PreviewResponse(trim(read.parsed()), duplicates, read.bank().bankName(),
+        return new PreviewResponse(trim(read.parsed()), duplicates, read.bank().bankName(), read.bank().fileType(),
                 accountCheck(read.bank(), read.parsed(), groupBuy));
     }
 
     @Transactional
-    public UploadResponse upload(Long sellerId, Long groupBuyId, MultipartFile file, String bankName, String password) {
+    public UploadResponse upload(Long sellerId, Long groupBuyId, MultipartFile file, String bankName, StatementType fileType,
+                                 String password) {
         GroupBuy groupBuy = groupBuyService.getOwned(sellerId, groupBuyId);
-        Read read = read(sellerId, groupBuy, file, bankName, password);
+        Read read = read(sellerId, groupBuy, file, bankName, fileType, password);
         String fileName = file.getOriginalFilename();
         String lower = fileName == null ? "" : fileName.toLowerCase(Locale.ROOT);
         DepositSource source = lower.endsWith(".csv") ? DepositSource.CSV : lower.endsWith(".pdf") ? DepositSource.PDF : DepositSource.EXCEL;
         SaveResult saved = saveDeposits(groupBuy, source, fileName, read.parsed().deposits());
         return new UploadResponse(saved.uploadId(), saved.saved(), saved.duplicates(), trim(read.parsed()), read.bank().bankName(),
-                accountCheck(read.bank(), read.parsed(), groupBuy));
+                read.bank().fileType(), accountCheck(read.bank(), read.parsed(), groupBuy));
     }
 
     public record SaveResult(Long uploadId, int saved, int duplicates) {
@@ -342,7 +354,7 @@ public class DepositService {
                 .handled(handled)
                 .otherRows(otherRows)
                 .sharedGroupBuys(pool.groupBuys().stream().filter(g -> !g.getId().equals(mine)).map(GroupBuy::getTitle).toList())
-                .bankName(bankHeaders.forAccountBank(sellerId, groupBuy.getBankName()).bankName())
+                .bankName(bankHeaders.bankFor(sellerId, groupBuy.getBankName()))
                 .matchedCount(matched)
                 .suggestedCount(suggested)
                 .ambiguousCount(ambiguous)

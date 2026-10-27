@@ -189,7 +189,7 @@ class OrderLifecycleFixesTest extends IntegrationTest {
         mvc.perform(withJson(post(g.pub() + "/cancel"), Map.of("phone", "01091000006", "depositorName", "한바로")))
                 .andExpect(status().isOk());
         mvc.perform(multipart(g.base() + "/deposits/uploads").file(new MockMultipartFile("file", "거래내역.csv", "text/csv",
-                "거래일자,거래내용,거래금액\n2026.10.19 10:00:00,한바로,1000\n".getBytes(StandardCharsets.UTF_8))).cookie(g.seller()))
+                "거래 일시,적요,거래 금액\n2026.10.19 10:00:00,한바로,1000\n".getBytes(StandardCharsets.UTF_8))).cookie(g.seller()))
                 .andExpect(status().isOk());
         JsonNode row = read(mvc.perform(get(g.base() + "/deposits/match").cookie(g.seller())).andReturn()).get("rows").get(0);
         long orderId = sellerOrder(g, 1).get("id").asLong();

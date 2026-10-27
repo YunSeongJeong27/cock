@@ -69,7 +69,7 @@ class M3DepositFlowTest extends IntegrationTest {
         mvc.perform(withJson(post(base + "/orders/" + orderId + "/manual-paid").cookie(seller),
                 Map.of("depositorName", "김수동", "amount", 5000))).andExpect(status().isOk());
 
-        String file = "거래일자,거래내용,거래금액\n2026.10.26 10:00:00,김수동,5000\n2026.10.26 11:00:00,홍길동,3000\n";
+        String file = "거래 일시,적요,거래 금액\n2026.10.26 10:00:00,김수동,5000\n2026.10.26 11:00:00,홍길동,3000\n";
         mvc.perform(multipart(base + "/deposits/uploads").file(csv(file)).cookie(seller)).andExpect(status().isOk());
         JsonNode match = read(mvc.perform(get(base + "/deposits/match").cookie(seller)).andReturn());
         assertThat(match.get("manualOrders")).hasSize(1);
@@ -127,7 +127,7 @@ class M3DepositFlowTest extends IntegrationTest {
         placeOrder(seller, id, "010-1000-0002", "박서준");
         placeOrder(seller, id, "010-1000-0003", "이수진");
 
-        String content = "거래일자,거래내용,거래금액\n"
+        String content = "거래 일시,적요,거래 금액\n"
                 + "2025.11.09 10:00:00,김지영,13900\n"
                 + "2025.11.09 10:05:00,박서준맘,13900\n"
                 + "2025.11.09 10:06:00,이수진,14000\n"
@@ -138,8 +138,9 @@ class M3DepositFlowTest extends IntegrationTest {
         mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/preview").file(csv(content)).cookie(seller))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.bankName").value("토스뱅크"))
-                .andExpect(jsonPath("$.parsed.mapping.nameColumn").value("거래내용"))
-                .andExpect(jsonPath("$.parsed.mapping.amountColumn").value("거래금액"))
+                .andExpect(jsonPath("$.fileType").value("EXCEL"))
+                .andExpect(jsonPath("$.parsed.mapping.nameColumn").value("적요"))
+                .andExpect(jsonPath("$.parsed.mapping.amountColumn").value("거래 금액"))
                 .andExpect(jsonPath("$.parsed.deposits.length()").value(4));
 
         mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/uploads").file(csv(content)).cookie(seller))
@@ -191,7 +192,7 @@ class M3DepositFlowTest extends IntegrationTest {
         long next = openGroupBuy(seller, "다음 공구", 8900);
         placeOrder(seller, next, "010-1000-0002", "박서준");
         mvc.perform(multipart("/api/seller/group-buys/" + next + "/deposits/uploads")
-                        .file(csv("거래내용,거래금액,거래일자\n박서준맘,8900\n")).cookie(seller))
+                        .file(csv("적요,거래 금액,거래 일시\n박서준맘,8900\n")).cookie(seller))
                 .andExpect(status().isOk());
         JsonNode nextMatch = read(mvc.perform(get("/api/seller/group-buys/" + next + "/deposits/match").cookie(seller)).andReturn());
         Map<String, JsonNode> nextByName = new HashMap<>();
@@ -265,16 +266,22 @@ class M3DepositFlowTest extends IntegrationTest {
         mvc.perform(multipart(base + "/deposits/preview").file(csv(content)).cookie(seller))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("STATEMENT_HEADER_MISMATCH"))
-                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("'토스뱅크'")))
-                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("거래내용, 거래금액, 거래일자")));
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("'토스뱅크 엑셀·CSV'")))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("적요, 거래 금액, 거래 일시")));
         mvc.perform(multipart(base + "/deposits/uploads").file(csv(content)).cookie(seller))
                 .andExpect(status().isBadRequest());
         assertThat(read(mvc.perform(get(base + "/deposits/uploads").cookie(seller)).andReturn())).isEmpty();
 
         // 은행 추가 → 그 은행을 골라 읽기
-        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(seller), Map.of("bankName", "우리동네은행",
+        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(seller), Map.of("bankName", "우리동네은행", "fileType", "EXCEL",
                         "nameColumn", "보낸 사람 이름", "amountColumn", "들어온 돈", "dateColumn", "입금 날짜")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.source").value("CUSTOM"));
+        // 추가한 은행에 PDF 값은 없다 → 파일 종류를 PDF 로 고르면 "아직 없습니다"
+        mvc.perform(multipart(base + "/deposits/preview").file(csv(content)).param("bankName", "우리동네은행")
+                        .param("fileType", "PDF").cookie(seller))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("STATEMENT_BANK_TYPE_MISSING"))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("'우리동네은행' PDF")));
         mvc.perform(multipart(base + "/deposits/preview").file(csv(content)).param("bankName", "우리동네은행").cookie(seller))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.bankName").value("우리동네은행"))
@@ -287,21 +294,25 @@ class M3DepositFlowTest extends IntegrationTest {
                 .andExpect(jsonPath("$.rows[0].status").value("MATCHED"));
 
         // 운영자 은행(토스뱅크) 값을 판매자가 바꾸면 은행을 안 골라도 바꾼 값으로 읽고, 지우면 원래 값으로
-        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(seller), Map.of("bankName", "토스뱅크",
+        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(seller), Map.of("bankName", "토스뱅크", "fileType", "EXCEL",
                         "nameColumn", "보낸 사람 이름", "amountColumn", "들어온 돈", "dateColumn", "입금 날짜")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.source").value("CHANGED"))
-                .andExpect(jsonPath("$.original.nameColumn").value("거래내용"));
+                .andExpect(jsonPath("$.original.nameColumn").value("적요"));
         mvc.perform(multipart(base + "/deposits/preview").file(csv(content)).cookie(seller))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.duplicateCount").value(1));
-        mvc.perform(delete("/api/seller/bank-headers").param("bankName", "토스뱅크").cookie(seller)).andExpect(status().isOk());
+        mvc.perform(delete("/api/seller/bank-headers").param("bankName", "토스뱅크").param("fileType", "EXCEL").cookie(seller))
+                .andExpect(status().isOk());
         mvc.perform(multipart(base + "/deposits/preview").file(csv(content)).cookie(seller))
                 .andExpect(jsonPath("$.code").value("STATEMENT_HEADER_MISMATCH"));
-        mvc.perform(delete("/api/seller/bank-headers").param("bankName", "토스뱅크").cookie(seller))
+        mvc.perform(delete("/api/seller/bank-headers").param("bankName", "토스뱅크").param("fileType", "EXCEL").cookie(seller))
                 .andExpect(status().isNotFound());
-        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(seller), Map.of("bankName", "새은행", "nameColumn", "a",
-                        "amountColumn", "b", "dateColumn", " ")))
+        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(seller), Map.of("bankName", "새은행", "fileType", "PDF",
+                        "nameColumn", "a", "amountColumn", "b", "dateColumn", " ")))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("DATE_COLUMN_REQUIRED"));
+        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(seller), Map.of("bankName", "새은행",
+                        "nameColumn", "a", "amountColumn", "b", "dateColumn", "c")))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("FILE_TYPE_REQUIRED"));
 
         // 다른 판매자는 이 판매자가 추가한 은행을 쓸 수 없다
         Cookie other = signup(uniqueEmail());
@@ -312,7 +323,7 @@ class M3DepositFlowTest extends IntegrationTest {
 
     /**
      * 암호 걸린 엑셀 올리기 (2026-10-27 사용자 요청): 비밀번호 없으면 "입력하세요", 틀리면 "맞지 않습니다", 맞으면 저장.
-     * 토스 이메일 엑셀처럼 헤더(컬럼)명이 PDF 와 달라서 판매자가 추가한 은행으로 읽는다
+     * 토스 이메일 엑셀은 운영자 기본값 "토스뱅크 · 엑셀·CSV" 헤더(컬럼)명으로 읽는다 (은행·파일 종류를 안 골라도 공구 계좌 은행·파일로)
      */
     @Test
     void encryptedExcelUploadWithPassword() throws Exception {
@@ -320,9 +331,6 @@ class M3DepositFlowTest extends IntegrationTest {
         long id = openGroupBuy(seller, "암호 엑셀", 5000);
         String base = "/api/seller/group-buys/" + id;
         placeOrder(seller, id, "010-2100-0001", "홍길동");
-        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(seller), Map.of("bankName", "토스 엑셀",
-                "nameColumn", "적요", "amountColumn", "거래 금액", "dateColumn", "거래 일시", "typeColumn", "거래 유형")))
-                .andExpect(status().isOk());
 
         byte[] locked;
         try (org.apache.poi.xssf.usermodel.XSSFWorkbook wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
@@ -347,17 +355,19 @@ class M3DepositFlowTest extends IntegrationTest {
         MockMultipartFile file = new MockMultipartFile("file", "토스뱅크_거래내역.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", locked);
 
-        mvc.perform(multipart(base + "/deposits/preview").file(file).param("bankName", "토스 엑셀").cookie(seller))
+        mvc.perform(multipart(base + "/deposits/preview").file(file).cookie(seller))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("STATEMENT_FILE_PASSWORD_REQUIRED"));
-        mvc.perform(multipart(base + "/deposits/uploads").file(file).param("bankName", "토스 엑셀").param("password", "000000")
+        mvc.perform(multipart(base + "/deposits/uploads").file(file).param("password", "000000")
                         .cookie(seller))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("STATEMENT_FILE_PASSWORD_WRONG"));
         assertThat(read(mvc.perform(get(base + "/deposits/uploads").cookie(seller)).andReturn())).isEmpty();
-        mvc.perform(multipart(base + "/deposits/uploads").file(file).param("bankName", "토스 엑셀").param("password", "900101")
+        mvc.perform(multipart(base + "/deposits/uploads").file(file).param("password", "900101")
                         .cookie(seller))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bankName").value("토스뱅크"))
+                .andExpect(jsonPath("$.fileType").value("EXCEL"))
                 .andExpect(jsonPath("$.savedCount").value(1));
         mvc.perform(get(base + "/deposits/match").cookie(seller))
                 .andExpect(jsonPath("$.rows[0].status").value("MATCHED"));
@@ -371,7 +381,7 @@ class M3DepositFlowTest extends IntegrationTest {
         // 같은 번호로 다시 주문하면 기존 주문이 바뀌므로(2026-10-18) 다른 번호, 같은 입금자명 두 사람
         placeOrder(seller, id, "010-7000-0001", "김지영");
         placeOrder(seller, id, "010-7000-0002", "김지영");
-        String content = "거래일자,거래내용,거래금액\n2025-11-01,김지영,5000\n2025-11-01,김지영,5000\n";
+        String content = "거래 일시,적요,거래 금액\n2025-11-01,김지영,5000\n2025-11-01,김지영,5000\n";
         mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/uploads").file(csv(content)).cookie(seller))
                 .andExpect(jsonPath("$.savedCount").value(2))
                 .andExpect(jsonPath("$.duplicateCount").value(0));

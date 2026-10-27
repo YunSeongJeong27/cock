@@ -205,7 +205,7 @@ class ReviewFixesOrderTest extends IntegrationTest {
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .multipart("/api/seller/group-buys/" + g.id() + "/deposits/uploads")
                         .file(new org.springframework.mock.web.MockMultipartFile("file", "a.csv", "text/csv",
-                                "거래내용,거래금액,거래일자\n가,1000\n".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                                "적요,거래 금액,거래 일시\n가,1000\n".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
                         .cookie(g.seller()))
                 .andExpect(status().isOk());
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders

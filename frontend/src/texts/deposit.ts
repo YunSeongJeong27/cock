@@ -8,12 +8,13 @@ export const depositText = {
   // 2026-10-27 사용자 요청 문구
   visibleInfoTip: '거래내역서에 계좌번호와 이름이 가려지지 않고 보이면 대조가 잘 됩니다.',
   filePasswordHelp: '암호가 걸린 PDF나 엑셀이면 올리기 전에 비밀번호를 입력하세요. 비밀번호는 파일을 여는 데만 쓰고 저장하지 않습니다.',
-  bankSelectHelp: '고른 은행의 헤더(컬럼)명으로 입금을 읽습니다. 처음에는 공구 입금 계좌의 은행이 골라져 있고 목록에 없는 은행이면 토스뱅크가 골라져 있습니다.',
+  bankSelectHelp: '고른 은행·파일 종류의 헤더(컬럼)명으로 입금을 읽습니다. 은행은 공구 입금 계좌의 은행이 골라져 있고 목록에 없으면 토스뱅크입니다. 파일 종류는 고른 파일에 맞춰집니다.',
+  bankTypeMissing: (bank: string, type: string) => `${bank} ${type} 헤더(컬럼)명이 아직 없습니다. [은행 헤더(컬럼) 설정]에서 추가해 주세요.`,
   uploaded: (saved: number, duplicates: number) =>
     `입금 ${saved}건을 올렸습니다.${duplicates ? ` 이미 올린 입금 ${duplicates}건은 건너뛰었습니다.` : ''}`,
   /** headerRowNo 가 null 이면(PDF) 헤더 행 번호를 말하지 않는다 */
-  columnsFound: (bankName: string, headerRowNo: number | null) =>
-    `${bankName} 헤더(컬럼)명으로 읽었습니다.${headerRowNo ? ` 헤더는 ${headerRowNo}행입니다.` : ''}`,
+  columnsFound: (bankName: string, type: string, headerRowNo: number | null) =>
+    `${bankName} ${type} 헤더(컬럼)명으로 읽었습니다.${headerRowNo ? ` 헤더는 ${headerRowNo}행입니다.` : ''}`,
   /** excluded: 거래 구분으로 뺀 줄 (skipped 에 들어 있음) */
   previewCounts: (deposits: number, skipped: number, excluded: number, duplicates: number) =>
     `입금 ${deposits}건${excluded ? ` · 캐시백·카드·이자 등이라 뺀 줄 ${excluded}개` : ''}${skipped - excluded ? ` · 입금이 아니라서 건너뛴 줄 ${skipped - excluded}개` : ''}${duplicates ? ` · 이미 올린 입금 ${duplicates}건` : ''}`,
@@ -71,7 +72,7 @@ export const depositText = {
       { img: 'e2-email', text: '국문·이메일 → [엑셀로 받기]' },
       { img: 'e3-account', text: '계좌 → [다음] → 메일로 받음' },
     ],
-    excelNote: "메일로 온 엑셀은 암호가 걸려 있어서 올릴 때 파일 비밀번호를 입력하세요. 엑셀은 헤더(컬럼)명이 PDF와 달라요. [은행 헤더(컬럼) 설정]에서 은행을 추가해 입금자명 '적요', 입금액 '거래 금액', 거래일시 '거래 일시', 거래 구분 '거래 유형'을 적고 올릴 때 그 은행을 고르세요.",
+    excelNote: '메일로 온 엑셀은 암호가 걸려 있어서 올릴 때 파일 비밀번호를 입력하세요. 파일 종류는 엑셀·CSV로 맞춰지고 토스 엑셀 헤더(컬럼)명으로 읽습니다.',
   },
   criteriaFooter: '[확정]을 누르기 전에는 아무것도 저장되지 않습니다. 확정하면 입금자명이 그 고객의 별칭으로 저장되어 다음 공구부터 자동 매칭에 쓰입니다.',
 
@@ -84,11 +85,12 @@ export const depositText = {
   captureLimitReached: '오늘 한도를 다 썼습니다. 직접 입력해 주세요.',
 
   // 은행 헤더(컬럼) 설정 (2026-10-27)
-  bankHeadersHelp: '거래내역을 올리면 고른 은행의 헤더(컬럼)명으로 입금을 읽습니다. 파일의 헤더(컬럼)명과 다르면 [수정]에서 고쳐 주세요.',
+  bankHeadersHelp: '거래내역을 올리면 고른 은행·파일 종류의 헤더(컬럼)명으로 입금을 읽습니다. 같은 은행도 PDF와 엑셀은 헤더(컬럼)명이 달라서 따로 둡니다. 파일과 다르면 [수정]에서 고쳐 주세요.',
   missingBank: '사용하시는 계좌의 은행이 없나요?',
-  bankSaved: (name: string) => `${name} 헤더(컬럼)명을 저장했습니다.`,
-  confirmRevert: (name: string) => `${name} 헤더(컬럼)명을 원래 값으로 되돌릴까요?`,
-  confirmRemoveBank: (name: string) => `${name}${josa(name, '을/를')} 목록에서 지울까요?`,
+  addBankHint: '목록에 있는 은행이라도 없는 파일 종류는 여기서 추가합니다.',
+  bankSaved: (name: string, type: string) => `${name} ${type} 헤더(컬럼)명을 저장했습니다.`,
+  confirmRevert: (name: string, type: string) => `${name} ${type} 헤더(컬럼)명을 원래 값으로 되돌릴까요?`,
+  confirmRemoveBank: (name: string, type: string) => `${name} ${type}${josa(type, '을/를')} 목록에서 지울까요?`,
   typeColumnHint: '거래 구분 헤더(컬럼) 값에 "캐시백", "프로모션", "카드", "이자", "출금", "지급"이 들어간 줄은 고객 입금이 아니라서 뺍니다. 파일에 이 헤더(컬럼)가 없으면 빼지 않고 읽습니다.',
   accountLabelHint: '거래내역서 위쪽에서 계좌번호 앞에 적힌 글자입니다. 적으면 공구 입금 계좌와 같은 계좌의 거래내역인지 확인합니다.',
   // 설정 방법 창

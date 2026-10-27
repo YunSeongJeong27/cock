@@ -3,14 +3,19 @@ import { Link } from 'react-router-dom'
 import { api, ApiError, dateTime, errorMessage, won } from '../../api'
 import { ErrorBox, StatusBadge } from '../../components/Ui'
 import { depositText as T } from '../../texts/deposit'
-import type { BankHeaderView, GroupBuy, MatchResponse, MatchRow, OrderBrief, PreviewResponse, UploadResponse, UploadSummary } from '../../types'
+import { STATEMENT_TYPE_LABEL, type BankHeaderView, type GroupBuy, type MatchResponse, type MatchRow, type OrderBrief, type PreviewResponse, type StatementType, type UploadResponse, type UploadSummary } from '../../types'
 import ScreenshotDeposits from './ScreenshotDeposits'
 import TossFileGuide from './TossFileGuide'
 
 interface Props { groupBuy: GroupBuy; reload: () => void }
 
 /** 거래내역을 올릴 때 알림창으로도 띄우는 서버 오류 */
-const ALERT_CODES = ['STATEMENT_HEADER_MISMATCH', 'STATEMENT_PDF_NO_TEXT', 'STATEMENT_FILE_PASSWORD_REQUIRED', 'STATEMENT_FILE_PASSWORD_WRONG']
+const ALERT_CODES = ['STATEMENT_HEADER_MISMATCH', 'STATEMENT_BANK_TYPE_MISSING', 'STATEMENT_PDF_NO_TEXT', 'STATEMENT_FILE_PASSWORD_REQUIRED', 'STATEMENT_FILE_PASSWORD_WRONG']
+
+/** 고른 파일의 종류: .pdf 면 PDF, 나머지(엑셀·CSV)는 엑셀 */
+function typeOf(file: File | null): StatementType {
+  return file && file.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EXCEL'
+}
 
 /** 같은 입금 계좌를 쓰는 다른 공구의 주문이면 앞에 공구 제목을 붙인다 (2026-10-27) */
 function orderLabel(o: OrderBrief, groupBuyId: number) {
@@ -22,6 +27,8 @@ export default function DepositTab({ groupBuy, reload }: Props) {
   const [file, setFile] = useState<File | null>(null)
   const [banks, setBanks] = useState<BankHeaderView[]>([])
   const [bankName, setBankName] = useState('')
+  /** 파일 종류 (2026-10-27): 파일을 고르면 맞춰지고 판매자가 바꿀 수도 있다 */
+  const [fileType, setFileType] = useState<StatementType>('PDF')
   /** 암호 걸린 PDF·엑셀의 비밀번호 (2026-10-27). 서버에 저장하지 않고 올리면 비운다 */
   const [password, setPassword] = useState('')
   const [checked, setChecked] = useState<PreviewResponse | null>(null)
@@ -64,6 +71,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
     const fd = new FormData()
     fd.append('file', file as File)
     if (bankName) fd.append('bankName', bankName)
+    fd.append('fileType', fileType)
     if (password) fd.append('password', password)
     return fd
   }
@@ -159,7 +167,8 @@ export default function DepositTab({ groupBuy, reload }: Props) {
   // "자동 매칭 모두 확정"은 화면에서 지금 고른 주문으로 확정한다 (판매자가 비우면 빼고, 바꾸면 바꾼 주문으로).
   // 확인 필요(같은 고객의 주문·입금이 여러 건)는 빼고 하나씩 확정하게 한다 (2026-10-26)
   const matched = match?.rows.filter((r) => r.status === 'MATCHED' && !r.checkNote && choice[r.rowId]) ?? []
-  const bank = banks.find((b) => b.bankName === bankName)
+  const bankNames = [...new Set(banks.map((b) => b.bankName))]
+  const bank = banks.find((b) => b.bankName === bankName && b.fileType === fileType)
   const parsed = checked?.parsed ?? null
 
   return (
@@ -173,7 +182,12 @@ export default function DepositTab({ groupBuy, reload }: Props) {
         {/* 2026-10-27 사용자 요청: 공구 말고 다른 거래가 섞인 계좌면 대조가 잘 안 될 수 있음을 강조 */}
         <div className="warn-box"><b>⚠ {T.mixedAccountWarning}</b></div>
         <p className="small">{T.visibleInfoTip}</p>
-        <input key={inputKey} type="file" accept=".xlsx,.xls,.csv,.pdf" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setChecked(null) }} />
+        <input key={inputKey} type="file" accept=".xlsx,.xls,.csv,.pdf" onChange={(e) => {
+          const picked = e.target.files?.[0] ?? null
+          setFile(picked)
+          if (picked) setFileType(typeOf(picked))
+          setChecked(null)
+        }} />
         <div className="mt">
           <label className="field" style={{ maxWidth: 320 }}>
             <span>파일 비밀번호 (선택)</span>
@@ -182,13 +196,24 @@ export default function DepositTab({ groupBuy, reload }: Props) {
           <p className="small muted">{T.filePasswordHelp}</p>
         </div>
         <div className="mt">
-          <label className="field" style={{ maxWidth: 320 }}>
-            <span>거래내역 은행</span>
-            <select value={bankName} onChange={(e) => { setBankName(e.target.value); setChecked(null) }}>
-              {banks.map((b) => <option key={b.bankName} value={b.bankName}>{b.bankName}</option>)}
-            </select>
-          </label>
+          <div className="row" style={{ alignItems: 'flex-start' }}>
+            <label className="field" style={{ width: 200 }}>
+              <span>거래내역 은행</span>
+              <select value={bankName} onChange={(e) => { setBankName(e.target.value); setChecked(null) }}>
+                {bankNames.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </label>
+            <label className="field" style={{ width: 160 }}>
+              <span>파일 종류</span>
+              <select value={fileType} onChange={(e) => { setFileType(e.target.value as StatementType); setChecked(null) }}>
+                {(['PDF', 'EXCEL'] as StatementType[]).map((t) => <option key={t} value={t}>{STATEMENT_TYPE_LABEL[t]}</option>)}
+              </select>
+            </label>
+          </div>
           <p className="small muted">{T.bankSelectHelp}</p>
+          {!bank && bankName && (
+            <div className="warn-box small">{T.bankTypeMissing(bankName, STATEMENT_TYPE_LABEL[fileType])} <Link to="/seller/bank">은행 헤더(컬럼) 설정</Link></div>
+          )}
           {bank && (
             <div className="small">
               <span className="chip">입금자명: {bank.values.nameColumn}</span>
@@ -211,7 +236,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
               <div className="warn-box">{checked.account.check === 'DIFFERENT' ? <b>⚠ {checked.account.notice}</b> : checked.account.notice}</div>
             )}
             <div className="success-box">
-              {T.columnsFound(checked.bankName, file?.name.toLowerCase().endsWith('.pdf') ? null : parsed.headerRowNo)}
+              {T.columnsFound(checked.bankName, STATEMENT_TYPE_LABEL[checked.fileType], checked.fileType === 'PDF' ? null : parsed.headerRowNo)}
               <div className="small mt">{T.previewCounts(parsed.deposits.length, parsed.skippedRows, parsed.excludedRows, checked.duplicateCount)}</div>
             </div>
             <div className="table-wrap mt">

@@ -81,7 +81,7 @@ class DepositPoolTest extends IntegrationTest {
         long c = openGroupBuy(seller, "C 공구", 5000, "토스뱅크", "9999-1111-2222");
         placeOrder(seller, a, "010-8100-0001", "김에이");
         placeOrder(seller, b, "010-8100-0002", "박비");
-        String file = "거래일자,거래내용,거래금액\n2026-10-27,김에이,3000\n2026-10-27,박비,5000\n2026-10-27,무관,700\n";
+        String file = "거래 일시,적요,거래 금액\n2026-10-27,김에이,3000\n2026-10-27,박비,5000\n2026-10-27,무관,700\n";
         assertThat(upload(seller, a, file).get("savedCount").asInt()).isEqualTo(3);
 
         JsonNode ma = match(seller, a);
@@ -148,7 +148,7 @@ class DepositPoolTest extends IntegrationTest {
     void uploadsFollowAccountChangeWhenNotShared() throws Exception {
         Cookie seller = signup(uniqueEmail());
         long a = openGroupBuy(seller, "혼자 공구", 3000, "토스뱅크", "1000-2222-3333");
-        upload(seller, a, "거래일자,거래내용,거래금액\n2026-10-27,누구,3000\n");
+        upload(seller, a, "거래 일시,적요,거래 금액\n2026-10-27,누구,3000\n");
         Map<String, Object> product = product("상품", 3000, null);
         product.put("id", read(mvc.perform(get("/api/seller/group-buys/" + a).cookie(seller)).andReturn())
                 .get("products").get(0).get("id").asLong());
@@ -163,7 +163,7 @@ class DepositPoolTest extends IntegrationTest {
     void statementAccountIsComparedWithGroupBuyAccount() throws Exception {
         Cookie seller = signup(uniqueEmail());
         long a = openGroupBuy(seller, "계좌 확인", 3000, "토스뱅크", "1000-3333-4444");
-        String header = "거래일자,거래내용,거래금액\n2026-10-27,누구,3000\n";
+        String header = "거래 일시,적요,거래 금액\n2026-10-27,누구,3000\n";
         JsonNode same = upload(seller, a, "계좌번호,1000-****-4444\n" + header);
         assertThat(same.get("account").get("check").asText()).isEqualTo("SAME");
         assertThat(same.get("account").get("notice").isNull()).isTrue();
@@ -187,12 +187,34 @@ class DepositPoolTest extends IntegrationTest {
         long kb = openGroupBuy(seller, "국민 공구", 3000, "국민은행", "123456-00-123789");
         placeOrder(seller, kb, "010-8200-0001", "홍길동");
         assertThat(match(seller, kb).get("bankName").asText()).isEqualTo("KB국민은행");
-        JsonNode uploaded = upload(seller, kb, "계좌번호,123456-**-***789\n거래일시,적요,보낸분/받는분,출금액,입금액\n"
-                + "2026.10.26 10:30:00,전자금융,홍길동,0,3000\n2026.10.26 11:00:00,체크카드,편의점,5000,0\n");
+        String kbCsv = "계좌번호,123456-**-***789\n거래일시,적요,보낸분/받는분,출금액,입금액\n"
+                + "2026.10.26 10:30:00,전자금융,홍길동,0,3000\n2026.10.26 11:00:00,체크카드,편의점,5000,0\n";
+        // KB국민은행은 PDF 기본값만 있다: CSV(엑셀·CSV)를 올리면 "아직 없습니다" → 판매자가 엑셀 값을 넣으면 읽힌다
+        mvc.perform(multipart("/api/seller/group-buys/" + kb + "/deposits/uploads").file(csv(kbCsv)).cookie(seller))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("STATEMENT_BANK_TYPE_MISSING"));
+        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(seller), Map.of("bankName", "KB국민은행", "fileType", "EXCEL",
+                "nameColumn", "보낸분/받는분", "amountColumn", "입금액", "dateColumn", "거래일시", "accountLabel", "계좌번호",
+                "typeColumn", "적요"))).andExpect(status().isOk()).andExpect(jsonPath("$.source").value("CUSTOM"));
+        JsonNode uploaded = upload(seller, kb, kbCsv);
+        assertThat(uploaded.get("fileType").asText()).isEqualTo("EXCEL");
         assertThat(uploaded.get("bankName").asText()).isEqualTo("KB국민은행");
         assertThat(uploaded.get("savedCount").asInt()).isEqualTo(1);
         assertThat(uploaded.get("account").get("check").asText()).isEqualTo("SAME");
         assertThat(match(seller, kb).get("rows").get(0).get("status").asText()).isEqualTo("MATCHED");
+
+        // PDF 를 올리면 같은 은행의 PDF 헤더(컬럼)명으로 읽는다 (은행·파일 종류를 안 골라도)
+        byte[] pdf;
+        try (var in = getClass().getClassLoader().getResourceAsStream("statements/kb-statement.pdf")) {
+            pdf = in.readAllBytes();
+        }
+        mvc.perform(multipart("/api/seller/group-buys/" + kb + "/deposits/preview")
+                        .file(new MockMultipartFile("file", "KB거래내역.pdf", "application/pdf", pdf)).cookie(seller))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bankName").value("KB국민은행"))
+                .andExpect(jsonPath("$.fileType").value("PDF"))
+                .andExpect(jsonPath("$.parsed.mapping.nameColumn").value("보낸분/받는분"))
+                .andExpect(jsonPath("$.parsed.deposits.length()").value(5));
 
         // 목록에 없는 은행이면 기본(토스뱅크)
         long other = openGroupBuy(seller, "모르는 은행", 3000, "어느은행", "1234-5678-9012");
@@ -208,7 +230,7 @@ class DepositPoolTest extends IntegrationTest {
         placeOrder(seller, a, "010-8300-0002", "박늦음");
         placeOrder(seller, a, "010-8300-0003", "이날짜");
         LocalDateTime now = LocalDateTime.now(clock);
-        upload(seller, a, "거래일자,거래내용,거래금액\n"
+        upload(seller, a, "거래 일시,적요,거래 금액\n"
                 + now.plusMinutes(20).format(TIME) + ",김정시,3000\n"
                 + now.plusHours(3).format(TIME) + ",박늦음,3000\n"
                 + now.toLocalDate() + ",이날짜,3000\n");

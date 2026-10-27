@@ -53,7 +53,7 @@ class PaymentHistoryTest extends IntegrationTest {
         mvc.perform(post(base + "/orders/" + orderId + "/unconfirm-paid").cookie(seller)).andExpect(status().isOk());
         // 2) 거래내역으로 다시 확정 → 취소 → 업로드 삭제 (입금 줄이 없어져도 기록은 남음)
         long uploadId = read(mvc.perform(multipart(base + "/deposits/uploads")
-                .file(new MockMultipartFile("file", "a.csv", "text/csv", "거래내용,거래금액,거래일자\n김기록,1000\n".getBytes(StandardCharsets.UTF_8)))
+                .file(new MockMultipartFile("file", "a.csv", "text/csv", "적요,거래 금액,거래 일시\n김기록,1000\n".getBytes(StandardCharsets.UTF_8)))
                 .cookie(seller)).andExpect(status().isOk()).andReturn()).get("uploadId").asLong();
         long rowId = read(mvc.perform(get(base + "/deposits/match").cookie(seller)).andReturn()).get("rows").get(0).get("rowId").asLong();
         mvc.perform(withJson(post(base + "/deposits/confirm").cookie(seller),

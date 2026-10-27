@@ -72,16 +72,16 @@ class SecurityReviewTest extends IntegrationTest {
         o.put("acknowledgeWarnings", true);
         mvc.perform(withJson(post("/api/public/g/" + ag.get("publicToken").asText() + "/orders"), o));
         mvc.perform(multipart("/api/seller/group-buys/" + aliceGb + "/deposits/uploads")
-                .file(new MockMultipartFile("file", "a.csv", "text/csv", "거래내용,거래금액,거래일자\n가,1000\n".getBytes()))
+                .file(new MockMultipartFile("file", "a.csv", "text/csv", "적요,거래 금액,거래 일시\n가,1000\n".getBytes()))
                 .cookie(alice)).andExpect(status().isOk());
         JsonNode match = read(mvc.perform(get("/api/seller/group-buys/" + aliceGb + "/deposits/match").cookie(alice)).andReturn());
         long aliceRow = match.get("rows").get(0).get("rowId").asLong();
         long aliceOrder = match.get("rows").get(0).get("order").get("orderId").asLong();
         mvc.perform(withJson(post("/api/seller/group-buys/" + aliceGb + "/deposits/confirm").cookie(alice),
                 Map.of("items", List.of(Map.of("rowId", aliceRow, "orderId", aliceOrder))))).andExpect(status().isOk());
-        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(alice), Map.of("bankName", "앨리스은행",
+        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(alice), Map.of("bankName", "앨리스은행", "fileType", "EXCEL",
                 "nameColumn", "a", "amountColumn", "b", "dateColumn", "c"))).andExpect(status().isOk());
-        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(alice), Map.of("bankName", "토스뱅크",
+        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(alice), Map.of("bankName", "토스뱅크", "fileType", "EXCEL",
                 "nameColumn", "앨리스이름", "amountColumn", "앨리스금액", "dateColumn", "앨리스날짜"))).andExpect(status().isOk());
         JsonNode aliceAliases = read(mvc.perform(get("/api/seller/aliases").cookie(alice)).andReturn());
         assertThat(aliceAliases).isNotEmpty();
@@ -112,7 +112,7 @@ class SecurityReviewTest extends IntegrationTest {
         assertThat(confirm.get("confirmedCount").asInt()).isZero();
 
         // 은행 헤더 설정: 앨리스가 추가·바꾼 값은 밥에게 안 보이고, 밥이 지우거나 쓸 수 없다
-        mvc.perform(delete("/api/seller/bank-headers").param("bankName", "앨리스은행").cookie(bob))
+        mvc.perform(delete("/api/seller/bank-headers").param("bankName", "앨리스은행").param("fileType", "EXCEL").cookie(bob))
                 .andExpect(status().isNotFound());
         mvc.perform(multipart(b + "/deposits/preview")
                 .file(new MockMultipartFile("file", "a.csv", "text/csv", "a,b,c\n가,1000,\n".getBytes()))

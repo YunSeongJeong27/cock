@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SellerBankHeaderRepository extends JpaRepository<SellerBankHeader, Long> {
 
-    List<SellerBankHeader> findBySellerIdOrderByBankNameAsc(Long sellerId);
+    List<SellerBankHeader> findBySellerIdOrderByBankNameAscFileTypeAsc(Long sellerId);
 
-    Optional<SellerBankHeader> findBySellerIdAndBankName(Long sellerId, String bankName);
+    Optional<SellerBankHeader> findBySellerIdAndBankNameAndFileType(Long sellerId, String bankName, StatementType fileType);
 }

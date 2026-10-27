@@ -45,20 +45,22 @@ public class DepositController {
     /**
      * bankName: 어느 은행의 헤더(컬럼)명으로 읽을지 (은행 헤더 설정 목록의 이름). 없으면 공구 입금 계좌의 은행 (2026-10-27).
      * 전에는 열 이름을 요청마다 직접 지정하거나 저장한 설정(presetId)을 골랐음.
-     * password: 암호 걸린 PDF·엑셀의 비밀번호 (요청 칸, 저장 안 함)
+     * fileType: PDF / EXCEL (엑셀·CSV). 없으면 올린 파일의 종류. password: 암호 걸린 PDF·엑셀의 비밀번호 (요청 칸, 저장 안 함)
      */
     @PostMapping(BASE + "/preview")
     public PreviewResponse preview(@PathVariable Long groupBuyId, @RequestPart("file") MultipartFile file,
                                    @RequestParam(required = false) String bankName,
+                                   @RequestParam(required = false) StatementType fileType,
                                    @RequestParam(required = false) String password) {
-        return service.preview(CurrentSeller.id(), groupBuyId, file, bankName, password);
+        return service.preview(CurrentSeller.id(), groupBuyId, file, bankName, fileType, password);
     }
 
     @PostMapping(BASE + "/uploads")
     public UploadResponse upload(@PathVariable Long groupBuyId, @RequestPart("file") MultipartFile file,
                                  @RequestParam(required = false) String bankName,
+                                 @RequestParam(required = false) StatementType fileType,
                                  @RequestParam(required = false) String password) {
-        return service.upload(CurrentSeller.id(), groupBuyId, file, bankName, password);
+        return service.upload(CurrentSeller.id(), groupBuyId, file, bankName, fileType, password);
     }
 
     @GetMapping(BASE + "/uploads")
@@ -103,16 +105,16 @@ public class DepositController {
         service.manualConfirm(CurrentSeller.id(), groupBuyId, orderId, request.depositorName(), request.amount());
     }
 
-    /** 은행별 헤더(컬럼)명 저장: 목록에 있는 은행이면 판매자 값으로 바꾸고, 없는 은행이면 추가 (2026-10-27) */
+    /** 은행·파일 종류별 헤더(컬럼)명 저장: 운영자 값이 있으면 판매자 값으로 바꾸고, 없으면 추가 (2026-10-27) */
     @PutMapping("/api/seller/bank-headers")
     public BankHeaderView saveBankHeader(@Valid @RequestBody BankHeaderRequest request) {
         return bankHeaders.save(CurrentSeller.id(), request);
     }
 
-    /** 판매자 값 지우기: 운영자 은행은 원래 값으로, 판매자가 추가한 은행은 목록에서 빠짐 */
+    /** 판매자 값 지우기: 운영자 값이 있으면 원래 값으로, 판매자가 추가한 값은 목록에서 빠짐 */
     @DeleteMapping("/api/seller/bank-headers")
-    public void deleteBankHeader(@RequestParam String bankName) {
-        bankHeaders.delete(CurrentSeller.id(), bankName);
+    public void deleteBankHeader(@RequestParam String bankName, @RequestParam StatementType fileType) {
+        bankHeaders.delete(CurrentSeller.id(), bankName, fileType);
     }
 
     @GetMapping("/api/seller/aliases")

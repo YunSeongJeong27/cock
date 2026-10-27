@@ -100,7 +100,7 @@ class ConcurrencyTest extends IntegrationTest {
         order(g, "010-8200-0002", "나", 1);
         mvc.perform(multipart("/api/seller/group-buys/" + g.id() + "/deposits/uploads")
                         .file(new MockMultipartFile("file", "a.csv", "text/csv",
-                                "거래내용,거래금액,거래일자\n다른이름,1000\n또다른이름,1000\n".getBytes(StandardCharsets.UTF_8)))
+                                "적요,거래 금액,거래 일시\n다른이름,1000\n또다른이름,1000\n".getBytes(StandardCharsets.UTF_8)))
                         .cookie(g.seller()))
                 .andExpect(status().isOk());
         JsonNode match = read(mvc.perform(get("/api/seller/group-buys/" + g.id() + "/deposits/match").cookie(g.seller())).andReturn());

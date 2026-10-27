@@ -141,7 +141,7 @@ class M4M6ScreenshotAndCommentTest extends IntegrationTest {
 
         // 댓글 주문도 입금 대조: 입금자명 숫자 "2171505" → 꼭지맘 (동·호수 217-1505)
         mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/uploads")
-                        .file(new MockMultipartFile("file", "x.csv", "text/csv", "거래내용,거래금액,거래일자\n2171505,1900\n".getBytes()))
+                        .file(new MockMultipartFile("file", "x.csv", "text/csv", "적요,거래 금액,거래 일시\n2171505,1900\n".getBytes()))
                         .cookie(seller))
                 .andExpect(status().isOk());
         mvc.perform(get("/api/seller/group-buys/" + id + "/deposits/match").cookie(seller))

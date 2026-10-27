@@ -174,6 +174,8 @@ public enum ErrorCode {
     REFUNDED_CANNOT_UNCONFIRM(BAD_REQUEST, "환불 완료된 주문은 입금 확정을 취소할 수 없습니다."),
     ALIAS_NOT_FOUND(NOT_FOUND, "별칭을 찾을 수 없습니다."),
     BANK_HEADER_NOT_FOUND(NOT_FOUND, "은행 헤더(컬럼) 설정을 찾을 수 없습니다."),
+    STATEMENT_BANK_TYPE_MISSING(BAD_REQUEST, "'%s' %s 헤더(컬럼)명이 아직 없습니다. [은행 헤더(컬럼) 설정]에서 추가한 뒤 다시 올려 주세요."),
+    FILE_TYPE_REQUIRED(BAD_REQUEST, "파일 종류를 골라 주세요."),
 
     // ---- 댓글 집계 ----
     COMMENT_AUTHOR_EMPTY(BAD_REQUEST, "작성자가 비어 있는 댓글이 있습니다: %s"),

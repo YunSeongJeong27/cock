@@ -85,8 +85,8 @@ class ScreenApiTest extends IntegrationTest {
         order(g, "010-3000-0011", "박세나", 1);
         assertThat(getJson(g, g.base() + "/deposits/match").get("uploads")).isEmpty();
 
-        upload(g, "거래내용,거래금액,거래일자\n박세나,1000\n관련없음,500\n");
-        upload(g, "거래내용,거래금액,거래일자\n또다른,700\n");
+        upload(g, "적요,거래 금액,거래 일시\n박세나,1000\n관련없음,500\n");
+        upload(g, "적요,거래 금액,거래 일시\n또다른,700\n");
         JsonNode match = getJson(g, g.base() + "/deposits/match");
         long row = match.get("rows").get(0).get("rowId").asLong();
         long orderId = match.get("rows").get(0).get("order").get("orderId").asLong();
@@ -108,10 +108,10 @@ class ScreenApiTest extends IntegrationTest {
     @Test
     void bankSettingsHasBankHeadersAndAliases() throws Exception {
         Opened g = open();
-        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(g.seller()), Map.of("bankName", "우리은행",
+        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(g.seller()), Map.of("bankName", "우리은행", "fileType", "EXCEL",
                 "nameColumn", "기재내용", "amountColumn", "맡기신금액", "dateColumn", "거래일시"))).andExpect(status().isOk());
         order(g, "010-3000-0021", "최다솜", 1);
-        upload(g, "거래내용,거래금액,거래일자\n다솜맘,1000\n");
+        upload(g, "적요,거래 금액,거래 일시\n다솜맘,1000\n");
         JsonNode match = getJson(g, g.base() + "/deposits/match");
         long row = match.get("rows").get(0).get("rowId").asLong();
         long orderId = match.get("openOrders").get(0).get("orderId").asLong();
@@ -124,8 +124,14 @@ class ScreenApiTest extends IntegrationTest {
         assertThat(banks.get(0).get("bankName").asText()).isEqualTo("토스뱅크");
         assertThat(banks.get(0).get("defaultBank").asBoolean()).isTrue();
         assertThat(banks.get(0).get("source").asText()).isEqualTo("SYSTEM");
+        assertThat(banks.get(0).get("fileType").asText()).isEqualTo("PDF");
         assertThat(banks.get(0).get("values").get("nameColumn").asText()).isEqualTo("거래내용");
-        assertThat(banks.get(1).get("bankName").asText()).isEqualTo("KB국민은행");
+        // 같은 은행의 엑셀 값은 따로 (토스 엑셀은 입금자명이 "적요")
+        assertThat(banks.get(1).get("bankName").asText()).isEqualTo("토스뱅크");
+        assertThat(banks.get(1).get("fileType").asText()).isEqualTo("EXCEL");
+        assertThat(banks.get(1).get("values").get("nameColumn").asText()).isEqualTo("적요");
+        assertThat(banks.get(2).get("bankName").asText()).isEqualTo("KB국민은행");
+        assertThat(banks.get(2).get("fileType").asText()).isEqualTo("PDF");
         JsonNode mine = banks.get(banks.size() - 1);
         assertThat(mine.get("bankName").asText()).isEqualTo("우리은행");
         assertThat(mine.get("source").asText()).isEqualTo("CUSTOM");

@@ -2,20 +2,23 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api, dateTime, errorMessage } from '../../api'
 import { ErrorBox } from '../../components/Ui'
 import { depositText as T } from '../../texts/deposit'
-import type { BankHeaderValues, BankHeaderView } from '../../types'
+import { STATEMENT_TYPE_LABEL, type BankHeaderValues, type BankHeaderView, type StatementType } from '../../types'
 
 interface Alias { id: number; depositorName: string; customerId: number; customerLabel: string; createdAt: string }
-/** GET /api/seller/bank-settings: 은행별 헤더(컬럼)명 + 입금자 별칭 */
+/** GET /api/seller/bank-settings: 은행·파일 종류별 헤더(컬럼)명 + 입금자 별칭 */
 interface Settings { banks: BankHeaderView[]; aliases: Alias[] }
 
-/** 수정 칸: 은행 이름 + 헤더(컬럼)명. adding 이면 새 은행 (2026-10-27) */
-interface Form { adding: boolean; bankName: string; nameColumn: string; amountColumn: string; dateColumn: string; accountLabel: string; typeColumn: string }
+/** 수정 칸: 은행 이름·파일 종류 + 헤더(컬럼)명. adding 이면 새로 추가 (2026-10-27) */
+interface Form {
+  adding: boolean; bankName: string; fileType: StatementType
+  nameColumn: string; amountColumn: string; dateColumn: string; accountLabel: string; typeColumn: string
+}
 
-const SOURCE_LABEL: Record<BankHeaderView['source'], string> = { SYSTEM: '기본값', CHANGED: '바꾼 값', CUSTOM: '추가한 은행' }
+const SOURCE_LABEL: Record<BankHeaderView['source'], string> = { SYSTEM: '기본값', CHANGED: '바꾼 값', CUSTOM: '추가한 값' }
 
-function toForm(bankName: string, v: BankHeaderValues | null, adding: boolean): Form {
+function toForm(bankName: string, fileType: StatementType, v: BankHeaderValues | null, adding: boolean): Form {
   return {
-    adding, bankName,
+    adding, bankName, fileType,
     nameColumn: v?.nameColumn ?? '', amountColumn: v?.amountColumn ?? '', dateColumn: v?.dateColumn ?? '',
     accountLabel: v?.accountLabel ?? '', typeColumn: v?.typeColumn ?? '',
   }
@@ -46,7 +49,7 @@ export default function BankSettings() {
     setError(null)
     try {
       const saved = await api.put<BankHeaderView>('/api/seller/bank-headers', form)
-      setNotice(T.bankSaved(saved.bankName))
+      setNotice(T.bankSaved(saved.bankName, STATEMENT_TYPE_LABEL[saved.fileType]))
       setForm(null)
       load()
     } catch (err) {
@@ -56,11 +59,12 @@ export default function BankSettings() {
 
   /** 판매자 값 지우기: 기본 은행은 원래 값으로, 추가한 은행은 목록에서 빠진다 */
   async function removeBank(b: BankHeaderView) {
-    if (!confirm(b.source === 'CUSTOM' ? T.confirmRemoveBank(b.bankName) : T.confirmRevert(b.bankName))) return
+    const type = STATEMENT_TYPE_LABEL[b.fileType]
+    if (!confirm(b.source === 'CUSTOM' ? T.confirmRemoveBank(b.bankName, type) : T.confirmRevert(b.bankName, type))) return
     setError(null)
     try {
-      await api.del(`/api/seller/bank-headers?bankName=${encodeURIComponent(b.bankName)}`)
-      if (form?.bankName === b.bankName) setForm(null)
+      await api.del(`/api/seller/bank-headers?bankName=${encodeURIComponent(b.bankName)}&fileType=${b.fileType}`)
+      if (form?.bankName === b.bankName && form.fileType === b.fileType) setForm(null)
       load()
     } catch (e) {
       setError(errorMessage(e))
@@ -77,7 +81,8 @@ export default function BankSettings() {
     }
   }
 
-  const editing = form && !form.adding ? banks.find((b) => b.bankName === form.bankName) : undefined
+  const editing = form && !form.adding ? banks.find((b) => b.bankName === form.bankName && b.fileType === form.fileType) : undefined
+  const bankNames = [...new Set(banks.map((b) => b.bankName))]
   const set = (key: keyof Form) => (e: { target: { value: string } }) => form && setForm({ ...form, [key]: e.target.value })
 
   return (
@@ -85,17 +90,18 @@ export default function BankSettings() {
       <h1>은행 거래내역 헤더(컬럼) 설정</h1>
       <div className="card">
         <div className="row between">
-          <h3>은행별 헤더(컬럼)명</h3>
+          <h3>은행·파일 종류별 헤더(컬럼)명</h3>
           <button type="button" className="btn small" onClick={() => setShowHelp(true)}>거래내역 입금 헤더(컬럼)명 설정 방법</button>
         </div>
         <p className="muted small">{T.bankHeadersHelp}</p>
         <div className="table-wrap">
           <table className="stack">
-            <thead><tr><th>은행</th><th>입금자명</th><th>입금액</th><th>거래일시</th><th>계좌번호</th><th>거래 구분</th><th>상태</th><th></th></tr></thead>
+            <thead><tr><th>은행</th><th>파일</th><th>입금자명</th><th>입금액</th><th>거래일시</th><th>계좌번호</th><th>거래 구분</th><th>상태</th><th></th></tr></thead>
             <tbody>
               {banks.map((b) => (
-                <tr key={b.bankName}>
+                <tr key={`${b.bankName}-${b.fileType}`}>
                   <td className="stack-title">{b.bankName}</td>
+                  <td data-label="파일">{STATEMENT_TYPE_LABEL[b.fileType]}</td>
                   <td data-label="입금자명">{b.values.nameColumn}</td>
                   <td data-label="입금액">{b.values.amountColumn}</td>
                   <td data-label="거래일시">{b.values.dateColumn}</td>
@@ -103,7 +109,7 @@ export default function BankSettings() {
                   <td data-label="거래 구분">{b.values.typeColumn ?? '-'}</td>
                   <td data-label="상태" className="small">{SOURCE_LABEL[b.source]}</td>
                   <td className="stack-action">
-                    <button type="button" className="btn small" onClick={() => { setNotice(null); setForm(toForm(b.bankName, b.values, false)) }}>수정</button>
+                    <button type="button" className="btn small" onClick={() => { setNotice(null); setForm(toForm(b.bankName, b.fileType, b.values, false)) }}>수정</button>
                     {b.source === 'CHANGED' && <button type="button" className="btn small" onClick={() => removeBank(b)}>원래 값으로</button>}
                     {b.source === 'CUSTOM' && <button type="button" className="btn small danger" onClick={() => removeBank(b)}>삭제</button>}
                   </td>
@@ -114,14 +120,27 @@ export default function BankSettings() {
         </div>
         <div className="row mt">
           <span className="small">{T.missingBank}</span>
-          <button type="button" className="btn small primary" onClick={() => { setNotice(null); setForm(toForm('', null, true)) }}>사용 은행 추가</button>
+          <button type="button" className="btn small primary" onClick={() => { setNotice(null); setForm(toForm('', 'PDF', null, true)) }}>사용 은행 추가</button>
         </div>
         {notice && <div className="success-box mt">{notice}</div>}
         {form && (
           <form className="mt" onSubmit={submit} style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
-            <h3>{form.adding ? '사용 은행 추가' : `${form.bankName} 수정`}</h3>
+            <h3>{form.adding ? '사용 은행 추가' : `${form.bankName} ${STATEMENT_TYPE_LABEL[form.fileType]} 수정`}</h3>
+            {form.adding && <p className="small muted">{T.addBankHint}</p>}
             <div className="mapping-grid">
-              {form.adding && <label className="field"><span>은행 이름 *</span><input type="text" value={form.bankName} onChange={set('bankName')} required placeholder="예: 신협" /></label>}
+              {form.adding && (
+                <>
+                  <label className="field"><span>은행 이름 *</span>
+                    <input type="text" list="bank-names" value={form.bankName} onChange={set('bankName')} required placeholder="예: 신협" />
+                    <datalist id="bank-names">{bankNames.map((n) => <option key={n} value={n} />)}</datalist>
+                  </label>
+                  <label className="field"><span>파일 종류 *</span>
+                    <select value={form.fileType} onChange={set('fileType')}>
+                      {(['PDF', 'EXCEL'] as StatementType[]).map((t) => <option key={t} value={t}>{STATEMENT_TYPE_LABEL[t]}</option>)}
+                    </select>
+                  </label>
+                </>
+              )}
               <label className="field"><span>입금자명 *</span><input type="text" value={form.nameColumn} onChange={set('nameColumn')} required /></label>
               <label className="field"><span>입금액 *</span><input type="text" value={form.amountColumn} onChange={set('amountColumn')} required /></label>
               <label className="field"><span>거래일시 *</span><input type="text" value={form.dateColumn} onChange={set('dateColumn')} required /></label>
