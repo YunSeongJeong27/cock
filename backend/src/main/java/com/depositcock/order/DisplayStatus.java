@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 public enum DisplayStatus {
     AWAITING_DEPOSIT("주문 확정 전"),
     PAID("주문 확정"),
-    RESERVED("예약됨 (현장결제)"),
+    RESERVED("예약됨"),
     PICKED_UP("수령 완료"),
     CANCELLED("취소됨");
 

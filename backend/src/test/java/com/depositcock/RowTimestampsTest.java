@@ -95,7 +95,7 @@ class RowTimestampsTest extends IntegrationTest {
     private long[] upload(Opened g, String depositor) throws Exception {
         long uploadId = read(mvc.perform(multipart(g.base() + "/deposits/uploads")
                 .file(new MockMultipartFile("file", "a.csv", "text/csv",
-                        ("입금자명,입금액\n" + depositor + ",1000\n").getBytes(StandardCharsets.UTF_8)))
+                        ("적요,거래 금액,거래 일시\n" + depositor + ",1000\n").getBytes(StandardCharsets.UTF_8)))
                 .cookie(g.seller())).andExpect(status().isOk()).andReturn()).get("uploadId").asLong();
         long rowId = jdbc.queryForObject("select id from deposit_row where upload_id = ?", Long.class, uploadId);
         return new long[] {uploadId, rowId};
@@ -108,7 +108,7 @@ class RowTimestampsTest extends IntegrationTest {
                 + " and lower(table_name) <> 'flyway_schema_history'", String.class);
         assertThat(tables).contains("seller", "seller_notification", "app_setting", "customer", "group_buy", "pickup_point",
                 "product", "customer_order", "order_item", "order_change", "customer_device", "deposit_upload", "deposit_row",
-                "deposit_confirmation", "depositor_alias", "bank_column_preset", "imported_comment", "capture_usage");
+                "deposit_confirmation", "depositor_alias", "bank", "bank_header", "seller_bank_header", "imported_comment", "capture_usage");
         for (String table : tables) {
             List<String> columns = jdbc.queryForList("select lower(column_name) from information_schema.columns"
                     + " where lower(table_schema) = 'public' and lower(table_name) = ?"

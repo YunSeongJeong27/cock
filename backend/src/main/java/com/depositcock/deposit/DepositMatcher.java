@@ -1,5 +1,6 @@
 package com.depositcock.deposit;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -35,6 +36,11 @@ import lombok.RequiredArgsConstructor;
  *               그 주문에 이름 근거로 추천된 다른 입금이 없음, 이 입금이 이미 연결·확인·취소된 주문의 입금자와 같지 않음)
  *   AMBIGUOUS : 후보가 2명 이상 → 자동 확정 금지, 판매자가 고른다 (목록의 첫 번째에 임의로 붙이지 않는다)
  *   UNRELATED : 관련 없는 입금
+ * 확인 필요 (2026-10-26): 자동 매칭·추천(이름 근거)이어도 같은 고객의 미입금 주문이나 그 고객으로 보이는 입금이
+ *   여러 건이면 짝이 맞는지 판매자가 확인하게 표시한다 (Outcome.checks)
+ * 1시간 규칙 (2026-10-27 사용자 결정): 자동 매칭이어도 입금 시각과 "금액이 정해진 시각"(주문, 또는 금액을 바꾼 시각)이
+ *   1시간 넘게 차이 나면 확인 필요. 입금 시각(시:분)을 모르는 입금과 댓글 주문(주문 시각이 댓글 시각이 아님)은 보지 않는다.
+ *   같은 고객의 주문이 여러 건이면 입금 시각에 가까운 주문부터 짝짓는다
  * 입금 1건은 주문 1건에만 쓴다. "후보 몇 명"은 고객(customerId) 수로 센다 (한 고객의 주문 여러 건은 1명).
  * 1차(자동 매칭)는 입금마다 다른 입금과 상관없이 판단해서, 거래내역의 줄 순서에 따라 결과가 달라지지 않게 한다.
  * </pre>
@@ -77,17 +83,33 @@ public final class DepositMatcher {
         SUGGESTED
     }
 
-    /** 대조 대상 주문 (선입금, 취소 안 됨, 입금 확정 안 됨, 금액 > 0) */
+    /** 자동 매칭을 그대로 둘 입금 시각 차이 (2026-10-27 사용자 결정) */
+    public static final Duration TIME_WINDOW = Duration.ofHours(1);
+
+    /**
+     * 대조 대상 주문 (선입금, 취소 안 됨, 입금 확정 안 됨, 금액 > 0)
+     * @param amountSetAt 금액이 정해진 시각 (주문, 또는 금액을 바꾼 시각)
+     * @param timeRule    1시간 규칙을 볼 주문인지 (댓글 주문은 아님)
+     */
     public record Payee(Long orderId, Long customerId, String depositorName, String nickname, int expectedAmount,
-                        LocalDateTime orderedAt) {
+                        LocalDateTime orderedAt, LocalDateTime amountSetAt, boolean timeRule) {
+
+        public Payee(Long orderId, Long customerId, String depositorName, String nickname, int expectedAmount,
+                     LocalDateTime orderedAt) {
+            this(orderId, customerId, depositorName, nickname, expectedAmount, orderedAt, orderedAt, false);
+        }
     }
 
     /** 대조 대상은 아니지만 입금자 확인에 쓰는 주문 (이미 입금 확인됨 / 취소됨) */
     public record Known(Payee order, Relation relation) {
     }
 
-    /** 입금 1건 */
-    public record Deposit(Long rowId, String name, int amount) {
+    /** 입금 1건. depositedAt 은 입금 시각(시:분까지 알 때만, 모르면 null) */
+    public record Deposit(Long rowId, String name, int amount, LocalDateTime depositedAt) {
+
+        public Deposit(Long rowId, String name, int amount) {
+            this(rowId, name, amount, null);
+        }
     }
 
     public record Candidate(Long orderId, Evidence evidence, int amountDiff) {
@@ -100,7 +122,22 @@ public final class DepositMatcher {
                          List<Candidate> candidates, Related related) {
     }
 
-    public record Outcome(List<Result> results, List<Payee> unpaid) {
+    /**
+     * 확인 필요: 같은 고객의 미입금 주문 수·그 고객으로 보이는 입금 수, 1시간 규칙에 걸렸으면 입금 시각 − 금액 정해진 시각(분)
+     */
+    public record Check(int orders, int deposits, Long minutesApart) {
+
+        public Check(int orders, int deposits) {
+            this(orders, deposits, null);
+        }
+
+        public boolean duplicate() {
+            return orders > 1 || deposits > 1;
+        }
+    }
+
+    /** @param checks 입금 줄 id → 확인 필요 (자동 매칭·추천 중 같은 고객의 주문이나 입금이 여러 건인 것) */
+    public record Outcome(List<Result> results, List<Payee> unpaid, Map<Long, Check> checks) {
     }
 
     private static final Pattern DIGITS = Pattern.compile("\\d+");
@@ -154,7 +191,7 @@ public final class DepositMatcher {
                 continue;
             }
             Deposit d = deposits.get(i);
-            List<Candidate> withEvidence = sorted(candidates(d, targets, aliases, reserved), byId);
+            List<Candidate> withEvidence = sorted(candidates(d, targets, aliases, reserved), byId, d);
             if (withEvidence.isEmpty()) {
                 continue;
             }
@@ -216,7 +253,40 @@ public final class DepositMatcher {
             }
         }
         List<Payee> unpaid = targets.stream().filter(p -> !mentioned.contains(p.orderId())).toList();
-        return new Outcome(List.of(results), unpaid);
+        return new Outcome(List.of(results), unpaid, checks(results, deposits, targets, byId, aliases));
+    }
+
+    /**
+     * 확인 필요 (2026-10-26 사용자 "중복되는 건 확인 필요 표시는 다 해 줘야"): 자동 매칭·추천(이름 근거)이어도
+     * 같은 고객의 미입금 주문이 여러 건이거나 그 고객으로 보이는 입금이 여러 건이면 짝이 바뀌었을 수 있다
+     */
+    private static Map<Long, Check> checks(Result[] results, List<Deposit> deposits, List<Payee> targets,
+                                           Map<Long, Payee> byId, Map<String, Long> aliases) {
+        Map<Long, Integer> ordersByCustomer = new HashMap<>();
+        targets.forEach(p -> ordersByCustomer.merge(p.customerId(), 1, Integer::sum));
+        Map<Long, Integer> depositsByCustomer = new HashMap<>();
+        for (Deposit d : deposits) {
+            candidates(d, targets, aliases, Set.of()).stream().map(c -> byId.get(c.orderId()).customerId()).distinct()
+                    .forEach(customer -> depositsByCustomer.merge(customer, 1, Integer::sum));
+        }
+        Map<Long, Check> checks = new HashMap<>();
+        for (Result r : results) {
+            boolean byName = r.status() == Status.MATCHED
+                    || (r.status() == Status.SUGGESTED && r.evidence() != Evidence.AMOUNT_ONLY);
+            if (!byName || r.orderId() == null) {
+                continue;
+            }
+            Payee payee = byId.get(r.orderId());
+            int orders = ordersByCustomer.getOrDefault(payee.customerId(), 0);
+            int sameDeposits = depositsByCustomer.getOrDefault(payee.customerId(), 0);
+            // 1시간 규칙은 자동 매칭에만 (추천은 원래 판매자가 보고 확정한다)
+            Long gap = r.status() == Status.MATCHED ? minutesApart(r.deposit(), payee) : null;
+            Long late = gap != null && Math.abs(gap) > TIME_WINDOW.toMinutes() ? gap : null;
+            if (orders > 1 || sameDeposits > 1 || late != null) {
+                checks.put(r.deposit().rowId(), new Check(orders, sameDeposits, late));
+            }
+        }
+        return checks;
     }
 
     /**
@@ -233,17 +303,32 @@ public final class DepositMatcher {
         if (top.stream().map(c -> byId.get(c.orderId()).customerId()).distinct().count() != 1) {
             return List.of();
         }
-        return sorted(top.stream().filter(c -> c.amountDiff() == 0).toList(), byId);
+        return sorted(top.stream().filter(c -> c.amountDiff() == 0).toList(), byId, d);
     }
 
-    /** 근거가 강한 순 → 금액 차이가 작은 순 → 주문 시각 순 */
-    private static List<Candidate> sorted(List<Candidate> candidates, Map<Long, Payee> byId) {
+    /** 근거가 강한 순 → 금액 차이가 작은 순 → 입금 시각에 가까운 순(입금 시각을 알 때, 2026-10-27) → 주문 시각 순 */
+    private static List<Candidate> sorted(List<Candidate> candidates, Map<Long, Payee> byId, Deposit d) {
         return candidates.stream()
                 .sorted(Comparator.comparing(Candidate::evidence)
                         .thenComparingInt(c -> Math.abs(c.amountDiff()))
+                        .thenComparingLong(c -> timeDistance(d, byId.get(c.orderId())))
                         .thenComparing(c -> byId.get(c.orderId()).orderedAt(), Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(Candidate::orderId))
                 .toList();
+    }
+
+    /** 입금 시각과 금액이 정해진 시각의 차이(분, 절댓값). 비교할 수 없으면 0 (순서에 영향 없음) */
+    private static long timeDistance(Deposit d, Payee p) {
+        Long gap = minutesApart(d, p);
+        return gap == null ? 0 : Math.abs(gap);
+    }
+
+    /** 입금 시각 − 금액이 정해진 시각 (분). 입금 시각을 모르거나 댓글 주문이면 null */
+    static Long minutesApart(Deposit d, Payee p) {
+        if (d.depositedAt() == null || p.amountSetAt() == null || !p.timeRule()) {
+            return null;
+        }
+        return Duration.between(p.amountSetAt(), d.depositedAt()).toMinutes();
     }
 
     /** 근거 없는 입금이 이미 다른 주문(이번에 연결됨 / 입금 확인됨 / 취소됨)의 입금자인지 */

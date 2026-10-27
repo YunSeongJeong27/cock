@@ -60,7 +60,7 @@ public class SellerOrderService {
     }
 
     /**
-     * 고객 환불 신청이 기다리는 주문은 판매자가 [취소하고 환불]·[취소 안 함]으로 먼저 처리해야 한다 (2026-10-19).
+     * 고객 환불 신청이 기다리는 주문은 판매자가 [주문 취소 후 환불 진행]·[환불 신청 취소]로 먼저 처리해야 한다 (2026-10-19).
      * 그 전에 수령 체크·주문 변경·일반 취소를 하면 환불 기록이 사라지거나, 물건을 받은 주문이 환불로 취소될 수 있다
      */
     private static void requireNoRefundPending(CustomerOrder order) {
@@ -99,7 +99,7 @@ public class SellerOrderService {
 
     /**
      * 고객의 환불 신청 처리 (2026-10-18 사용자 결정: 판매자가 확인 후 취소). 판매자가 직접 계좌로 돈을 돌려보내야 하므로
-     * approve = 주문 취소 + "환불 필요"(판매자가 송금 후 "환불 완료"), reject = 취소 안 함 (주문 그대로, 고객 화면에 반려 표시)
+     * approve = 주문 취소 + "환불 필요"(판매자가 송금 후 "환불 완료"), reject = 환불 신청 취소 (주문 그대로, 고객 화면에 반려 표시)
      */
     @Transactional
     public SellerOrder decideRefund(Long sellerId, Long groupBuyId, Long orderId, boolean approve) {

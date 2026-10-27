@@ -21,7 +21,7 @@ public enum MailText {
     REFUND_REQUESTED("%d번 주문에 환불 신청이 들어왔습니다."),
     REFUND_ON_CONFIRMED("주문 확정된 주문입니다."),
     REFUND_ON_UNCONFIRMED("주문 확정 전 주문입니다. 입금 내역을 먼저 확인해 주세요."),
-    REFUND_HOW_TO("주문 목록에서 [취소하고 환불] 또는 [취소 안 함]을 눌러 주세요. 환불 계좌는 판매자 화면에서 볼 수 있습니다."),
+    REFUND_HOW_TO("주문 목록에서 [주문 취소 후 환불 진행] 또는 [환불 신청 취소]를 눌러 주세요. 환불 계좌는 판매자 화면에서 볼 수 있습니다."),
     AUTO_CLOSED("공구가 마감 시각이 돼 마감됐습니다."),
     AUTO_CLOSED_AT("마감 시각: %s");
 

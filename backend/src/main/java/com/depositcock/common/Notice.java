@@ -13,35 +13,42 @@ public enum Notice {
     // 공구·주문
     PAUSE_DEFAULT("현재 주문 집계 중입니다. 판매자에게 문의해 주시면 감사하겠습니다."),
     ORDER_CLOSED("주문이 마감되었습니다."),
-    CHANGED_ON_OTHER_DEVICE("(주문한 기기와 다른 기기에서 바꿈)"),
+    CHANGED_ON_OTHER_DEVICE("주문한 기기와 다른 기기에서 바꿈"),
 
     // 재고 알림 (화면 알림 칸과 메일이 같은 문장)
     STOCK_LEFT("'%s' 재고가 %d개 남았습니다."),
     STOCK_ALL_ORDERED("'%s' 준비 수량이 모두 주문됐습니다."),
     STOCK_OVER("'%s' 재고보다 %d개 더 주문됐습니다."),
-    STOCK_ABUSE_WARNING("악용하는 고객이 있을 수 있으니 계좌 입금내역 대조를 통해 확인하십시오."),
+    STOCK_ABUSE_WARNING("중복 주문 고객이 있을 수 있으니 계좌 입금내역 대조로 확인해 주세요."),
 
     // 입금 대조 결과 (상태 이름)
     MATCH_AUTO("자동 매칭"),
     MATCH_SUGGESTED("추천"),
-    MATCH_SUGGESTED_DIFF("추천 (금액 차이 %s원)"),
+    MATCH_SUGGESTED_DIFF("추천 · 금액 차이 %s원"),
     MATCH_AMBIGUOUS("후보 %d명 - 직접 선택"),
     MATCH_UNRELATED("관련 없는 입금"),
 
     // 입금 대조: 관련 없는 입금의 확인 안내. 첫 자리는 "3번 " 처럼 주문번호 (없으면 빈칸)
-    DEPOSIT_SAME_AS_LINKED("%s주문에 같은 입금자의 입금이 이미 연결됐습니다. 중복 입금인지 확인하세요."),
-    DEPOSIT_SAME_AS_PAID("%s주문(입금 확인됨)의 입금자와 같습니다. 중복 입금인지 확인하세요."),
+    // "중복 입금"은 같은 파일을 다시 올린 것으로 읽힐 수 있어 "고객이 두 번 보냈는지"로 (2026-10-26). 같은 파일을 다시 올린 입금은 건너뛰어서 이 안내가 안 뜬다
+    DEPOSIT_SAME_AS_LINKED("%s주문에 같은 입금자의 입금이 이미 연결됐습니다. 고객이 두 번 보냈는지 확인하세요."),
+    DEPOSIT_SAME_AS_PAID("입금 확인된 %s주문의 입금자와 같습니다. 고객이 두 번 보냈는지 확인하세요."),
     DEPOSIT_SAME_AS_CANCELLED("취소된 %s주문의 입금자와 같습니다. 환불이 필요한지 확인하세요."),
-    DEPOSIT_SAME_AS_SUGGESTED("%s주문에 같은 입금자의 다른 입금이 추천됐습니다. 나눠 보냈거나 중복 입금인지 확인하세요."),
+    DEPOSIT_SAME_AS_SUGGESTED("%s주문에 같은 입금자의 다른 입금이 추천됐습니다. 나눠 보냈거나 두 번 보냈는지 확인하세요."),
+    DEPOSIT_SAME_AS_MANUAL("거래내역 없이 입금 확정한 %s주문의 입금자와 같습니다. 같은 입금이면 이 주문에 연결하세요."),
+    MATCH_CHECK_NEEDED("같은 고객의 미입금 주문 %d건·입금 %d건이 있습니다. 짝이 맞는지 확인하세요."),
+    MATCH_CHECK_TIME("주문(또는 금액 변경) %s %s에 입금돼서 1시간이 넘게 차이 납니다. 맞는 입금인지 확인하세요."),
+    MATCH_TIME_GAP("%s %s %s 입금"),
+    ACCOUNT_DIFFERENT("거래내역서의 계좌(%s)가 공구에 설정한 입금 계좌(%s)와 다릅니다. 다시 한번 확인해 주세요."),
+    ACCOUNT_NOT_FOUND("거래내역서에서 \"%s\"를 찾지 못해 공구 입금 계좌와 같은 계좌인지 확인하지 못했습니다."),
 
     // 스크린샷 읽기
-    SCREENSHOT_DEPOSITS_READ("AI가 읽은 결과입니다. 화면과 비교해 이름·금액을 꼭 확인하세요.%s (오늘 남은 캡처 %d장)"),
-    SCREENSHOT_COMMENTS_READ("AI가 읽은 결과입니다. 작성자·내용을 확인하세요.%s (오늘 남은 캡처 %d장)"),
+    SCREENSHOT_DEPOSITS_READ("AI가 읽은 결과입니다. 화면과 비교해 이름·금액을 꼭 확인하세요.%s 오늘 남은 캡처는 %d장입니다."),
+    SCREENSHOT_COMMENTS_READ("AI가 읽은 결과입니다. 작성자·내용을 확인하세요.%s 오늘 남은 캡처는 %d장입니다."),
     SCREENSHOT_PAGES_FAILED(" %s번째 캡처는 읽지 못했습니다. 그 부분은 직접 입력해 주세요."),
-    CAPTURE_LIMIT_REACHED("오늘 캡처 한도(%d장)를 초과했습니다. 아래 표에 직접 입력해 주세요. (내일 다시 쓸 수 있습니다)"),
+    CAPTURE_LIMIT_REACHED("오늘 캡처 한도 %d장을 다 썼습니다. 아래 표에 직접 입력해 주세요. 내일 다시 쓸 수 있습니다."),
     CAPTURE_LIMIT_OVER("오늘 캡처 한도 초과: 남은 장수는 %d장인데 %d장을 올렸습니다. 장수를 줄여서 다시 올리거나 아래 표에 직접 입력해 주세요."),
-    VISION_NOT_CONFIGURED("스크린샷 글자 읽기(비전 AI)가 아직 설정되지 않았습니다. 아래 표에 직접 입력해 주세요. "
-            + "(관리자: 환경변수 APP_VISION_PROVIDER=anthropic, ANTHROPIC_API_KEY 설정)");
+    // 켜는 방법(환경변수 APP_VISION_PROVIDER·ANTHROPIC_API_KEY)은 판매자 화면에 쓰지 않고 README 에 둔다
+    VISION_NOT_CONFIGURED("스크린샷 글자 읽기가 아직 설정되지 않았습니다. 아래 표에 직접 입력해 주세요.");
 
     private final String format;
 

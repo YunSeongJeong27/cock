@@ -78,6 +78,11 @@ public class Seller extends BaseTimeEntity {
     @Column(nullable = false)
     private boolean commentFeatureEnabled;
 
+    /** 공구를 만든 뒤 뜨는 "제품 판매 TIP" 안내를 다시 보지 않기 (판매자 계정마다, 2026-10-26) */
+    @Setter
+    @Column(nullable = false)
+    private boolean salesTipHidden;
+
     @Setter
     private String defaultBankName;
     @Setter

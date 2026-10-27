@@ -74,7 +74,7 @@ class SellerOrderEditTest extends IntegrationTest {
     }
 
     private int remainingA(Opened g) throws Exception {
-        return read(mvc.perform(get("/api/public/g/" + g.token())).andReturn()).get("products").get(0).get("remaining").asInt();
+        return read(mvc.perform(get(g.base()).cookie(g.seller())).andReturn()).get("products").get(0).get("remaining").asInt();
     }
 
     @Test

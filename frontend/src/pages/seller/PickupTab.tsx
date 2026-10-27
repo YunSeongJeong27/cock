@@ -36,7 +36,7 @@ export default function PickupTab({ groupBuy, orders, reload }: Props) {
   return (
     <div>
       <div className="row mb">
-        <input type="text" placeholder="이름·닉네임·전화 뒷자리·동호수 검색" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1, minWidth: 180 }} />
+        <input type="text" placeholder="이름·닉네임·전화 뒷자리·동호수 검색" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: '1 1 280px', minWidth: 0 }} />
         {groupBuy.pickupPoints.length > 1 && (
           <select value={point} onChange={(e) => setPoint(e.target.value)} style={{ width: 150 }}>
             <option value="all">모든 지점</option>
@@ -60,7 +60,7 @@ export default function PickupTab({ groupBuy, orders, reload }: Props) {
             </div>
           </div>
           {refundPending(o) ? (
-            // 환불 신청이 기다리는 주문은 주문 목록에서 [취소하고 환불]·[취소 안 함]을 먼저 (2026-10-19)
+            // 환불 신청이 기다리는 주문은 주문 목록에서 [주문 취소 후 환불 진행]·[환불 신청 취소]를 먼저 (2026-10-19)
             <span className="small" style={{ color: 'var(--warn)', minWidth: 96, textAlign: 'right' }}>환불 신청 중<br />주문 목록에서 먼저 처리</span>
           ) : (
             <button className={`btn ${o.pickedUp ? 'ok' : ''}`} onClick={() => toggle(o)} style={{ minWidth: 96 }}>

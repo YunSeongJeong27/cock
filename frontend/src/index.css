@@ -16,6 +16,11 @@
   color: var(--text);
   background: var(--bg);
   line-height: 1.5;
+  /* 한글은 기본값이면 글자 단위로 줄이 바뀌어 "확인하세/요"처럼 단어가 잘린다. 띄어쓰기에서만 바꾸고,
+     한 단어가 칸보다 길 때만(링크·긴 이름) 단어 안에서 바꾼다 (2026-10-25 화면 점검).
+     anywhere 가 아니라 break-word: anywhere 는 표 칸의 최소 폭까지 줄여서 관리자 표의 이메일 칸이 몇 글자 폭으로 찌그러졌음 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); }
@@ -38,7 +43,8 @@ input[type=date].date-compact { width: 150px; padding: 8px; }
   padding-left: max(16px, calc((100% - 1200px) / 2 + 16px)); padding-right: max(16px, calc((100% - 1200px) / 2 + 16px));
   background: var(--card); border-bottom: 1px solid var(--line); flex-wrap: wrap; position: sticky; top: 0; z-index: 10; }
 .topbar.wider { padding-left: max(16px, calc((100% - 1440px) / 2 + 16px)); padding-right: max(16px, calc((100% - 1440px) / 2 + 16px)); }
-.topbar nav { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 0.95rem; }
+.topbar nav { display: flex; gap: 4px 14px; flex-wrap: wrap; align-items: center; font-size: 0.95rem; }
+.topbar nav a, .topbar nav button { white-space: nowrap; }
 .topbar nav a { color: var(--muted); }
 .topbar nav a.active { color: var(--text); font-weight: 700; }
 .brand { font-weight: 800; color: var(--text); font-size: 1.1rem; }
@@ -74,8 +80,10 @@ input[readonly] { background: var(--bg); color: var(--muted); }
 .check { display: flex; gap: 8px; align-items: center; margin: 6px 0; font-size: 0.95rem; }
 .check input { width: 18px; height: 18px; flex-shrink: 0; }
 
+/* 버튼 글자는 줄을 바꾸지 않는다 (좁으면 버튼째 다음 줄로) */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; border-radius: 8px;
-  border: 1px solid var(--line); background: #fff; color: var(--text); font-size: 0.95rem; cursor: pointer; font-weight: 600; }
+  border: 1px solid var(--line); background: #fff; color: var(--text); font-size: 0.95rem; cursor: pointer; font-weight: 600;
+  white-space: nowrap; flex-shrink: 0; }
 .btn:hover { background: #f3f4f6; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
@@ -95,10 +103,13 @@ button.link { background: none; border: none; color: var(--muted); cursor: point
 .receipt-total { border-top: 1px dashed var(--line); margin-top: 4px; padding-top: 6px; }
 .warn-box { background: var(--warn-weak); color: #7c4a03; padding: 10px 12px; border-radius: 8px; margin: 10px 0; font-size: 0.92rem; }
 
-.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
-.stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-.stat-label { color: var(--muted); font-size: 0.8rem; }
-.stat-value { font-size: 1.2rem; font-weight: 800; }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.stat-label { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+/* 숫자는 한 줄로 ("162,000/원"으로 나뉘지 않게). 긴 금액은 글자를 조금 줄인다 (Stat 의 long·xlong) */
+.stat-value { font-size: 1.2rem; font-weight: 800; white-space: nowrap; }
+.stat-value.long { font-size: 1.05rem; }
+.stat-value.xlong { font-size: 0.95rem; }
 .stat.ok .stat-value { color: var(--ok); }
 .stat.warn .stat-value { color: var(--warn); }
 .stat.danger .stat-value { color: var(--danger); }
@@ -110,8 +121,17 @@ button.link { background: none; border: none; color: var(--muted); cursor: point
 
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; background: var(--card); }
-th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: center; vertical-align: top; }
 th { background: #f9fafb; font-weight: 700; white-space: nowrap; }
+/*
+ * 표 정렬 (2026-10-26 사용자 "중앙정렬할 거면 다 하고"): 머리줄·칸 모두 가운데. 숫자·금액(.right·.num)도 가운데.
+ * 펼친 상세와 칸 안에 입력하는 글자는 왼쪽. 폰 카드(table.stack)는 아래 미디어 쿼리에서 왼쪽
+ */
+th.right, td.right { text-align: center; }
+td { font-variant-numeric: tabular-nums; }
+tr:not(.detail):not(.stack-detail) > td > .row { justify-content: center; }
+td input[type=text], td input[type=number], td textarea { text-align: left; }
+tr.detail td, tr.stack-detail td { text-align: left; }
 tr.dim td { color: var(--muted); }
 
 .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
@@ -124,6 +144,8 @@ tr.dim td { color: var(--muted); }
 .badge-SUGGESTED { background: var(--warn-weak); color: #92400e; }
 .badge-AMBIGUOUS { background: #ede9fe; color: #5b21b6; }
 .badge-UNRELATED { background: #e5e7eb; color: #374151; }
+/* 대조 결과 "확인 필요": 같은 고객의 주문·입금이 여러 건 (2026-10-26) */
+.badge-CHECK { background: var(--danger-weak); color: #991b1b; }
 .badge-DRAFT { background: #e5e7eb; color: #374151; }
 .badge-OPEN { background: var(--ok-weak); color: #166534; }
 .badge-CLOSED { background: var(--danger-weak); color: #991b1b; }
@@ -138,16 +160,44 @@ tr.dim td { color: var(--muted); }
 .qty button { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font-size: 1.2rem; cursor: pointer; }
 .qty input { width: 56px; text-align: center; }
 .segmented { display: flex; gap: 8px; flex-wrap: wrap; }
-.segmented label { flex: 1; min-width: 120px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; cursor: pointer; display: flex; gap: 8px; align-items: center; background: #fff; }
+/* 같은 폭으로 나란히, 글자가 다 안 들어가면 줄을 바꾸지 않고 칸째 아래로 */
+.segmented label { flex: 1 1 0; min-width: max-content; white-space: nowrap; border: 1px solid var(--line); border-radius: 8px; padding: 10px; cursor: pointer; display: flex; gap: 8px; align-items: center; background: #fff; }
 .segmented label.on { border-color: var(--primary); background: var(--primary-weak); }
 
 .hero { text-align: center; padding: 48px 16px 24px; }
 .hero h1 { font-size: 1.9rem; }
 .hero p { color: var(--muted); }
+/* 안내 창 (공구 만든 뒤 "제품 판매 TIP", 2026-10-26) */
+.modal-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(17, 24, 39, 0.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.modal { background: var(--card); border-radius: 14px; padding: 20px; width: 100%; max-width: 440px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); }
+.modal h3 { margin: 0 0 10px; }
+.modal.modal-wide { max-width: 560px; max-height: calc(100vh - 32px); overflow-y: auto; }
+.criteria-item { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px solid var(--line); }
+.criteria-item .badge { justify-self: start; }
+.modal-foot { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
+/* 은행 헤더(컬럼)명 설정 방법 창 (2026-10-27) */
+.modal.modal-help { max-width: 860px; }
+.modal h4 { margin: 16px 0 6px; font-size: 14px; }
+.howto-steps { margin: 0 0 8px; padding-left: 20px; }
+.howto-steps li { margin: 3px 0; }
+.howto-image { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; }
+/* 토스 모바일 파일다운 예시: 단계 그림을 가로로 넘겨 봄 (2026-10-27) */
+.guide-steps { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+.guide-step { flex: 0 0 132px; margin: 0; }
+.guide-step img { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); }
+.guide-step figcaption { margin-top: 6px; font-size: 12px; line-height: 1.4; }
+.tip-example { background: var(--primary-weak); border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+.link-button { background: none; border: none; padding: 4px 0; color: var(--muted); font-size: 0.88rem; text-decoration: underline; cursor: pointer; }
+/* 첫 화면 무료 안내 강조 (2026-10-26) */
+.hero .promo { display: inline-block; margin-top: 20px; padding: 7px 16px; border-radius: 999px; background: var(--primary-weak); color: var(--primary); font-weight: 700; font-size: 1.05rem; }
+.hero .promo + p { margin-top: 8px; }
 .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 
 .sticky-bottom { position: sticky; bottom: 0; background: var(--card); padding: 12px 0; border-top: 1px solid var(--line); }
-.chip { display: inline-block; background: var(--primary-weak); color: #1e3a8a; border-radius: 6px; padding: 2px 8px; font-size: 0.82rem; margin: 2px; }
+.chip { display: inline-block; background: var(--primary-weak); color: #1e3a8a; border-radius: 6px; padding: 2px 8px; font-size: 0.82rem; margin: 2px; white-space: nowrap; }
+/* 값 아래 작은 보조 줄 (그리드·폰 카드 공통) */
+.sub { display: block; font-size: 0.78rem; color: var(--muted); }
+.sub.warn { color: var(--warn); }
 .edit-box { border-top: 1px solid var(--line); padding-top: 12px; }
 .edit-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
 .edit-item { display: flex; gap: 10px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
@@ -163,12 +213,11 @@ table.grid th, table.grid td { padding: 7px 10px; vertical-align: middle; }
 table.grid thead th { position: sticky; top: 0; z-index: 2; background: #f3f4f6; }
 table.grid th.sortable { cursor: pointer; user-select: none; }
 table.grid th.sortable:hover { background: #e5e7eb; }
-table.grid .num { text-align: right; }
+table.grid .num { text-align: center; }
 table.grid tbody tr.grid-row:hover td { background: #f9fafb; }
 table.grid tbody tr.open td { background: var(--primary-weak); }
 table.grid tr.detail td { white-space: normal; background: #fafafa; }
 table.grid tfoot td { position: sticky; bottom: 0; z-index: 2; background: #f3f4f6; font-weight: 700; border-top: 1px solid var(--line); }
-table.grid .sub { display: block; font-size: 0.78rem; color: var(--muted); }
 /* 가로로 넘칠 때 주문번호 열은 왼쪽에 고정, 펼친 상세는 보이는 폭 안에 */
 table.grid .pin-1, table.grid .pin-2 { position: sticky; z-index: 1; background: var(--card); }
 table.grid .pin-1 { left: 0; width: 48px; min-width: 48px; max-width: 48px; }
@@ -180,10 +229,15 @@ table.grid .warn { color: var(--warn); }
 .mapping-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
 .preview-table td { font-size: 0.8rem; white-space: nowrap; }
 
+input.capture-limit { width: 110px; }
+
 /* 관리자 표: PC 에서는 한 줄, 폰에서는 아래 카드 모양 */
 @media (min-width: 641px) {
   .admin-table { min-width: 1080px; }
   .show-mobile { display: none; }
+  /* PC 표의 버튼 칸: 버튼끼리 붙지 않게 (폰 카드에서는 flex gap 이 띄움) */
+  td.stack-action { white-space: nowrap; }
+  td.stack-action .btn + .btn { margin-left: 6px; }
 }
 
 /*
@@ -196,20 +250,24 @@ table.grid .warn { color: var(--warn); }
   .stats { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
   .stat { padding: 8px 10px; }
   .stat-value { font-size: 1.05rem; }
+  .stat-value.long { font-size: 0.95rem; }
+  .stat-value.xlong { font-size: 0.85rem; }
   table.stack, table.stack tbody, table.stack tr, table.stack td { display: block; width: 100%; }
   table.stack { background: transparent; }
   table.stack thead { display: none; }
   table.stack tr { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
   table.stack tr.stack-detail { margin-top: -8px; border-top: none; border-radius: 0 0 10px 10px; }
   table.stack td { border: none; padding: 3px 0; text-align: left; }
+  table.stack tr:not(.stack-detail) > td > .row { justify-content: flex-start; }
   table.stack td.hide-mobile { display: none; }
   table.stack td[data-label] { display: flex; gap: 10px; align-items: baseline; }
-  table.stack td[data-label]::before { content: attr(data-label); flex: 0 0 76px; color: var(--muted); font-size: 0.8rem; }
+  table.stack td[data-label]::before { content: attr(data-label); flex: 0 0 84px; color: var(--muted); font-size: 0.8rem; }
   table.stack td.stack-title { font-size: 1rem; padding-bottom: 6px; }
   table.stack td.stack-action { padding-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
   table.stack td.stack-action:empty { display: none; }
   table.stack td[data-label]:empty { display: none; }
   table.stack td input[type=text], table.stack td input[type=number], table.stack td input[type=date], table.stack td select { flex: 1; min-width: 0; width: auto !important; }
   table.stack td .edit-item input[type=number] { flex: 0 0 84px; width: 84px !important; }
+  table.stack td input.capture-limit { flex: 0 0 110px; width: 110px !important; }
   table.stack td .edit-fields input, table.stack td .edit-fields select { width: 100% !important; }
 }

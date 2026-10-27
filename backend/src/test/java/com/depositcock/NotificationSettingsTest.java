@@ -112,6 +112,18 @@ class NotificationSettingsTest extends IntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /** 공구를 만든 뒤 뜨는 "제품 판매 TIP": 다시 보지 않기는 판매자 계정에 저장되고 다른 판매자에게는 영향 없음 (2026-10-26) */
+    @Test
+    void salesTipCanBeHiddenPerSeller() throws Exception {
+        Cookie seller = signup(uniqueEmail());
+        Cookie other = signup(uniqueEmail());
+        mvc.perform(get("/api/me").cookie(seller)).andExpect(jsonPath("$.salesTipHidden").value(false));
+        mvc.perform(post("/api/seller/sales-tip/hide").cookie(seller)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.salesTipHidden").value(true));
+        mvc.perform(get("/api/me").cookie(seller)).andExpect(jsonPath("$.salesTipHidden").value(true));
+        mvc.perform(get("/api/me").cookie(other)).andExpect(jsonPath("$.salesTipHidden").value(false));
+    }
+
     @Test
     void defaultsAreEssentialOnlyAndSellerCanToggleEach() throws Exception {
         Cookie seller = signup(uniqueEmail());
@@ -167,7 +179,7 @@ class NotificationSettingsTest extends IntegrationTest {
         assertThat(refund.type()).isEqualTo(NotificationType.MAIL_REFUND_REQUEST);
         assertThat(refund.headline()).isEqualTo("1번 주문에 환불 신청이 들어왔습니다.");
         assertThat(refund.lines()).containsExactly("상품 2개 · 2,000원", "주문 확정 전 주문입니다. 입금 내역을 먼저 확인해 주세요.",
-                "주문 목록에서 [취소하고 환불] 또는 [취소 안 함]을 눌러 주세요. 환불 계좌는 판매자 화면에서 볼 수 있습니다.");
+                "주문 목록에서 [주문 취소 후 환불 진행] 또는 [환불 신청 취소]를 눌러 주세요. 환불 계좌는 판매자 화면에서 볼 수 있습니다.");
         // 메일에는 이름·연락처·계좌를 넣지 않는다
         assertThat(String.join(" ", refund.lines())).doesNotContain("김알림").doesNotContain("8900").doesNotContain("110123456789");
     }
@@ -192,7 +204,7 @@ class NotificationSettingsTest extends IntegrationTest {
         assertThat(sent.get(0).lines()).containsExactly("상품 1개 · 1,000원");
         assertThat(sent.get(1).headline()).isEqualTo("1번 주문을 고객이 수정했습니다.");
         // 테스트는 주문한 기기 쿠키 없이 바꿨으므로 판매자 기록과 같은 표시가 붙는다
-        assertThat(sent.get(1).lines()).containsExactly("상품 1→3개, 금액 1,000원→3,000원, (주문한 기기와 다른 기기에서 바꿈)");
+        assertThat(sent.get(1).lines()).containsExactly("상품 1→3개, 금액 1,000원→3,000원, 주문한 기기와 다른 기기에서 바꿈");
         assertThat(sent.get(2).headline()).isEqualTo("1번 주문을 고객이 취소했습니다.");
         assertThat(sent.get(3).headline()).isEqualTo("2번 새 주문이 들어왔습니다.");
     }

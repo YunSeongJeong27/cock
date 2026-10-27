@@ -105,7 +105,7 @@ export default function ScreenshotDeposits({ groupBuy, onSaved }: { groupBuy: Gr
               <div className="row mt">
                 <button className="btn small" onClick={() => setRows([...rows, { name: '', amount: 0, datetime: null, type: '입금', duplicateSuspected: false, imageIndex: 0 }])}>+ 줄 추가</button>
                 <span className="grow muted small">합계 {won(rows.reduce((s, r) => s + (r.amount || 0), 0))} / {rows.length}건</span>
-                <button className="btn primary" disabled={busy || rows.some(hasUnread)} onClick={save}>검수 완료, 저장</button>
+                <button className="btn primary" disabled={busy || rows.some(hasUnread)} onClick={save}>검수 완료하고 저장</button>
               </div>
               {rows.some(hasUnread) && <div className="small" style={{ color: 'var(--danger)' }}>{T.fixUnreadFirst}</div>}
             </div>

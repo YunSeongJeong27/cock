@@ -156,7 +156,7 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
       case 'NEW': return c.quantity > 0 ? <span className="chip">새로 추가</span> : <span className="small muted">수량을 정하면 추가</span>
       case 'SAME': return <span className="small muted">주문 {c.orderNo}번 ✓</span>
       case 'DIFFERENT': return <span className="small" style={{ color: 'var(--warn)' }}>{T.appliedDifferent(c.orderNo, c.orderQuantity)}</span>
-      case 'CANCELLED': return <span className="small muted">주문 {c.orderNo}번 취소됨 (다시 안 만듦)</span>
+      case 'CANCELLED': return <span className="small muted">주문 {c.orderNo}번 취소됨 · 다시 만들지 않음</span>
     }
   }
 
@@ -185,6 +185,7 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
         </div>
         <label className="field mt"><span>{T.pasteLabel}</span>
           <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={'꼭지맘 217-1505 | 1\n205-1205 | 1 7시이후 픽업\n망고맘 | 2박스요'} />
+          <span className="muted small" style={{ fontWeight: 400 }}>{T.pasteHint}</span>
         </label>
         <button className="btn" disabled={!text.trim() || busy} onClick={parseText}>텍스트 읽기</button>
       </div>
@@ -218,7 +219,7 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
           </div>
           <div className="row mt">
             <button className="btn small" onClick={() => setDrafts([...drafts, { author: '', content: '', duplicateSuspected: false }])}>+ 줄 추가</button>
-            <button className="btn primary" disabled={busy || drafts.some((d) => d.author.includes('[?]') || d.content.includes('[?]'))} onClick={() => saveDrafts(files ? 'SCREENSHOT' : 'TEXT')}>검수 완료, 댓글 저장</button>
+            <button className="btn primary" disabled={busy || drafts.some((d) => d.author.includes('[?]') || d.content.includes('[?]'))} onClick={() => saveDrafts(files ? 'SCREENSHOT' : 'TEXT')}>검수 완료하고 댓글 저장</button>
             <button className="btn" onClick={() => { setDrafts(null); setSkipped([]) }}>취소</button>
           </div>
         </div>
@@ -237,14 +238,14 @@ export default function CommentsTab({ groupBuy, reload }: { groupBuy: GroupBuy; 
             </div>
             <p className="muted small">
               {product ? `${product.name} ${won(product.unitPrice)} 기준` : ''} · 고객 {data.customers.length}명 · {data.totalQuantity}개
-              {data.reviewCount > 0 && <b style={{ color: 'var(--warn)' }}> · 확인 필요 {data.reviewCount}개 (수량을 정하기 전까지 합계에서 빠짐)</b>}
+              {data.reviewCount > 0 && <b style={{ color: 'var(--warn)' }}> · {T.reviewExcluded(data.reviewCount)}</b>}
               {data.appliedOrderCount > 0 && ` · 반영된 댓글 주문 ${data.appliedOrderCount}건`}
               {toCheck > 0 && <b style={{ color: 'var(--warn)' }}> · 반영된 주문과 다른 손님 {toCheck}명</b>}
             </p>
             <p className="muted small">{T.reapplyHelp}</p>
             <div className="table-wrap">
               <table className="stack">
-                <thead><tr><th>고객(닉네임)</th><th className="right">수량</th><th className="right">금액</th><th>메모</th><th>주문 반영</th></tr></thead>
+                <thead><tr><th>닉네임</th><th className="right">수량</th><th className="right">금액</th><th>메모</th><th>주문 반영</th></tr></thead>
                 <tbody>
                   {data.customers.map((c) => (
                     <tr key={c.customerKey}>

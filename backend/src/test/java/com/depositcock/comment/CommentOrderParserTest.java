@@ -46,7 +46,23 @@ class CommentOrderParserTest {
     @Test
     void memoIsNotCut() {
         assertThat(CommentOrderParser.parse("1 7시이후 픽업").memo()).isEqualTo("7시이후 픽업");
-        assertThat(CommentOrderParser.parse("2박스요").memo()).isEqualTo("요");
+    }
+
+    /** 수량 뒤에 남던 주문 말끝이 메모로 들어가던 문제 (전에는 "1박스요" → 메모 "요") */
+    @ParameterizedTest(name = "{0} → 메모 [{1}]")
+    @CsvSource(delimiter = '|', value = {
+            "1박스요|",
+            "2박스요^^|",
+            "2박스 주세요|",
+            "4팩 예약합니다|",
+            "1개만요 부탁드려요~|",
+            "1박스요~~입금했어요|입금했어요",
+            "간장닭갈비1세트요 입금했어요|간장닭갈비 입금했어요",
+            "1개 7시 이후 픽업 부탁드려요|7시 이후 픽업",
+            "2개요 (7시 픽업)|7시 픽업",
+    })
+    void memoWithoutOrderEndings(String content, String memo) {
+        assertThat(CommentOrderParser.parse(content).memo()).as(content).isEqualTo(memo == null ? "" : memo);
     }
 
     /** 알려진 한계 (정리본 8장): 날짜 "10/8" 을 합산 18 로 오인 → 30 초과 아니므로 ORDER 18 */

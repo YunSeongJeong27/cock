@@ -125,7 +125,7 @@ class CancelRefundPauseTest extends IntegrationTest {
         assertThat(o.get("refundRequestedAt").isNull()).isFalse();
         mvc.perform(get(g.sellerBase() + "/detail").cookie(g.seller())).andExpect(jsonPath("$.dashboard.refundRequestCount").value(1));
 
-        // 판매자 [취소 안 함]: 주문 그대로, 고객 화면 "반려", 계좌 삭제, 다시 신청 불가
+        // 판매자 [환불 신청 취소]: 주문 그대로, 고객 화면 "반려", 계좌 삭제, 다시 신청 불가
         long orderId = o.get("id").asLong();
         mvc.perform(post(g.sellerBase() + "/orders/" + orderId + "/refund-request/reject").cookie(g.seller()))
                 .andExpect(status().isOk())
@@ -141,7 +141,7 @@ class CancelRefundPauseTest extends IntegrationTest {
 
     /**
      * 환불 신청 중인 주문은 판매자가 처리할 때까지 그대로: 같은 번호로 다시 주문하면 새 주문으로 쌓이고, 수정·바로 취소는 안 됨.
-     * 판매자가 [취소하고 환불]하면 그 주문은 취소(환불 필요)로 남고 새 주문은 그대로 (2026-10-19)
+     * 판매자가 [주문 취소 후 환불 진행]하면 그 주문은 취소(환불 필요)로 남고 새 주문은 그대로 (2026-10-19)
      */
     @Test
     void reorderWhileRefundPendingAddsNewOrder() throws Exception {
@@ -166,7 +166,7 @@ class CancelRefundPauseTest extends IntegrationTest {
         mvc.perform(withJson(post(g.pub() + "/orders").cookie(device), again))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.replaceOrderNo").isEmpty())
-                .andExpect(jsonPath("$.warnings[0]").value("이 번호로 환불 신청한 주문이 있어, 이번 주문은 새 주문으로 추가됩니다."));
+                .andExpect(jsonPath("$.warnings[0]").value("이 번호로 환불 신청한 주문이 있어 이번 주문은 새 주문으로 추가됩니다."));
         again.put("acknowledgeWarnings", true);
         mvc.perform(withJson(post(g.pub() + "/orders").cookie(device), again))
                 .andExpect(status().isOk())

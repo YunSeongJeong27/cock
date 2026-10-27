@@ -15,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -84,8 +85,8 @@ class ScreenApiTest extends IntegrationTest {
         order(g, "010-3000-0011", "박세나", 1);
         assertThat(getJson(g, g.base() + "/deposits/match").get("uploads")).isEmpty();
 
-        upload(g, "입금자명,입금액\n박세나,1000\n관련없음,500\n");
-        upload(g, "입금자명,입금액\n또다른,700\n");
+        upload(g, "적요,거래 금액,거래 일시\n박세나,1000\n관련없음,500\n");
+        upload(g, "적요,거래 금액,거래 일시\n또다른,700\n");
         JsonNode match = getJson(g, g.base() + "/deposits/match");
         long row = match.get("rows").get(0).get("rowId").asLong();
         long orderId = match.get("rows").get(0).get("order").get("orderId").asLong();
@@ -103,14 +104,14 @@ class ScreenApiTest extends IntegrationTest {
         assertThat(uploads.get(1).get("usedCount").asInt()).isEqualTo(1);
     }
 
-    /** 은행 열 설정: 열 이름 후보·저장된 열 설정·입금자 별칭이 한 응답에. 열 설정·별칭은 따로 읽은 것과 같다 */
+    /** 은행 헤더(컬럼) 설정: 은행별 헤더(컬럼)명·입금자 별칭이 한 응답에. 별칭은 따로 읽은 것과 같다 */
     @Test
-    void bankSettingsHasDefaultsPresetsAndAliases() throws Exception {
+    void bankSettingsHasBankHeadersAndAliases() throws Exception {
         Opened g = open();
-        mvc.perform(withJson(post("/api/seller/bank-columns/presets").cookie(g.seller()),
-                Map.of("name", "우리은행", "nameColumn", "기재내용", "amountColumn", "맡기신금액"))).andExpect(status().isOk());
+        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(g.seller()), Map.of("bankName", "우리은행", "fileType", "EXCEL",
+                "nameColumn", "기재내용", "amountColumn", "맡기신금액", "dateColumn", "거래일시"))).andExpect(status().isOk());
         order(g, "010-3000-0021", "최다솜", 1);
-        upload(g, "입금자명,입금액\n다솜맘,1000\n");
+        upload(g, "적요,거래 금액,거래 일시\n다솜맘,1000\n");
         JsonNode match = getJson(g, g.base() + "/deposits/match");
         long row = match.get("rows").get(0).get("rowId").asLong();
         long orderId = match.get("openOrders").get(0).get("orderId").asLong();
@@ -118,10 +119,23 @@ class ScreenApiTest extends IntegrationTest {
                 Map.of("items", List.of(Map.of("rowId", row, "orderId", orderId))))).andExpect(status().isOk());
 
         JsonNode settings = getJson(g, "/api/seller/bank-settings");
-        assertThat(settings.get("defaults").get("name").toString()).contains("입금자명", "적요");
-        assertThat(settings.get("defaults").get("amount")).isNotEmpty();
-        assertThat(settings.get("presets")).isEqualTo(getJson(g, "/api/seller/bank-columns/presets"));
-        assertThat(settings.get("presets").get(0).get("name").asText()).isEqualTo("우리은행");
+        JsonNode banks = settings.get("banks");
+        // 운영자 은행(토스뱅크 기본·KB국민은행) 다음에 판매자가 추가한 은행
+        assertThat(banks.get(0).get("bankName").asText()).isEqualTo("토스뱅크");
+        assertThat(banks.get(0).get("defaultBank").asBoolean()).isTrue();
+        assertThat(banks.get(0).get("source").asText()).isEqualTo("SYSTEM");
+        assertThat(banks.get(0).get("fileType").asText()).isEqualTo("PDF");
+        assertThat(banks.get(0).get("values").get("nameColumn").asText()).isEqualTo("거래내용");
+        // 같은 은행의 엑셀 값은 따로 (토스 엑셀은 입금자명이 "적요")
+        assertThat(banks.get(1).get("bankName").asText()).isEqualTo("토스뱅크");
+        assertThat(banks.get(1).get("fileType").asText()).isEqualTo("EXCEL");
+        assertThat(banks.get(1).get("values").get("nameColumn").asText()).isEqualTo("적요");
+        assertThat(banks.get(2).get("bankName").asText()).isEqualTo("KB국민은행");
+        assertThat(banks.get(2).get("fileType").asText()).isEqualTo("PDF");
+        JsonNode mine = banks.get(banks.size() - 1);
+        assertThat(mine.get("bankName").asText()).isEqualTo("우리은행");
+        assertThat(mine.get("source").asText()).isEqualTo("CUSTOM");
+        assertThat(mine.get("original").isNull()).isTrue();
         assertThat(settings.get("aliases")).isEqualTo(getJson(g, "/api/seller/aliases"));
         assertThat(settings.get("aliases").get(0).get("depositorName").asText()).isEqualTo("다솜맘");
     }

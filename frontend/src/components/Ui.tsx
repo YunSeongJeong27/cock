@@ -42,10 +42,13 @@ export function CopyButton({ text, label = '복사' }: { text: string; label?: s
 }
 
 export function Stat({ label, value, tone }: { label: string; value: ReactNode; tone?: 'ok' | 'warn' | 'danger' }) {
+  // 숫자는 한 줄로 두므로 "1,620,000원"처럼 긴 값은 글자를 줄여 칸 안에 넣는다
+  const length = typeof value === 'string' || typeof value === 'number' ? String(value).length : 0
+  const size = length >= 10 ? ' xlong' : length >= 8 ? ' long' : ''
   return (
     <div className={`stat ${tone ?? ''}`}>
       <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
+      <div className={`stat-value${size}`}>{value}</div>
     </div>
   )
 }

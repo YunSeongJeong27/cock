@@ -259,4 +259,82 @@ class DepositMatcherTest {
         assertThat(o.results().get(0).related().relation()).isEqualTo(DepositMatcher.Relation.SUGGESTED);
         assertThat(o.results().get(0).related().orderId()).isEqualTo(1L);
     }
+
+    /** 같은 고객의 주문·입금이 여러 건이면 자동 매칭이어도 확인 필요 (2026-10-26) */
+    @Test
+    void sameCustomerManyOrdersOrDepositsNeedsCheck() {
+        // 같은 고객 주문 2건 + 입금 2건 → 둘 다 자동 매칭, 둘 다 확인 필요
+        Outcome two = DepositMatcher.match(
+                List.of(payee(1, "c-dup", "김중복", null, 3800), payee(2, "c-dup", "김중복", null, 3800)),
+                List.of(new Deposit(10L, "김중복", 3800), new Deposit(11L, "김중복", 3800)), Map.of());
+        assertThat(two.results()).extracting(r -> r.status()).containsOnly(Status.MATCHED);
+        assertThat(two.checks()).containsOnlyKeys(10L, 11L);
+        assertThat(two.checks().get(10L)).isEqualTo(new DepositMatcher.Check(2, 2));
+
+        // 주문 1건 + 입금 2건 → 매칭된 1건도 확인 필요
+        Outcome extra = DepositMatcher.match(List.of(payee(3, "c-one", "박한번", null, 5000)),
+                List.of(new Deposit(20L, "박한번", 5000), new Deposit(21L, "박한번", 5000)), Map.of());
+        Long matchedRow = extra.results().stream().filter(r -> r.status() == Status.MATCHED).findFirst().orElseThrow()
+                .deposit().rowId();
+        assertThat(extra.checks()).containsOnlyKeys(matchedRow);
+
+        // 주문 1건 + 입금 1건 → 확인 필요 없음
+        Outcome single = DepositMatcher.match(List.of(payee(4, "c-solo", "이혼자", null, 7000)),
+                List.of(new Deposit(30L, "이혼자", 7000)), Map.of());
+        assertThat(single.checks()).isEmpty();
+    }
+
+    private static Payee timed(long id, String customer, String depositor, int amount, LocalDateTime orderedAt,
+                               LocalDateTime amountSetAt) {
+        return new Payee(id, cid(customer), depositor, null, amount, orderedAt, amountSetAt, true);
+    }
+
+    /**
+     * 1시간 규칙 (2026-10-27): 자동 매칭이어도 입금 시각이 금액이 정해진 시각(주문 또는 금액 변경)과 1시간 넘게 차이 나면 확인 필요.
+     * 입금 시각을 모르거나(날짜만) 댓글 주문이면 보지 않는다
+     */
+    @Test
+    void depositMoreThanAnHourFromAmountSetNeedsCheck() {
+        Outcome within = DepositMatcher.match(List.of(timed(1, "t1", "김정시", 3000, T, T)),
+                List.of(new Deposit(10L, "김정시", 3000, T.plusMinutes(60))), Map.of());
+        assertThat(within.results().get(0).status()).isEqualTo(Status.MATCHED);
+        assertThat(within.checks()).isEmpty();
+
+        Outcome late = DepositMatcher.match(List.of(timed(2, "t2", "박늦음", 3000, T, T)),
+                List.of(new Deposit(20L, "박늦음", 3000, T.plusMinutes(61))), Map.of());
+        assertThat(late.results().get(0).status()).isEqualTo(Status.MATCHED);
+        assertThat(late.checks().get(20L)).isEqualTo(new DepositMatcher.Check(1, 1, 61L));
+        assertThat(late.checks().get(20L).duplicate()).isFalse();
+
+        Outcome early = DepositMatcher.match(List.of(timed(3, "t3", "이먼저", 3000, T, T)),
+                List.of(new Deposit(30L, "이먼저", 3000, T.minusMinutes(90))), Map.of());
+        assertThat(early.checks().get(30L).minutesApart()).isEqualTo(-90L);
+
+        // 금액을 바꿨으면 바꾼 시각 기준
+        Outcome changed = DepositMatcher.match(List.of(timed(4, "t4", "최변경", 5000, T, T.plusHours(5))),
+                List.of(new Deposit(40L, "최변경", 5000, T.plusHours(5).plusMinutes(10))), Map.of());
+        assertThat(changed.checks()).isEmpty();
+
+        // 입금 시각을 모름 / 댓글 주문(timeRule false)
+        Outcome noTime = DepositMatcher.match(List.of(timed(5, "t5", "정날짜", 3000, T, T)),
+                List.of(new Deposit(50L, "정날짜", 3000)), Map.of());
+        assertThat(noTime.checks()).isEmpty();
+        Outcome comment = DepositMatcher.match(List.of(new Payee(6L, cid("t6"), "한댓글", null, 3000, T, T, false)),
+                List.of(new Deposit(60L, "한댓글", 3000, T.plusDays(1))), Map.of());
+        assertThat(comment.checks()).isEmpty();
+    }
+
+    /** 같은 고객의 주문이 여러 건이면 입금 시각에 가까운 주문부터 맺는다 (2026-10-27) */
+    @Test
+    void sameCustomerOrdersAreMatchedByNearestTime() {
+        Outcome o = DepositMatcher.match(
+                List.of(timed(1, "near", "김두번", 3800, T, T), timed(2, "near", "김두번", 3800, T.plusHours(3), T.plusHours(3))),
+                List.of(new Deposit(10L, "김두번", 3800, T.plusHours(3).plusMinutes(5)),
+                        new Deposit(11L, "김두번", 3800, T.plusMinutes(5))), Map.of());
+        Map<Long, Long> orderByRow = new java.util.HashMap<>();
+        o.results().forEach(r -> orderByRow.put(r.deposit().rowId(), r.orderId()));
+        assertThat(orderByRow).containsEntry(10L, 2L).containsEntry(11L, 1L);
+        // 같은 고객 주문 2건·입금 2건이라 둘 다 확인 필요 (시각은 1시간 안이라 시각 안내는 없음)
+        assertThat(o.checks().get(10L)).isEqualTo(new DepositMatcher.Check(2, 2, null));
+    }
 }

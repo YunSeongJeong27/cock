@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { api, errorMessage, itemsText, won } from '../../api'
 import { ErrorBox } from '../../components/Ui'
+import { josa } from '../../texts/common'
 import { sellerOrderText as T } from '../../texts/sellerOrders'
 import type { GroupBuy, PaymentMethod, ReceiveMethod, SellerOrder } from '../../types'
 
@@ -134,8 +135,9 @@ export default function OrderEditForm({ groupBuy, order, onSaved, onClose }: Pro
             </select>
           </label>
         )}
-        <label className="field"><span>입금자명{order.source === 'COMMENT' && ' (모르면 비워 두기)'}</span>
-          <input type="text" value={form.depositorName} onChange={(e) => set('depositorName', e.target.value)} />
+        <label className="field"><span>입금자명</span>
+          <input type="text" value={form.depositorName} onChange={(e) => set('depositorName', e.target.value)}
+            placeholder={order.source === 'COMMENT' ? T.depositorUnknownHint : undefined} />
         </label>
         <label className="field"><span>닉네임</span>
           <input type="text" value={form.nickname} onChange={(e) => set('nickname', e.target.value)} />
@@ -171,7 +173,7 @@ export default function OrderEditForm({ groupBuy, order, onSaved, onClose }: Pro
 
       <div className="mt">
         <b>변경 후 금액 {won(total)}</b>
-        {shippingFee > 0 && <span className="small muted"> (상품 {won(itemsAmount)} + 배송비 {won(shippingFee)})</span>}
+        {shippingFee > 0 && <span className="small muted"> · 상품 {won(itemsAmount)} + 배송비 {won(shippingFee)}</span>}
         {total !== order.expectedAmount && <span className="small muted"> · 지금 {won(order.expectedAmount)}</span>}
       </div>
       <p className="small muted">
@@ -187,11 +189,11 @@ export default function OrderEditForm({ groupBuy, order, onSaved, onClose }: Pro
   )
 }
 
-/** 판매자가 댓글에 남길 답글 예시 (판매자가 고쳐서 쓴다) */
+/** 판매자가 댓글에 남길 답글 예시. 판매자가 고쳐서 쓴다 */
 export function changeReply(o: SellerOrder): string {
   const who = o.nickname || o.depositorName || '고객'
   const items = itemsText(o.items)
-  const head = `${who}님, 주문을 ${items}(으)로 변경했어요.`
+  const head = `${who}님 주문을 ${items}${josa(items, '으로/로')} 변경했어요.`
   // 현장결제는 픽업만 가능 (배송은 선입금만)
   if (o.paymentMethod === 'ONSITE') return `${head} 픽업하실 때 ${won(o.expectedAmount)} 결제해 주세요.`
   return `${head} 변경된 금액 ${won(o.expectedAmount)} 입금해 주시면 확정됩니다.`

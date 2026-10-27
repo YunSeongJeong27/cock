@@ -128,7 +128,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
     return (
       <>
         <div className="row">
-          <span>환불 계좌: <b>{o.refundBank} {o.refundAccount ?? '(읽을 수 없음)'}</b></span>
+          <span>환불 계좌: <b>{o.refundBank} {o.refundAccount ?? '읽을 수 없음'}</b></span>
           {o.refundAccount && <CopyButton text={o.refundAccount} label="계좌 복사" />}
         </div>
         {paidName && squash(paidName) !== squash(o.depositorName) && (
@@ -151,7 +151,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
           {o.shippingFee > 0 && <div>상품 {won(o.itemsAmount)} + 배송비 {won(o.shippingFee)}</div>}
           {o.payments.map((p, i) => (
             <div key={i} className={p.cancelledAt ? 'muted' : undefined}>
-              입금 확정{p.manual ? '(수동)' : ''}: {dateTime(p.confirmedAt)} · {p.depositorName} {won(p.amount)}
+              {p.manual ? '수동 입금 확정' : '입금 확정'}: {dateTime(p.confirmedAt)} · {p.depositorName} {won(p.amount)}
               {p.cancelledAt && <> → {dateTime(p.cancelledAt)} 확정 취소</>}
             </div>
           ))}
@@ -159,7 +159,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             <div key={i} className="change-log">{c.changedBy === 'CUSTOMER' ? '고객 변경' : '판매자 변경'} {dateTime(c.changedAt)} · {c.summary}</div>
           ))}
           {o.cancelledAt && <div>취소: {dateTime(o.cancelledAt)}</div>}
-          {o.refundRejectedAt && <div className="muted">환불 신청 {dateTime(o.refundRequestedAt)} → {dateTime(o.refundRejectedAt)} 취소 안 함</div>}
+          {o.refundRejectedAt && <div className="muted">환불 신청 {dateTime(o.refundRequestedAt)} → {dateTime(o.refundRejectedAt)} 판매자가 환불 신청 취소</div>}
         </div>
         {refundPending(o) && (
           <div className="edit-box mt">
@@ -168,9 +168,9 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             {!o.paid && <div className="small mt" style={{ color: 'var(--warn)' }}>{T.refundBeforeConfirm}</div>}
             <div className="row mt">
               <button className="btn small danger" onClick={() => post(`${o.id}/refund-request/approve`, undefined,
-                T.confirmApproveRefund(o.orderNo))}>취소하고 환불</button>
+                T.confirmApproveRefund(o.orderNo))}>주문 취소 후 환불 진행</button>
               <button className="btn small" onClick={() => post(`${o.id}/refund-request/reject`, undefined,
-                T.confirmRejectRefund)}>취소 안 함</button>
+                T.confirmRejectRefund(o.orderNo))}>환불 신청 취소</button>
             </div>
           </div>
         )}
@@ -189,7 +189,12 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
           <div className="row mt">
             {o.active && !o.pickedUp && !refundPending(o) && <button className="btn small" onClick={() => startEdit(o)}>주문 변경</button>}
             {o.active && o.paymentMethod === 'PREPAID' && !o.paid && <button className="btn small" onClick={() => manualPaid(o)}>수동 입금 확정</button>}
-            {o.paid && !o.refundedAt && <button className="btn small" onClick={() => post(`${o.id}/unconfirm-paid`, undefined, T.confirmUnconfirmPaid)}>입금 확정 취소</button>}
+            {/* 선입금 주문에는 늘 보이고 주문 확정 상태일 때만 누를 수 있다. 환불 신청이 기다리는 동안은 환불 처리부터 (2026-10-26) */}
+            {o.paymentMethod === 'PREPAID' && (o.active || o.paid) && !o.refundedAt && (
+              <button className="btn small" disabled={!o.paid || refundPending(o)}
+                title={!o.paid ? T.unconfirmOnlyWhenPaid : refundPending(o) ? T.unconfirmAfterRefundDecision : undefined}
+                onClick={() => post(`${o.id}/unconfirm-paid`, undefined, T.confirmUnconfirmPaid)}>입금 확정 취소</button>
+            )}
             {o.refundRequired && !o.refundedAt && <button className="btn small ok" onClick={() => post(`${o.id}/refunded`)}>환불 완료</button>}
             {o.active && !refundPending(o) && !o.pickedUp && <button className="btn small danger" onClick={() => post(`${o.id}/cancel`, undefined, T.confirmCancel(o.orderNo, o.paid))}>주문 취소</button>}
           </div>
@@ -290,7 +295,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
         {active.length > 0 && (
           <tfoot>
             <tr>
-              <td colSpan={5}>합계 {active.length}건 <span className="muted">(보이는 주문 중 취소 제외)</span></td>
+              <td colSpan={5}>합계 {active.length}건 <span className="muted">· 취소 제외</span></td>
               {products.map((p) => <td key={p.id} className="num">{active.reduce((s, o) => s + qtyOf(o, p.id), 0)}</td>)}
               <td className="num">{won(active.reduce((s, o) => s + o.expectedAmount, 0))}</td>
               <td colSpan={6}></td>
@@ -311,11 +316,11 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
                 <td className="stack-title">
                   {checkBox(o)}<span className="muted">{o.orderNo}번 · </span>
                   <b>{o.nickname || o.depositorName}</b>
+                  {o.source === 'COMMENT' && <> <span className="chip">댓글</span></>}
+                  {o.changes.length > 0 && <> <span className="chip">변경됨</span></>}
                   {o.nickname && o.depositorName && <div className="small muted">입금자 {o.depositorName}</div>}
                   {o.phone && <div className="small muted">{maskPhone(o.phone)}</div>}
                   {warnings(o)}
-                  {o.source === 'COMMENT' && <span className="chip">댓글</span>}
-                  {o.changes.length > 0 && <span className="chip">변경됨</span>}
                 </td>
                 <td className="small" data-label="상품">{itemsText(o.items)}</td>
                 <td data-label="금액">{won(o.expectedAmount)}</td>
@@ -359,7 +364,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
         <select value={filter} onChange={(e) => { setFilter(e.target.value); setChecked(new Set()) }} style={{ width: 170 }}>
           <option value="all">전체 ({orders.length - finishedCount})</option>
           <option value="active">주문 중 (취소 제외)</option>
-          <option value="unpaid">미입금 (선입금)</option>
+          <option value="unpaid">선입금 미입금</option>
           <option value="refundreq">환불 신청 ({refundRequests})</option>
           <option value="refund">환불 필요</option>
           <option value="finished">완료 ({finishedCount})</option>
@@ -375,7 +380,7 @@ export default function OrdersTab({ groupBuy, orders, reload }: Props) {
             <option value="amount:desc">금액 큰 순</option>
           </select>
         )}
-        <input type="text" placeholder="닉네임·입금자명·전화 뒷자리·주문번호 검색" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1, minWidth: 180 }} />
+        <input type="text" placeholder="닉네임·입금자명·전화 뒷자리·주문번호 검색" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: '1 1 280px', minWidth: 0 }} />
       </div>
       {deleting && (
         <div className="row mb">

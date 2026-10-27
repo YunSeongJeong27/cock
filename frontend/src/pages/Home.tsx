@@ -13,13 +13,14 @@ export default function Home() {
           <Link className="btn primary" to="/signup">무료로 시작하기</Link>
           <Link className="btn" to="/login">로그인</Link>
         </div>
-        <p className="small muted mt">가입 후 첫 달 무료</p>
+        <div className="promo">가입 후 조건 없이 첫 달 무료</div>
+        <p className="small">무료 기간이 끝나도 자동 결제는 없으니 안심하세요!</p>
       </div>
       <div className="container">
         <div className="feature-grid">
           <div className="card">
             <h3>① 주문서 링크</h3>
-            <p className="muted">밴드·카톡 글에 링크 하나만 붙이세요. 고객은 로그인 없이 주문하고, 내 주문 상태도 확인합니다.</p>
+            <p className="muted">밴드·카톡 글에 링크 하나만 붙이세요. 고객은 로그인 없이 주문하고 내 주문 상태도 확인합니다.</p>
           </div>
           <div className="card">
             <h3>② 입금 대조</h3>

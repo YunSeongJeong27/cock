@@ -81,7 +81,10 @@ class M2OrderFormTest extends IntegrationTest {
                 .andExpect(jsonPath("$.myOrders[0].statusLabel").value("주문 확정 전"))
                 .andExpect(jsonPath("$.prefill.depositorName").value("김지영"))
                 .andExpect(jsonPath("$.prefill.phone").value("010-1234-5678"))
-                .andExpect(jsonPath("$.products[0].remaining").value(8));
+                // 손님 화면에는 남은 수량을 보내지 않는다 (2026-10-26 사용자 결정). 판매자 화면에서만 보인다
+                .andExpect(jsonPath("$.products[0].remaining").doesNotExist());
+        String sellerGroupBuy = "/api/seller/group-buys/" + created.get("id").asLong();
+        mvc.perform(get(sellerGroupBuy).cookie(seller)).andExpect(jsonPath("$.products[0].remaining").value(8));
 
         // 같은 연락처로 다시 주문하면 새 주문이 아니라 1번 주문이 바뀐다 (2026-10-18). 먼저 짧은 경고(409) + 바뀔 주문 내용
         String orders = "/api/public/g/" + token + "/orders";
@@ -103,8 +106,8 @@ class M2OrderFormTest extends IntegrationTest {
                 .andExpect(jsonPath("$.changed").value(true))
                 .andExpect(jsonPath("$.expectedAmount").value(5700))
                 .andExpect(jsonPath("$.myOrders.length()").value(1));
+        mvc.perform(get(sellerGroupBuy).cookie(seller)).andExpect(jsonPath("$.products[0].remaining").value(7));
         mvc.perform(get("/api/public/g/" + token).cookie(device))
-                .andExpect(jsonPath("$.products[0].remaining").value(7))
                 .andExpect(jsonPath("$.myOrders[0].customerChangedAt").isNotEmpty())
                 .andExpect(jsonPath("$.myOrders[0].changedAt").isEmpty());
 
@@ -134,8 +137,8 @@ class M2OrderFormTest extends IntegrationTest {
                 Map.of("orderNo", 2, "phone", "01099999999", "depositorName", "박민수"))).andExpect(status().isNotFound());
         mvc.perform(withJson(post("/api/public/g/" + token + "/cancel"),
                         Map.of("orderNo", 2, "phone", "010-2222-3333", "depositorName", "박민수")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.products[0].remaining").value(7));
+                .andExpect(status().isOk());
+        mvc.perform(get(sellerGroupBuy).cookie(seller)).andExpect(jsonPath("$.products[0].remaining").value(7));
 
         mvc.perform(get("/api/seller/group-buys/" + created.get("id").asLong() + "/detail").cookie(seller))
                 .andExpect(jsonPath("$.dashboard.orderCount").value(1))
@@ -222,7 +225,7 @@ class M2OrderFormTest extends IntegrationTest {
                 .andExpect(jsonPath("$.account").doesNotExist());
 
         JsonNode orders = read(mvc.perform(get("/api/seller/group-buys/" + g.id() + "/orders").cookie(g.seller())).andReturn());
-        assertThat(orders.get(0).get("statusLabel").asText()).isEqualTo("예약됨 (현장결제)");
+        assertThat(orders.get(0).get("statusLabel").asText()).isEqualTo("예약됨");
         assertThat(orders.get(0).get("pickupPointName").asText()).isEqualTo("2호점");
         long orderId = orders.get(0).get("id").asLong();
         mvc.perform(withJson(post("/api/seller/group-buys/" + g.id() + "/orders/" + orderId + "/picked-up").cookie(g.seller()),

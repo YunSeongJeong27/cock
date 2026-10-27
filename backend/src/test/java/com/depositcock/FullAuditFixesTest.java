@@ -114,7 +114,7 @@ class FullAuditFixesTest extends IntegrationTest {
         Opened g = open();
         String longName = "가".repeat(250);
         String longDate = "2026-10-20 10:00:00 " + "메".repeat(150);
-        String csv = "거래일시,입금자명,입금액\n" + longDate + "," + longName + ",1000\n2026-10-20 11:00:00,김보통,2000\n";
+        String csv = "거래 일시,적요,거래 금액\n" + longDate + "," + longName + ",1000\n2026-10-20 11:00:00,김보통,2000\n";
         MockMultipartFile file = new MockMultipartFile("file", "b".repeat(320) + ".csv", "text/csv",
                 csv.getBytes(StandardCharsets.UTF_8));
         mvc.perform(multipart(g.base() + "/deposits/uploads").file(file).cookie(g.seller()))

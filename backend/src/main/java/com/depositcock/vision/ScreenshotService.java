@@ -122,7 +122,7 @@ public class ScreenshotService {
         if (lines.isEmpty()) {
             throw new ApiException(ErrorCode.SCREENSHOT_NOTHING_TO_SAVE);
         }
-        return depositService.saveDeposits(groupBuy.getId(), DepositSource.SCREENSHOT, "스크린샷", lines);
+        return depositService.saveDeposits(groupBuy, DepositSource.SCREENSHOT, "스크린샷", lines);
     }
 
     public CommentExtractResponse extractComments(Long sellerId, Long groupBuyId, List<MultipartFile> files) {

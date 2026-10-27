@@ -156,7 +156,9 @@ public class CommentService {
                             .amount((long) t.quantity() * unitPrice)
                             .memo(t.memo())
                             .needsReview(t.needsReview())
-                            .linkOrderNos(linkOrders.getOrDefault(Nicknames.key(t.authorName()), List.of()))
+                            // 주문에 들어갈 닉네임(동·호수를 뗀 것)으로 비교한다
+                            .linkOrderNos(linkOrders.getOrDefault(
+                                    Nicknames.key(CommentNickname.split(t.authorName()).nickname()), List.of()))
                             .applyState(a.state())
                             .orderNo(a.orderNo())
                             .orderQuantity(a.orderQuantity())
@@ -305,7 +307,9 @@ public class CommentService {
             Customer customer = customers.byCommentNickname(groupBuy.getSeller().getId(), nickname, now);
             CustomerOrder order = new CustomerOrder(groupBuy, groupBuy.nextOrderNo(maxOrderNo), OrderSource.COMMENT, customer,
                     Tokens.random(16), now);
-            order.setNickname(t.authorName());
+            CommentNickname split = CommentNickname.split(nickname);
+            order.setNickname(split.nickname());
+            order.setUnitAddress(split.unitAddress());
             order.setReceiveMethod(receive);
             order.setPaymentMethod(payment);
             order.addItem(new OrderItem(order, product, t.quantity()));

@@ -101,7 +101,7 @@ class GroupBuyListTotalsTest extends IntegrationTest {
         long rejected = place(g, "010-9400-0004", "반려", "PREPAID", 0, 2);
         paid(g, rejected, "반려");
         refundRequest(g, "010-9400-0004", "반려");
-        seller(g, rejected, "refund-request/reject", Map.of());                      // 환불 신청 반려 (살아 있음)
+        seller(g, rejected, "refund-request/reject", Map.of());                      // 환불 신청 취소 (살아 있음)
         place(g, "010-9400-0005", "현장", "ONSITE", 1, 1);                           // 현장결제
         long onsitePickedUp = place(g, "010-9400-0006", "현장수령", "ONSITE", 2, 0);
         seller(g, onsitePickedUp, "picked-up", Map.of("pickedUp", true));           // 현장결제 + 수령

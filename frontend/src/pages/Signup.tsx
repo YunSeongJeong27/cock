@@ -44,8 +44,9 @@ export default function Signup() {
         <label className="field"><span>비밀번호 (8자 이상)</span>
           <input type="password" minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
         </label>
-        <label className="field"><span>판매자 이름 (고객 화면에 보임)</span>
+        <label className="field"><span>판매자 이름</span>
           <input type="text" value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} required placeholder="예: 달콤 과일가게" />
+          <span className="muted small" style={{ fontWeight: 400 }}>{T.displayNameHint}</span>
         </label>
         <label className="check">
           <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />

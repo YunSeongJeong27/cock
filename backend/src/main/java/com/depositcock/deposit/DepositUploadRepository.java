@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface DepositUploadRepository extends JpaRepository<DepositUpload, Long> {
 
-    List<DepositUpload> findByGroupBuyIdOrderByIdDesc(Long groupBuyId);
+    List<DepositUpload> findBySellerIdAndAccountKeyOrderByIdDesc(Long sellerId, String accountKey);
 
-    Optional<DepositUpload> findByIdAndGroupBuyId(Long id, Long groupBuyId);
+    Optional<DepositUpload> findByIdAndSellerIdAndAccountKey(Long id, Long sellerId, String accountKey);
 }

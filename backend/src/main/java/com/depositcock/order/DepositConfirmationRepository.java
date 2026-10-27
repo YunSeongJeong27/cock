@@ -15,6 +15,10 @@ public interface DepositConfirmationRepository extends JpaRepository<DepositConf
     @Query("select c from DepositConfirmation c join fetch c.order o where o.groupBuy.id = :groupBuyId and c.cancelledAt is null")
     List<DepositConfirmation> findActiveByGroupBuyId(@Param("groupBuyId") Long groupBuyId);
 
+    /** 여러 공구(같은 입금 계좌를 쓰는 공구들)의 살아 있는 확정 (2026-10-27) */
+    @Query("select c from DepositConfirmation c join fetch c.order o where o.groupBuy.id in :groupBuyIds and c.cancelledAt is null")
+    List<DepositConfirmation> findActiveByGroupBuyIds(@Param("groupBuyIds") Collection<Long> groupBuyIds);
+
     boolean existsByActiveDepositRowId(Long depositRowId);
 
     /*

@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -74,6 +75,282 @@ class BankStatementReaderTest {
         assertThat(parsed.skippedRows()).isEqualTo(2);
     }
 
+    /**
+     * 사용자가 보내 준 실제 거래내역 PDF(2026-10-27, KB국민·토스뱅크)의 머리줄을 CSV 로 옮긴 것. 값은 가짜.
+     * KB 는 "적요"에 거래 종류(전자금융·FBS입금)가 들어 있어 입금자명은 "보낸분/받는분"에서 읽어야 한다
+     */
+    @Test
+    void kbAndTossPdfHeaders() {
+        String kb = "거래일시,적요,보낸분/받는분,출금액,입금액,잔액,송금메모,거래점\n"
+                + "2026.10.26 10:30:00,전자금융,홍길동,0,\"10,000\",\"110,000\",-,예시은행\n"
+                + "2026.10.26 10:20:00,오픈뱅킹출금,예시가게,\"5,000\",0,\"100,000\",-,예시은행\n";
+        ParsedStatement kbParsed = reader.read("kb.csv", kb.getBytes(StandardCharsets.UTF_8), null);
+        assertThat(kbParsed.mapping().nameColumn()).isEqualTo("보낸분/받는분");
+        assertThat(kbParsed.mapping().dateColumn()).isEqualTo("거래일시");
+        assertThat(kbParsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동");
+        assertThat(kbParsed.deposits().get(0).dateText()).isEqualTo("2026.10.26 10:30:00");
+
+        String toss = "거래일자,구분,거래금액,거래 후 잔액,거래내용\n"
+                + "2026-10-22 22:50:00,출금,\"-20,000\",\"50,500\",김출금\n"
+                + "2026-10-22 22:40:00,입금,\"30,000\",\"70,500\",홍길동\n";
+        ParsedStatement tossParsed = reader.read("toss.csv", toss.getBytes(StandardCharsets.UTF_8), null);
+        assertThat(tossParsed.mapping().nameColumn()).isEqualTo("거래내용");
+        assertThat(tossParsed.mapping().dateColumn()).isEqualTo("거래일자");
+        assertThat(tossParsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동");
+        assertThat(tossParsed.deposits().get(0).dateText()).isEqualTo("2026-10-22 22:40:00");
+    }
+
+    /**
+     * 거래내역 PDF (2026-10-27). 테스트 PDF 는 사용자가 보낸 KB국민·토스뱅크 PDF 캡처의 배치(머리줄·칸 위치·정렬·페이지 나눔)를
+     * 흉내 내 만든 것이고 이름·금액·계좌번호·시각은 모두 지어낸 값이다 (src/test/resources/statements). 실제 은행 PDF 로는 아직 확인 못 함
+     */
+    @Test
+    void kbPdf() throws Exception {
+        ParsedStatement parsed = reader.read("KB거래내역조회.pdf", resource("statements/kb-statement.pdf"), null);
+        assertThat(parsed.ok()).isTrue();
+        assertThat(parsed.mapping().nameColumn()).isEqualTo("보낸분/받는분");
+        assertThat(parsed.mapping().amountColumn()).isEqualTo("입금액");
+        assertThat(parsed.mapping().dateColumn()).isEqualTo("거래일시");
+        // 2쪽에 다시 나온 머리줄·쪽 번호·안내문은 건너뛰고, 출금(입금액 0)도 건너뜀
+        assertThat(parsed.deposits()).extracting(DepositLine::name)
+                .containsExactly("홍길동", "김예시", "예시페이", "박샘플", "이테스트");
+        assertThat(parsed.deposits()).extracting(DepositLine::amount).containsExactly(10000, 20000, 30000, 40000, 50000);
+        assertThat(parsed.deposits().get(0).dateText()).isEqualTo("2026.10.26 10:30:00");
+        assertThat(parsed.deposits().get(0).depositedAt()).isEqualTo(LocalDateTime.of(2026, 10, 26, 10, 30, 0));
+    }
+
+    @Test
+    void tossPdf() throws Exception {
+        ParsedStatement parsed = reader.read("toss.pdf", resource("statements/toss-statement.pdf"), null);
+        assertThat(parsed.ok()).isTrue();
+        assertThat(parsed.mapping().nameColumn()).isEqualTo("거래내용");
+        assertThat(parsed.mapping().amountColumn()).isEqualTo("거래금액");
+        assertThat(parsed.mapping().typeColumn()).isEqualTo("구분");
+        // 머리줄 없는 2쪽도 같은 칸 위치로 읽음. 구분 "캐시백"(+500)은 고객 입금이 아니라서 뺀다 (2026-10-27 사용자 "일단 제외 처리는 해 놔")
+        assertThat(parsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동", "김샘플");
+        assertThat(parsed.deposits()).extracting(DepositLine::amount).containsExactly(30000, 20000);
+        assertThat(parsed.excludedRows()).isEqualTo(1);
+        assertThat(parsed.deposits().get(0).dateText()).isEqualTo("2026-10-22 22:40:00");
+    }
+
+    /**
+     * 은행별 헤더(컬럼)명으로 읽기 + 머리줄 위쪽에서 계좌번호 찾기 (2026-10-27). 값은 V1 운영자 값(bank_header)과 같다
+     */
+    @Test
+    void bankHeaderValuesAndAccountNumber() throws Exception {
+        ColumnMapping kb = new ColumnMapping("거래일시", "보낸분/받는분", "입금액", null);
+        ParsedStatement kbParsed = reader.read("kb.pdf", resource("statements/kb-statement.pdf"), kb, "계좌번호");
+        assertThat(kbParsed.ok()).isTrue();
+        assertThat(kbParsed.deposits()).hasSize(5);
+        assertThat(kbParsed.accountNumber()).isEqualTo("123456-**-***789");
+
+        ColumnMapping toss = new ColumnMapping("거래일자", "거래내용", "거래금액", "구분");
+        ParsedStatement tossParsed = reader.read("toss.pdf", resource("statements/toss-statement.pdf"), toss, "계좌번호");
+        assertThat(tossParsed.ok()).isTrue();
+        assertThat(tossParsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동", "김샘플");
+        assertThat(tossParsed.excludedRows()).isEqualTo(1);
+        assertThat(tossParsed.accountNumber()).isEqualTo("1001-0000-0000");
+
+        // 칸 이름 뒤에 붙은 계좌번호 ("계좌번호 ****-****-1234"), 계좌번호 칸이 머리줄에도 있지만 머리줄 위쪽만 본다
+        ColumnMapping xlsx = new ColumnMapping("거래 일시", "적요", "거래 금액", null);
+        ParsedStatement xlsxParsed = reader.read("toss.xlsx", tossBankXlsx(), xlsx, "계좌번호");
+        assertThat(xlsxParsed.accountNumber()).isEqualTo("****-****-1234");
+        assertThat(reader.read("toss.xlsx", tossBankXlsx(), xlsx, "계좌 번호").accountNumber()).isEqualTo("****-****-1234");
+        assertThat(reader.read("toss.xlsx", tossBankXlsx(), xlsx, "출금계좌").accountNumber()).isNull();
+    }
+
+    /**
+     * 거래 구분 값으로 고객 입금이 아닌 줄 빼기 (2026-10-27 사용자 "일단 제외 처리는 해 놔").
+     * 토스 PDF 구분·토스 엑셀 거래 유형·KB 적요에 나오는 값으로 확인. 고객 송금(입금·모임원송금·전자금융)은 남는다.
+     * 거래 구분 칸이 파일에 없으면 빼지 않고 읽는다
+     */
+    @Test
+    void nonCustomerDepositsAreExcludedByType() {
+        String csv = "거래일자,구분,거래금액,거래내용\n"
+                + "2026-10-26 10:00:00,입금,10000,홍길동\n"
+                + "2026-10-26 10:01:00,모임원송금,20000,김예시\n"
+                + "2026-10-26 10:02:00,캐시백,500,카드 캐시백\n"
+                + "2026-10-26 10:03:00,프로모션입금,500,카드 캐시백\n"
+                + "2026-10-26 10:04:00,체크카드결제,3000,예시가게\n"
+                + "2026-10-26 10:05:00,이자입금,12,예시이자\n"
+                + "2026-10-26 10:06:00,출금,-5000,박샘플\n";
+        ParsedStatement parsed = reader.read("x.csv", csv.getBytes(StandardCharsets.UTF_8),
+                new ColumnMapping("거래일자", "거래내용", "거래금액", "구분"));
+        assertThat(parsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동", "김예시");
+        assertThat(parsed.excludedRows()).isEqualTo(4);
+        assertThat(parsed.skippedRows()).isEqualTo(5);
+
+        String kb = "거래일시,적요,보낸분/받는분,출금액,입금액\n"
+                + "2026.10.26 10:00:00,전자금융,홍길동,0,10000\n"
+                + "2026.10.26 10:01:00,FBS입금,김예시,0,20000\n"
+                + "2026.10.26 10:02:00,체크카드,예시가게,0,3000\n";
+        ParsedStatement kbParsed = reader.read("kb.csv", kb.getBytes(StandardCharsets.UTF_8),
+                new ColumnMapping("거래일시", "보낸분/받는분", "입금액", "적요"));
+        assertThat(kbParsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동", "김예시");
+
+        // 거래 구분 칸이 없는 파일: 멈추지 않고 빼지도 않는다
+        String noType = "거래일자,거래금액,거래내용\n2026-10-26 10:00:00,500,카드 캐시백\n";
+        ParsedStatement plain = reader.read("x.csv", noType.getBytes(StandardCharsets.UTF_8),
+                new ColumnMapping("거래일자", "거래내용", "거래금액", "구분"));
+        assertThat(plain.ok()).isTrue();
+        assertThat(plain.deposits()).hasSize(1);
+        assertThat(plain.missingColumns()).isEmpty();
+    }
+
+    /** 은행 헤더(컬럼)명이 파일에 없으면 못 찾은 이름을 알려 준다. 날짜 칸도 있어야 한다 (2026-10-27) */
+    @Test
+    void missingBankHeaderColumnsAreReported() {
+        String csv = "거래일시,보낸분/받는분,입금액\n2026.10.26 10:00:00,홍길동,5000\n";
+        ParsedStatement wrongBank = reader.read("x.csv", csv.getBytes(StandardCharsets.UTF_8),
+                new ColumnMapping("거래일자", "거래내용", "거래금액", null));
+        assertThat(wrongBank.ok()).isFalse();
+        assertThat(wrongBank.missingColumns()).containsExactly("거래내용", "거래금액", "거래일자");
+        ParsedStatement noDate = reader.read("x.csv", csv.getBytes(StandardCharsets.UTF_8),
+                new ColumnMapping("입금일", "보낸분/받는분", "입금액", null));
+        assertThat(noDate.ok()).isFalse();
+        assertThat(noDate.missingColumns()).containsExactly("입금일");
+    }
+
+    /** 파일 이름이 .pdf 가 아니어도 내용이 PDF 면 PDF 로 읽는다 */
+    @Test
+    void pdfDetectedByContent() throws Exception {
+        assertThat(reader.read("거래내역", resource("statements/kb-statement.pdf"), null).deposits()).hasSize(5);
+    }
+
+    @Test
+    void pdfWithoutTextOrWithPassword() throws Exception {
+        byte[] blank;
+        try (org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            doc.addPage(new org.apache.pdfbox.pdmodel.PDPage());
+            doc.save(out);
+            blank = out.toByteArray();
+        }
+        assertThatThrownBy(() -> reader.read("scan.pdf", blank, null))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo(ErrorCode.STATEMENT_PDF_NO_TEXT));
+
+        byte[] locked;
+        try (org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            doc.addPage(new org.apache.pdfbox.pdmodel.PDPage());
+            doc.protect(new org.apache.pdfbox.pdmodel.encryption.StandardProtectionPolicy("owner", "900101",
+                    new org.apache.pdfbox.pdmodel.encryption.AccessPermission()));
+            doc.save(out);
+            locked = out.toByteArray();
+        }
+        assertThatThrownBy(() -> reader.read("locked.pdf", locked, null))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo(ErrorCode.STATEMENT_FILE_PASSWORD_REQUIRED));
+    }
+
+    private static final ColumnMapping TOSS_PDF = new ColumnMapping("거래일자", "거래내용", "거래금액", "구분");
+    private static final ColumnMapping TOSS_EXCEL = new ColumnMapping("거래 일시", "적요", "거래 금액", "거래 유형");
+
+    private static void assertCode(org.assertj.core.api.ThrowableAssert.ThrowingCallable call, ErrorCode code) {
+        assertThatThrownBy(call).isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo(code));
+    }
+
+    /**
+     * 암호 걸린 PDF: 파일 비밀번호로 연다 (2026-10-27 사용자 요청). RC4 40·128비트, AES 128·256비트.
+     * 비밀번호가 없으면 "입력하세요", 틀리면 "맞지 않습니다"
+     */
+    @Test
+    void encryptedPdfIsOpenedWithPassword() throws Exception {
+        byte[] plain = resource("statements/toss-statement.pdf");
+        for (int[] spec : new int[][] {{40, 0}, {128, 0}, {128, 1}, {256, 1}}) {
+            byte[] locked;
+            try (org.apache.pdfbox.pdmodel.PDDocument doc = org.apache.pdfbox.Loader.loadPDF(plain);
+                 ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                var policy = new org.apache.pdfbox.pdmodel.encryption.StandardProtectionPolicy("owner-pw", "900101",
+                        new org.apache.pdfbox.pdmodel.encryption.AccessPermission());
+                policy.setEncryptionKeyLength(spec[0]);
+                policy.setPreferAES(spec[1] == 1);
+                doc.protect(policy);
+                doc.save(out);
+                locked = out.toByteArray();
+            }
+            assertCode(() -> reader.read("toss.pdf", locked, TOSS_PDF, "계좌번호", null), ErrorCode.STATEMENT_FILE_PASSWORD_REQUIRED);
+            assertCode(() -> reader.read("toss.pdf", locked, TOSS_PDF, "계좌번호", "000000"), ErrorCode.STATEMENT_FILE_PASSWORD_WRONG);
+            ParsedStatement parsed = reader.read("toss.pdf", locked, TOSS_PDF, "계좌번호", "900101");
+            assertThat(parsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동", "김샘플");
+            assertThat(parsed.accountNumber()).isEqualTo("1001-0000-0000");
+        }
+        // 암호 없는 PDF 에 비밀번호를 넣어도 그냥 읽힌다
+        assertThat(reader.read("toss.pdf", plain, TOSS_PDF, "계좌번호", "900101").deposits()).hasSize(2);
+    }
+
+    /** 토스 이메일 엑셀 모양 (2026-10-27 사용자 캡처의 머리줄, 값은 지어냄) */
+    private static void fillTossExcel(Workbook wb) {
+        Sheet s = wb.createSheet("토스뱅크 거래내역");
+        s.createRow(0).createCell(1).setCellValue("토스뱅크 거래내역");
+        Row account = s.createRow(2);
+        account.createCell(1).setCellValue("계좌번호");
+        account.createCell(2).setCellValue("****-****-0000");
+        String[] header = {"거래 일시", "적요", "거래 유형", "거래 기관", "계좌번호", "거래 금액", "거래 후 잔액", "메모"};
+        Row h = s.createRow(7);
+        for (int i = 0; i < header.length; i++) {
+            h.createCell(i + 1).setCellValue(header[i]);
+        }
+        Object[][] rows = {
+                {"2026.10.26 14:20:00", "홍길동", "입금", "", "", 10000, 100000},
+                {"2026.10.26 13:10:00", "김예시", "모임원송금", "", "", 20000, 90000},
+                {"2026.10.26 12:00:00", "카드 캐시백", "프로모션입금", "", "", 500, 70000},
+                {"2026.10.26 11:00:00", "예시가게", "체크카드결제", "", "", -3000, 69500},
+        };
+        for (int r = 0; r < rows.length; r++) {
+            Row row = s.createRow(8 + r);
+            for (int c = 0; c < rows[r].length; c++) {
+                if (rows[r][c] instanceof Integer i) {
+                    row.createCell(c + 1).setCellValue(i);
+                } else {
+                    row.createCell(c + 1).setCellValue((String) rows[r][c]);
+                }
+            }
+        }
+    }
+
+    /** 암호 걸린 엑셀: xlsx(Agile 암호, 엑셀 2010 이후 기본) · xls(RC4) 를 파일 비밀번호로 연다 (2026-10-27) */
+    @Test
+    void encryptedExcelIsOpenedWithPassword() throws Exception {
+        byte[] xlsx;
+        try (XSSFWorkbook wb = new XSSFWorkbook();
+             org.apache.poi.poifs.filesystem.POIFSFileSystem fs = new org.apache.poi.poifs.filesystem.POIFSFileSystem();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            fillTossExcel(wb);
+            var info = new org.apache.poi.poifs.crypt.EncryptionInfo(org.apache.poi.poifs.crypt.EncryptionMode.agile);
+            var encryptor = info.getEncryptor();
+            encryptor.confirmPassword("900101");
+            try (var os = encryptor.getDataStream(fs)) {
+                wb.write(os);
+            }
+            fs.writeFilesystem(out);
+            xlsx = out.toByteArray();
+        }
+        byte[] xls;
+        org.apache.poi.hssf.record.crypto.Biff8EncryptionKey.setCurrentUserPassword("900101");
+        try (HSSFWorkbook wb = new HSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            fillTossExcel(wb);
+            wb.write(out);
+            xls = out.toByteArray();
+        } finally {
+            org.apache.poi.hssf.record.crypto.Biff8EncryptionKey.setCurrentUserPassword(null);
+        }
+        for (String name : new String[] {"토스.xlsx", "토스.xls"}) {
+            byte[] locked = name.endsWith(".xlsx") ? xlsx : xls;
+            assertCode(() -> reader.read(name, locked, TOSS_EXCEL, "계좌번호", null), ErrorCode.STATEMENT_FILE_PASSWORD_REQUIRED);
+            assertCode(() -> reader.read(name, locked, TOSS_EXCEL, "계좌번호", "000000"), ErrorCode.STATEMENT_FILE_PASSWORD_WRONG);
+            ParsedStatement parsed = reader.read(name, locked, TOSS_EXCEL, "계좌번호", "900101");
+            assertThat(parsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동", "김예시");
+            assertThat(parsed.excludedRows()).isEqualTo(1);
+            assertThat(parsed.accountNumber()).isEqualTo("****-****-0000");
+        }
+    }
+
+    private static byte[] resource(String path) throws Exception {
+        try (var in = BankStatementReaderTest.class.getClassLoader().getResourceAsStream(path)) {
+            return in.readAllBytes();
+        }
+    }
+
     @Test
     void csvMs949WithQuotesAndBom() {
         String csv = "거래일자,기재내용,출금액,입금액,잔액\r\n"
@@ -132,10 +409,11 @@ class BankStatementReaderTest {
         assertThat(BankStatementReader.parseAmount("입금")).isNull();
     }
 
+    /** 손상된 PDF (2026-10-27 전에는 PDF 를 모두 거절했음) */
     @Test
-    void pdfIsRejectedWithGuide() {
+    void brokenPdfIsRejectedWithGuide() {
         assertThatThrownBy(() -> reader.read("문서.pdf", new byte[]{'%', 'P', 'D', 'F'}, null))
-                .isInstanceOf(ApiException.class).hasMessageContaining("PDF");
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo(ErrorCode.STATEMENT_PDF_UNREADABLE));
     }
 
     /** 금액이 항상 양수이고 '구분'으로 입금/출금을 나누는 형식: 출금·지급 줄은 빠진다 */

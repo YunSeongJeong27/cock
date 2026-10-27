@@ -18,7 +18,7 @@ const MAIL_ITEMS: { type: NotificationType; label: string; note: string }[] = [
 const SCREEN_ITEMS: { type: NotificationType; label: string; note: string }[] = [
   { type: 'SCREEN_REFUND_REQUEST', label: '고객 환불 신청', note: '주문 목록 위에 표시' },
   { type: 'SCREEN_STOCK', label: '재고 알림 기준 도달', note: '공구 화면 위에 표시' },
-  { type: 'SCREEN_SAME_NICKNAME', label: '같은 닉네임 중복 주문', note: '주문 목록 위에 표시 (링크 주문과 댓글 주문)' },
+  { type: 'SCREEN_SAME_NICKNAME', label: '같은 닉네임 중복 주문', note: '링크 주문과 댓글 주문의 닉네임이 같을 때 주문 목록 위에 표시' },
 ]
 
 export default function Profile() {
@@ -86,7 +86,7 @@ export default function Profile() {
       <div className="card">
         <div><b>{me.email}</b></div>
         <div className="muted small">
-          플랜: {me.plan === 'TRIAL' ? `무료 체험 (~${me.trialEndsAt.substring(0, 10)})` : `유료 (~${me.paidUntil ?? '-'})`}
+          플랜: {me.plan === 'TRIAL' ? `무료 체험 · ${me.trialEndsAt.substring(0, 10)}까지` : `유료 · ${me.paidUntil ? me.paidUntil + '까지' : '만료일 없음'}`}
           {me.expired && <span style={{ color: 'var(--danger)' }}> · 기간 만료</span>}
         </div>
       </div>
@@ -94,11 +94,13 @@ export default function Profile() {
         <label className="field"><span>판매자 이름</span>
           <input type="text" value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} required />
         </label>
-        <h3>기본 입금 계좌 (새 공구에 자동으로 채움)</h3>
+        <h3>기본 입금 계좌</h3>
+        <p className="muted small">{T.defaultAccountHint}</p>
         <div className="row">
-          <input type="text" placeholder="은행" value={form.defaultBankName} onChange={(e) => setForm({ ...form, defaultBankName: e.target.value })} style={{ flex: 1 }} />
-          <input type="text" placeholder="계좌번호" value={form.defaultAccountNumber} onChange={(e) => setForm({ ...form, defaultAccountNumber: e.target.value })} style={{ flex: 2 }} />
-          <input type="text" placeholder="예금주" value={form.defaultAccountHolder} onChange={(e) => setForm({ ...form, defaultAccountHolder: e.target.value })} style={{ flex: 1 }} />
+          {/* 공구 만들기의 입금 계좌 칸과 같은 폭 규칙: 좁으면 예금주가 다음 줄로 */}
+          <input type="text" placeholder="은행" value={form.defaultBankName} onChange={(e) => setForm({ ...form, defaultBankName: e.target.value })} style={{ flex: 1, minWidth: 100 }} />
+          <input type="text" placeholder="계좌번호" value={form.defaultAccountNumber} onChange={(e) => setForm({ ...form, defaultAccountNumber: e.target.value })} style={{ flex: 2, minWidth: 160 }} />
+          <input type="text" placeholder="예금주" value={form.defaultAccountHolder} onChange={(e) => setForm({ ...form, defaultAccountHolder: e.target.value })} style={{ flex: 1, minWidth: 100 }} />
         </div>
         <ErrorBox message={error} />
         {saved && <div className="success-box">저장했습니다.</div>}
@@ -107,7 +109,7 @@ export default function Profile() {
       <div className="card">
         <h3>알림 설정</h3>
         <div className="muted small">{T.notifyHelp}</div>
-        <h4 className="mt">메일 ({me.email})</h4>
+        <h4 className="mt">메일 · {me.email}</h4>
         {MAIL_ITEMS.map((item) => (
           <label key={item.type} className="check">
             <input type="checkbox" checked={me.notifications[item.type]} disabled={notifySaving}
@@ -115,7 +117,7 @@ export default function Profile() {
             <span>{item.label} <span className="muted small">— {item.note}</span></span>
           </label>
         ))}
-        <h4 className="mt">화면 (노란 안내 칸)</h4>
+        <h4 className="mt">화면 안내</h4>
         {SCREEN_ITEMS.map((item) => (
           <label key={item.type} className="check">
             <input type="checkbox" checked={me.notifications[item.type]} disabled={notifySaving}

@@ -24,7 +24,7 @@ export function CaptureUsageLine({ status }: { status: CaptureStatus | null }) {
   const u = status.usage
   return (
     <div className="small" style={{ color: u.remainingToday === 0 ? 'var(--danger)' : 'var(--muted)' }}>
-      오늘 남은 캡처 {u.remainingToday}장 / 하루 {u.dailyLimit}장{u.remainingToday === 0 ? ' — 오늘 한도 초과, 직접 입력해 주세요' : ''}
+      오늘 남은 캡처 {u.remainingToday}장 / 하루 {u.dailyLimit}장{u.remainingToday === 0 ? ` · ${depositText.captureLimitReached}` : ''}
     </div>
   )
 }

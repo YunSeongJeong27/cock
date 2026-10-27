@@ -72,7 +72,7 @@ class CustomerReorderTest extends IntegrationTest {
         // 사과를 3개로 늘리는 건 품절이라 막힘
         mvc.perform(withJson(post(url + "/orders").cookie(device), order(Map.of(g.apple(), 3), "010-7100-0001", "김사과", 1)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value(containsString("최대 2개까지 주문할 수 있습니다. (지금 주문한 2개 포함)")));
+                .andExpect(jsonPath("$.detail").value(containsString("최대 2개까지 주문할 수 있습니다. 지금 주문한 2개도 포함한 수량입니다.")));
         // 사과를 1개로 줄이면 1개가 다시 남는다
         mvc.perform(withJson(post(url + "/orders").cookie(device), order(Map.of(g.apple(), 1), "010-7100-0001", "김사과", 1)))
                 .andExpect(status().isOk());
@@ -117,7 +117,7 @@ class CustomerReorderTest extends IntegrationTest {
         mvc.perform(withJson(post(url + "/orders"), again)).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.replaceOrderNo").isEmpty())
                 .andExpect(jsonPath("$.warnings[0]").value("이 주문은 수정할 수 없습니다. 주문이 확정됐거나 휴대폰 번호가 다릅니다."))
-                .andExpect(jsonPath("$.warnings[1]").value("이 번호로 확정된 주문이 있어, 이번 주문은 새 주문으로 추가됩니다."));
+                .andExpect(jsonPath("$.warnings[1]").value("이 번호로 확정된 주문이 있어 이번 주문은 새 주문으로 추가됩니다."));
         again.put("replaceOrderNo", null);
         mvc.perform(withJson(post(url + "/orders"), again)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.orderNo").value(2))
@@ -157,7 +157,7 @@ class CustomerReorderTest extends IntegrationTest {
         again.put("acknowledgeWarnings", false);
         mvc.perform(withJson(post(url + "/orders").cookie(device), again)).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.replaceOrderNo").isEmpty())
-                .andExpect(jsonPath("$.warnings[0]").value("이 번호로 확정된 주문이 있어, 이번 주문은 새 주문으로 추가됩니다."));
+                .andExpect(jsonPath("$.warnings[0]").value("이 번호로 확정된 주문이 있어 이번 주문은 새 주문으로 추가됩니다."));
         mvc.perform(withJson(post(url + "/orders").cookie(device), order(Map.of(g.apple(), 3), "010-7300-0001", "박입금", 1)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.warnings[0]").value("이 주문은 수정할 수 없습니다. 주문이 확정됐거나 휴대폰 번호가 다릅니다."));

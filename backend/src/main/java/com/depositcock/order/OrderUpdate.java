@@ -155,6 +155,7 @@ final class OrderUpdate {
         order.fillAmounts((int) itemsAmount, shippingFee);
         if (order.getExpectedAmount() != beforeAmount) {
             changes.add("금액 " + won(beforeAmount) + "→" + won(order.getExpectedAmount()));
+            order.markAmountSet(now); // 입금 대조 1시간 규칙의 기준 시각 (2026-10-27)
         }
         if (note != null) {
             changes.add(note);
@@ -189,7 +190,7 @@ final class OrderUpdate {
 
     private static void addIfChanged(List<String> changes, String label, String before, String after) {
         if (!Objects.equals(before, after)) {
-            changes.add(label + " " + (before == null ? "(없음)" : before) + "→" + (after == null ? "(없음)" : after));
+            changes.add(label + " " + (before == null ? "없음" : before) + "→" + (after == null ? "없음" : after));
         }
     }
 

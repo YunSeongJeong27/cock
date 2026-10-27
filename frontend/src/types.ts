@@ -16,6 +16,8 @@ export interface Me {
   defaultAccountHolder: string | null
   /** 댓글 주문 기능을 쓸 수 있는지 (관리자가 전체 공개했거나 이 판매자에게 허용) */
   commentFeatureEnabled: boolean
+  /** 공구를 만든 뒤 뜨는 "제품 판매 TIP"을 다시 보지 않기로 했는지 (2026-10-26) */
+  salesTipHidden: boolean
   /** 알림 켜짐/꺼짐 (2026-10-19, 모든 종류가 옴) */
   notifications: Record<NotificationType, boolean>
 }
@@ -211,7 +213,31 @@ export interface ParsedStatement {
   preview: string[][]
   deposits: DepositLine[]
   skippedRows: number
+  /** 그중 거래 구분 값(캐시백·카드·이자 등)으로 뺀 줄 수 (2026-10-27) */
+  excludedRows: number
   message: string | null
+  /** 거래내역서 위쪽에서 찾은 계좌번호 (못 찾았으면 null, 2026-10-27) */
+  accountNumber: string | null
+}
+
+/** 거래내역서 계좌번호와 공구 입금 계좌 비교 (2026-10-27). notice 는 같으면 null */
+export interface AccountCheckView { statementAccount: string | null; check: 'SAME' | 'DIFFERENT' | 'UNKNOWN'; notice: string | null }
+
+/** 거래내역 파일 종류 (2026-10-27): 같은 은행도 PDF·엑셀의 헤더(컬럼)명이 달라서 따로 둔다. CSV 는 엑셀과 같이 */
+export type StatementType = 'PDF' | 'EXCEL'
+export const STATEMENT_TYPE_LABEL: Record<StatementType, string> = { PDF: 'PDF', EXCEL: '엑셀' }
+
+/** bankName·fileType: 이 은행·파일 종류의 헤더(컬럼)명으로 읽었다 */
+export interface PreviewResponse { parsed: ParsedStatement; duplicateCount: number; bankName: string; fileType: StatementType; account: AccountCheckView }
+
+export interface UploadResponse {
+  uploadId: number | null
+  savedCount: number
+  duplicateCount: number
+  parsed: ParsedStatement
+  bankName: string
+  fileType: StatementType
+  account: AccountCheckView
 }
 
 export interface OrderBrief {
@@ -222,6 +248,9 @@ export interface OrderBrief {
   phoneLast4: string
   expectedAmount: number
   orderedAt: string
+  /** 같은 입금 계좌를 쓰는 다른 공구의 주문일 수 있어서 (2026-10-27) */
+  groupBuyId: number
+  groupBuyTitle: string
 }
 
 export type MatchStatus = 'MATCHED' | 'SUGGESTED' | 'AMBIGUOUS' | 'UNRELATED'
@@ -238,11 +267,20 @@ export interface MatchRow {
   evidence: string | null
   amountDiff: number
   candidates: { order: OrderBrief; evidence: string; amountDiff: number }[]
-  /** 관련 없는 입금의 확인 안내 (중복 입금·환불 가능성) */
+  /** 관련 없는 입금의 확인 안내 (두 번 보냄·환불 가능성, 거래내역 없이 확정한 주문의 입금) */
   note: string | null
   /** 취소된 주문의 입금자일 때 [환불 필요로 표시]를 걸 주문 id */
   refundCheckOrderId: number | null
+  /** 거래내역 없이 입금 확정한 주문의 입금자로 보이면 그 주문 id (미리 골라 둠, 2026-10-26) */
+  linkOrderId: number | null
+  /** 확인 필요: 같은 고객의 미입금 주문이나 입금이 여러 건, 또는 입금 시각이 1시간 넘게 차이. 있으면 "모두 확정"에서 뺀다 */
+  checkNote: string | null
+  /** 주문(금액이 정해진 시각)과 입금 시각의 차이 (예: "주문 12분 뒤 입금"). 비교할 수 없으면 null (2026-10-27) */
+  timeNote: string | null
 }
+
+/** 이미 처리 완료된 입금 (대조에서 뺀 입금, 2026-10-26) */
+export interface HandledRow { rowId: number; depositorName: string; amount: number; datetimeText: string | null; handledAt: string }
 
 export interface MatchResponse {
   /** 올린 거래내역 파일 목록 (대조와 같은 입금 행을 한 번 읽어 함께 내려옴) */
@@ -251,25 +289,49 @@ export interface MatchResponse {
   unpaid: OrderBrief[]
   /** 판매자가 직접 고를 수 있는 모든 미입금 선입금 주문 (다른 입금에 추천된 주문 포함) */
   openOrders: OrderBrief[]
-  used: { rowId: number; depositorName: string; amount: number; datetimeText: string | null; orderId: number; orderNo: number }[]
+  /** 확정한 입금 (주문번호 순). rowId 는 수동 확정이거나 올린 파일을 지웠으면 null */
+  used: { rowId: number | null; depositorName: string; amount: number; datetimeText: string | null; orderId: number; orderNo: number; order: OrderBrief | null; manual: boolean }[]
+  /** 거래내역 없이 입금 확정한 주문. 입금 줄을 연결할 수 있다 (2026-10-26) */
+  manualOrders: OrderBrief[]
+  /** 이미 처리 완료된 입금 (최근에 옮긴 순) */
+  handled: HandledRow[]
+  /** 같은 입금 계좌를 쓰는 다른 공구의 주문으로 보이는 입금. 여기서도 확정할 수 있다 (2026-10-27) */
+  otherRows: MatchRow[]
+  /** 같은 입금 계좌를 쓰는 다른 공구 제목 */
+  sharedGroupBuys: string[]
+  /** 이 공구 입금 계좌의 은행 (거래내역을 이 은행 헤더(컬럼)명으로 읽는다) */
+  bankName: string
   matchedCount: number
   suggestedCount: number
   ambiguousCount: number
   unrelatedCount: number
 }
 
-export interface Preset {
-  id: number
-  name: string
-  dateColumn: string | null
+/** 은행별 헤더(컬럼)명 값 (2026-10-27) */
+export interface BankHeaderValues {
   nameColumn: string
   amountColumn: string
+  dateColumn: string
+  accountLabel: string | null
   typeColumn: string | null
+}
+
+/**
+ * 판매자에게 적용되는 은행·파일 종류별 헤더(컬럼)명. source: 운영자 값 그대로 / 판매자가 바꿈 / 판매자가 추가한 값.
+ * original 은 운영자가 넣은 원래 값 (추가한 은행이면 null)
+ */
+export interface BankHeaderView {
+  bankName: string
+  fileType: StatementType
+  values: BankHeaderValues
+  source: 'SYSTEM' | 'CHANGED' | 'CUSTOM'
+  defaultBank: boolean
+  original: BankHeaderValues | null
 }
 
 export interface UploadSummary {
   id: number
-  source: 'EXCEL' | 'CSV' | 'SCREENSHOT'
+  source: 'EXCEL' | 'CSV' | 'PDF' | 'SCREENSHOT'
   fileName: string | null
   uploadedAt: string
   rowCount: number
