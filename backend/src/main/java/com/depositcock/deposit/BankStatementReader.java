@@ -78,8 +78,28 @@ public class BankStatementReader {
     private static final Charset MS949 = Charset.forName("MS949");
 
     public ParsedStatement read(String fileName, byte[] content, ColumnMapping requested) {
-        List<List<String>> rows = readRows(fileName, content);
+        List<List<String>> rows = isPdf(fileName, content)
+                ? PdfTableReader.read(content, header -> isPdfHeader(header, requested))
+                : readRows(fileName, content);
         return parse(rows, requested);
+    }
+
+    private static boolean isPdf(String fileName, byte[] content) {
+        boolean pdfName = fileName != null && fileName.toLowerCase(Locale.ROOT).endsWith(".pdf");
+        boolean pdfBytes = content.length >= 5 && content[0] == '%' && content[1] == 'P' && content[2] == 'D' && content[3] == 'F';
+        return pdfName || pdfBytes;
+    }
+
+    /**
+     * PDF 의 머리줄: 직접 지정했으면 지정한 입금자명·금액 헤더(컬럼)가 모두 있는 줄,
+     * 자동이면 입금자명 후보와 금액 후보가 모두 있는 줄 (엑셀·CSV 의 자동 인식과 같은 후보)
+     */
+    static boolean isPdfHeader(List<String> cells, ColumnMapping requested) {
+        List<String> header = cells.stream().map(Texts::squash).toList();
+        if (requested != null && requested.isComplete()) {
+            return header.contains(Texts.squash(requested.nameColumn())) && header.contains(Texts.squash(requested.amountColumn()));
+        }
+        return firstIndex(header, NAME_CANDIDATES) >= 0 && firstIndex(header, AMOUNT_CANDIDATES) >= 0;
     }
 
     // ---------- 파일 → 문자열 표 ----------
@@ -91,9 +111,6 @@ public class BankStatementReader {
         }
         if (lower.endsWith(".xlsx") || lower.endsWith(".xls") || looksLikeExcel(content)) {
             return readExcel(content);
-        }
-        if (lower.endsWith(".pdf")) {
-            throw new ApiException(ErrorCode.STATEMENT_PDF_NOT_SUPPORTED);
         }
         return readCsv(content);
     }

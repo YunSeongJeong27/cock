@@ -148,7 +148,10 @@ public enum ErrorCode {
     DELETE_ONLY_FINISHED(BAD_REQUEST, "완료된 주문만 지울 수 있습니다. 아직 처리 중인 주문: %s"),
 
     // ---- 입금 대조 ----
-    STATEMENT_PDF_NOT_SUPPORTED(BAD_REQUEST, "PDF 거래내역은 아직 읽을 수 없습니다. 은행 앱에서 엑셀이나 CSV 파일로 받아 올려주세요."),
+    STATEMENT_PDF_NO_TEXT(BAD_REQUEST, "PDF에서 글자를 읽지 못했습니다. 글자가 그림으로 된 PDF일 수 있습니다. 은행 앱 화면 캡처로 올리거나 엑셀로 받아 올려주세요."),
+    STATEMENT_PDF_PASSWORD(BAD_REQUEST, "비밀번호가 걸린 PDF는 읽을 수 없습니다. 은행 앱에서 비밀번호 없이 받거나 화면 캡처로 올려주세요."),
+    STATEMENT_PDF_UNREADABLE(BAD_REQUEST, "PDF 파일을 읽을 수 없습니다. 파일이 손상되었는지 확인해 주세요."),
+    STATEMENT_PDF_TOO_MANY_PAGES(BAD_REQUEST, "PDF는 %d쪽까지 읽을 수 있습니다. 조회 기간을 줄여서 받아 주세요."),
     STATEMENT_EXCEL_UNREADABLE(BAD_REQUEST, "엑셀 파일을 읽을 수 없습니다. 파일이 손상되었거나 암호가 걸려 있는지 확인해 주세요."),
     STATEMENT_GIVEN_COLUMNS_NOT_FOUND(BAD_REQUEST, "위쪽 %3$d줄 안에서 지정한 헤더(컬럼)를 찾지 못했습니다. 헤더(컬럼)명을 다시 확인해 주세요. 입금자명 헤더(컬럼): %1$s · 금액 헤더(컬럼): %2$s"),
     STATEMENT_COLUMNS_NOT_FOUND(BAD_REQUEST, "입금자명·금액 헤더(컬럼)를 자동으로 찾지 못했습니다. 은행마다 헤더(컬럼)명이 달라서 그렇습니다. "

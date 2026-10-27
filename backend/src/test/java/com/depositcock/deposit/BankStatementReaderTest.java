@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 
 import com.depositcock.common.ApiException;
+import com.depositcock.common.ErrorCode;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -99,6 +100,75 @@ class BankStatementReaderTest {
         assertThat(tossParsed.deposits().get(0).dateText()).isEqualTo("2026-10-22 22:52:05");
     }
 
+    /**
+     * 거래내역 PDF (2026-10-27). 테스트 PDF 는 사용자가 보낸 KB국민·토스뱅크 PDF 캡처의 배치(머리줄·칸 위치·정렬·페이지 나눔)를
+     * 흉내 내 만든 것이고 이름·금액은 가짜다 (src/test/resources/statements). 실제 은행 PDF 로는 아직 확인 못 함
+     */
+    @Test
+    void kbPdf() throws Exception {
+        ParsedStatement parsed = reader.read("KB거래내역조회.pdf", resource("statements/kb-statement.pdf"), null);
+        assertThat(parsed.ok()).isTrue();
+        assertThat(parsed.mapping().nameColumn()).isEqualTo("보낸분/받는분");
+        assertThat(parsed.mapping().amountColumn()).isEqualTo("입금액");
+        assertThat(parsed.mapping().dateColumn()).isEqualTo("거래일시");
+        // 2쪽에 다시 나온 머리줄·쪽 번호·안내문은 건너뛰고, 출금(입금액 0)도 건너뜀
+        assertThat(parsed.deposits()).extracting(DepositLine::name)
+                .containsExactly("홍길동", "김예시", "당근페이", "박샘플", "이테스트");
+        assertThat(parsed.deposits()).extracting(DepositLine::amount).containsExactly(8000, 8000, 90000, 300000, 870000);
+        assertThat(parsed.deposits().get(0).dateText()).isEqualTo("2026.10.26 10:43:46");
+        assertThat(parsed.deposits().get(0).depositedAt()).isEqualTo(LocalDateTime.of(2026, 10, 26, 10, 43, 46));
+    }
+
+    @Test
+    void tossPdf() throws Exception {
+        ParsedStatement parsed = reader.read("toss.pdf", resource("statements/toss-statement.pdf"), null);
+        assertThat(parsed.ok()).isTrue();
+        assertThat(parsed.mapping().nameColumn()).isEqualTo("거래내용");
+        assertThat(parsed.mapping().amountColumn()).isEqualTo("거래금액");
+        assertThat(parsed.mapping().typeColumn()).isEqualTo("구분");
+        // 머리줄 없는 2쪽도 같은 칸 위치로 읽음. 캐시백(+500)은 입금으로 읽힘 (자동으로 뺄지는 미결)
+        assertThat(parsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동", "카드 캐시백", "김샘플");
+        assertThat(parsed.deposits()).extracting(DepositLine::amount).containsExactly(35000, 500, 20000);
+        assertThat(parsed.deposits().get(0).dateText()).isEqualTo("2026-10-22 22:52:05");
+    }
+
+    /** 파일 이름이 .pdf 가 아니어도 내용이 PDF 면 PDF 로 읽는다 */
+    @Test
+    void pdfDetectedByContent() throws Exception {
+        assertThat(reader.read("거래내역", resource("statements/kb-statement.pdf"), null).deposits()).hasSize(5);
+    }
+
+    @Test
+    void pdfWithoutTextOrWithPassword() throws Exception {
+        byte[] blank;
+        try (org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            doc.addPage(new org.apache.pdfbox.pdmodel.PDPage());
+            doc.save(out);
+            blank = out.toByteArray();
+        }
+        assertThatThrownBy(() -> reader.read("scan.pdf", blank, null))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo(ErrorCode.STATEMENT_PDF_NO_TEXT));
+
+        byte[] locked;
+        try (org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            doc.addPage(new org.apache.pdfbox.pdmodel.PDPage());
+            doc.protect(new org.apache.pdfbox.pdmodel.encryption.StandardProtectionPolicy("owner", "900101",
+                    new org.apache.pdfbox.pdmodel.encryption.AccessPermission()));
+            doc.save(out);
+            locked = out.toByteArray();
+        }
+        assertThatThrownBy(() -> reader.read("locked.pdf", locked, null))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo(ErrorCode.STATEMENT_PDF_PASSWORD));
+    }
+
+    private static byte[] resource(String path) throws Exception {
+        try (var in = BankStatementReaderTest.class.getClassLoader().getResourceAsStream(path)) {
+            return in.readAllBytes();
+        }
+    }
+
     @Test
     void csvMs949WithQuotesAndBom() {
         String csv = "거래일자,기재내용,출금액,입금액,잔액\r\n"
@@ -157,10 +227,11 @@ class BankStatementReaderTest {
         assertThat(BankStatementReader.parseAmount("입금")).isNull();
     }
 
+    /** 손상된 PDF (2026-10-27 전에는 PDF 를 모두 거절했음) */
     @Test
-    void pdfIsRejectedWithGuide() {
+    void brokenPdfIsRejectedWithGuide() {
         assertThatThrownBy(() -> reader.read("문서.pdf", new byte[]{'%', 'P', 'D', 'F'}, null))
-                .isInstanceOf(ApiException.class).hasMessageContaining("PDF");
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo(ErrorCode.STATEMENT_PDF_UNREADABLE));
     }
 
     /** 금액이 항상 양수이고 '구분'으로 입금/출금을 나누는 형식: 출금·지급 줄은 빠진다 */

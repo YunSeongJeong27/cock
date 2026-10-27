@@ -1,14 +1,15 @@
 /** 입금 대조(거래내역·스크린샷), 은행 헤더(컬럼) 설정의 긴 문장. 규칙은 common.ts 맨 위 */
 export const depositText = {
   // 거래내역 올리기
-  uploadHelp: "은행 앱·인터넷뱅킹의 거래내역조회에서 엑셀로 받아 올려주세요. 토스뱅크는 발급할 때 '입금만 + 엑셀'로 받으면 편합니다. 원본 파일은 저장하지 않습니다.",
+  uploadHelp: "은행 앱·인터넷뱅킹의 거래내역조회에서 엑셀이나 PDF로 받아 올려주세요. 토스뱅크는 발급할 때 '입금만 + 엑셀'로 받으면 편합니다. 원본 파일은 저장하지 않습니다.",
   manualColumnsHelp: '은행마다 헤더(컬럼)명이 다릅니다. 파일의 헤더(컬럼)명을 그대로 적거나 목록에서 고르세요. 띄어쓰기는 달라도 됩니다.',
   uploaded: (saved: number, duplicates: number) =>
     `입금 ${saved}건을 올렸습니다.${duplicates ? ` 이미 올린 입금 ${duplicates}건은 건너뛰었습니다.` : ''}`,
   presetNamePrompt: '이 헤더(컬럼) 설정의 이름을 적어 주세요. 예: 신협',
   presetSaved: (name: string) => `"${name}" 헤더(컬럼) 설정을 저장했습니다. 다음부터 목록에서 고르면 됩니다.`,
-  columnsFound: (auto: boolean, headerRowNo: number) =>
-    `${auto ? '헤더(컬럼)를 자동으로 찾았습니다.' : '지정한 헤더(컬럼)명으로 읽었습니다.'} 헤더는 ${headerRowNo}행입니다.`,
+  /** headerRowNo 가 null 이면(PDF) 헤더 행 번호를 말하지 않는다 */
+  columnsFound: (auto: boolean, headerRowNo: number | null) =>
+    `${auto ? '헤더(컬럼)를 자동으로 찾았습니다.' : '지정한 헤더(컬럼)명으로 읽었습니다.'}${headerRowNo ? ` 헤더는 ${headerRowNo}행입니다.` : ''}`,
   previewCounts: (deposits: number, skipped: number, duplicates: number) =>
     `입금 ${deposits}건 · 출금·0원·이자 등 건너뛴 줄 ${skipped}개${duplicates ? ` · 이미 올린 입금 ${duplicates}건` : ''}`,
   wrongColumnsHint: '헤더(컬럼)가 틀렸으면 "헤더(컬럼)명 직접 지정"으로 바꿔서 다시 미리보기 하세요.',

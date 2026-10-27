@@ -161,9 +161,9 @@ export default function DepositTab({ groupBuy, reload }: Props) {
   return (
     <div>
       <div className="card">
-        <h3>① 거래내역 엑셀·CSV 올리기</h3>
+        <h3>① 거래내역 엑셀·CSV·PDF 올리기</h3>
         <p className="muted small">{T.uploadHelp}</p>
-        <input key={inputKey} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setParsed(null) }} />
+        <input key={inputKey} type="file" accept=".xlsx,.xls,.csv,.pdf" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setParsed(null) }} />
         <div className="row mt">
           <select value={presetId} onChange={(e) => { setPresetId(e.target.value); setManual(false) }} style={{ width: 220 }}>
             <option value="">헤더(컬럼) 자동 인식</option>
@@ -193,7 +193,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
             {parsed.headerRowNo > 0 ? (
               <>
                 <div className="success-box">
-                  {T.columnsFound(parsed.autoDetected, parsed.headerRowNo)}
+                  {T.columnsFound(parsed.autoDetected, file?.name.toLowerCase().endsWith('.pdf') ? null : parsed.headerRowNo)}
                   <div className="mt">
                     <span className="chip">입금자명: {parsed.mapping.nameColumn}</span>
                     <span className="chip">금액: {parsed.mapping.amountColumn}</span>
