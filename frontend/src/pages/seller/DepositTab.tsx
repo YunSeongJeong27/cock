@@ -163,6 +163,8 @@ export default function DepositTab({ groupBuy, reload }: Props) {
       <div className="card">
         <h3>① 거래내역 엑셀·CSV·PDF 올리기</h3>
         <p className="muted small">{T.uploadHelp}</p>
+        {/* 2026-10-27 사용자 요청: 공구 말고 다른 거래가 섞인 계좌면 대조가 잘 안 될 수 있음을 강조 */}
+        <div className="warn-box"><b>⚠ {T.mixedAccountWarning}</b></div>
         <input key={inputKey} type="file" accept=".xlsx,.xls,.csv,.pdf" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setParsed(null) }} />
         <div className="row mt">
           <select value={presetId} onChange={(e) => { setPresetId(e.target.value); setManual(false) }} style={{ width: 220 }}>

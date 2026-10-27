@@ -2,6 +2,7 @@
 export const depositText = {
   // 거래내역 올리기
   uploadHelp: "은행 앱·인터넷뱅킹의 거래내역조회에서 엑셀이나 PDF로 받아 올려주세요. 토스뱅크는 발급할 때 '입금만 + 엑셀'로 받으면 편합니다. 원본 파일은 저장하지 않습니다.",
+  mixedAccountWarning: '입금 받는 계좌를 공구 판매 말고 다른 용도로도 쓰면 대조가 잘 안 될 수 있습니다.',
   manualColumnsHelp: '은행마다 헤더(컬럼)명이 다릅니다. 파일의 헤더(컬럼)명을 그대로 적거나 목록에서 고르세요. 띄어쓰기는 달라도 됩니다.',
   uploaded: (saved: number, duplicates: number) =>
     `입금 ${saved}건을 올렸습니다.${duplicates ? ` 이미 올린 입금 ${duplicates}건은 건너뛰었습니다.` : ''}`,
