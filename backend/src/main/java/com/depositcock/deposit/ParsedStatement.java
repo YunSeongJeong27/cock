@@ -27,7 +27,11 @@ public record ParsedStatement(
         List<List<String>> preview,
         List<DepositLine> deposits,
         int skippedRows,
-        String message) {
+        String message,
+        /** 거래내역서 위쪽에서 찾은 계좌번호 (가려진 글자 포함, 못 찾으면 null, 2026-10-27) */
+        String accountNumber,
+        /** 지정한 헤더(컬럼)명 중 파일에서 못 찾은 것 (찾았으면 빈 목록) */
+        List<String> missingColumns) {
 
     public boolean ok() {
         return headerRowNo > 0;

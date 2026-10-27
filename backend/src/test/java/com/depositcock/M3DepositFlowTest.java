@@ -19,6 +19,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -68,7 +69,7 @@ class M3DepositFlowTest extends IntegrationTest {
         mvc.perform(withJson(post(base + "/orders/" + orderId + "/manual-paid").cookie(seller),
                 Map.of("depositorName", "김수동", "amount", 5000))).andExpect(status().isOk());
 
-        String file = "거래일시,입금자명,입금액\n2026.10.26 10:00:00,김수동,5000\n2026.10.26 11:00:00,홍길동,3000\n";
+        String file = "거래일자,거래내용,거래금액\n2026.10.26 10:00:00,김수동,5000\n2026.10.26 11:00:00,홍길동,3000\n";
         mvc.perform(multipart(base + "/deposits/uploads").file(csv(file)).cookie(seller)).andExpect(status().isOk());
         JsonNode match = read(mvc.perform(get(base + "/deposits/match").cookie(seller)).andReturn());
         assertThat(match.get("manualOrders")).hasSize(1);
@@ -126,18 +127,18 @@ class M3DepositFlowTest extends IntegrationTest {
         placeOrder(seller, id, "010-1000-0002", "박서준");
         placeOrder(seller, id, "010-1000-0003", "이수진");
 
-        String content = "거래일시,적요,거래금액\n"
+        String content = "거래일자,거래내용,거래금액\n"
                 + "2025.11.09 10:00:00,김지영,13900\n"
                 + "2025.11.09 10:05:00,박서준맘,13900\n"
                 + "2025.11.09 10:06:00,이수진,14000\n"
                 + "2025.11.09 10:07:00,관련없음,500\n"
                 + "2025.11.09 10:08:00,카드결제,-3000\n";
 
-        // 미리보기: 자동으로 찾은 열을 보여준다
+        // 미리보기: 공구 입금 계좌의 은행(토스뱅크) 헤더(컬럼)명으로 읽는다
         mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/preview").file(csv(content)).cookie(seller))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.parsed.autoDetected").value(true))
-                .andExpect(jsonPath("$.parsed.mapping.nameColumn").value("적요"))
+                .andExpect(jsonPath("$.bankName").value("토스뱅크"))
+                .andExpect(jsonPath("$.parsed.mapping.nameColumn").value("거래내용"))
                 .andExpect(jsonPath("$.parsed.mapping.amountColumn").value("거래금액"))
                 .andExpect(jsonPath("$.parsed.deposits.length()").value(4));
 
@@ -190,11 +191,18 @@ class M3DepositFlowTest extends IntegrationTest {
         long next = openGroupBuy(seller, "다음 공구", 8900);
         placeOrder(seller, next, "010-1000-0002", "박서준");
         mvc.perform(multipart("/api/seller/group-buys/" + next + "/deposits/uploads")
-                        .file(csv("입금자명,입금액\n박서준맘,8900\n")).cookie(seller))
+                        .file(csv("거래내용,거래금액,거래일자\n박서준맘,8900\n")).cookie(seller))
                 .andExpect(status().isOk());
-        mvc.perform(get("/api/seller/group-buys/" + next + "/deposits/match").cookie(seller))
-                .andExpect(jsonPath("$.rows[0].status").value("MATCHED"))
-                .andExpect(jsonPath("$.rows[0].evidence").value("저장된 별칭"));
+        JsonNode nextMatch = read(mvc.perform(get("/api/seller/group-buys/" + next + "/deposits/match").cookie(seller)).andReturn());
+        Map<String, JsonNode> nextByName = new HashMap<>();
+        nextMatch.get("rows").forEach(r -> nextByName.put(r.get("depositorName").asText(), r));
+        assertThat(nextByName.get("박서준맘").get("status").asText()).isEqualTo("MATCHED");
+        assertThat(nextByName.get("박서준맘").get("evidence").asText()).isEqualTo("저장된 별칭");
+        // 두 공구가 같은 입금 계좌: 앞 공구 주문(이수진)으로 보이는 입금은 "다른 공구" 목록에, 관련 없는 입금은 양쪽에 (2026-10-27)
+        assertThat(nextMatch.get("sharedGroupBuys").get(0).asText()).isEqualTo("떡 공구");
+        assertThat(nextMatch.get("otherRows").get(0).get("depositorName").asText()).isEqualTo("이수진");
+        assertThat(nextMatch.get("otherRows").get(0).get("order").get("groupBuyTitle").asText()).isEqualTo("떡 공구");
+        assertThat(nextByName).containsKey("관련없음");
 
         // 확정 취소 → 입금 줄이 다시 대조 대상으로
         mvc.perform(post("/api/seller/group-buys/" + id + "/orders/" + orderPark + "/unconfirm-paid").cookie(seller))
@@ -243,40 +251,63 @@ class M3DepositFlowTest extends IntegrationTest {
         }
     }
 
+    /**
+     * 은행 헤더(컬럼) 설정 (2026-10-27): 고른 은행의 헤더명이 파일에 없으면 멈추고 알린다.
+     * 판매자가 은행을 추가하거나 운영자 은행 값을 바꿔 쓸 수 있고, 지우면 원래 값으로 돌아간다
+     */
     @Test
-    void manualColumnMappingAndPreset() throws Exception {
+    void bankHeadersReadStatementAndStopOnMismatch() throws Exception {
         Cookie seller = signup(uniqueEmail());
-        long id = openGroupBuy(seller, "수동 열", 5000);
+        long id = openGroupBuy(seller, "은행 헤더", 5000);
+        String base = "/api/seller/group-buys/" + id;
         placeOrder(seller, id, "010-2000-0001", "홍길동");
-        String content = "보낸 사람 이름,들어온 돈\n홍길동,5000\n";
-        mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/preview").file(csv(content)).cookie(seller))
-                .andExpect(jsonPath("$.parsed.headerRowNo").value(0))
-                .andExpect(jsonPath("$.parsed.message").exists());
-        mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/uploads").file(csv(content)).cookie(seller))
+        String content = "입금 날짜,보낸 사람 이름,들어온 돈\n2026-10-27,홍길동,5000\n";
+        mvc.perform(multipart(base + "/deposits/preview").file(csv(content)).cookie(seller))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("STATEMENT_HEADER_MISMATCH"))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("'토스뱅크'")))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("거래내용, 거래금액, 거래일자")));
+        mvc.perform(multipart(base + "/deposits/uploads").file(csv(content)).cookie(seller))
                 .andExpect(status().isBadRequest());
-        // 화면의 "열 직접 지정": 요청 칸으로 열 이름을 보내면 그 열로 읽는다 (프리셋 없이)
-        mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/preview").file(csv(content))
-                        .param("nameColumn", "보낸 사람 이름").param("amountColumn", "들어온 돈").cookie(seller))
+        assertThat(read(mvc.perform(get(base + "/deposits/uploads").cookie(seller)).andReturn())).isEmpty();
+
+        // 은행 추가 → 그 은행을 골라 읽기
+        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(seller), Map.of("bankName", "우리동네은행",
+                        "nameColumn", "보낸 사람 이름", "amountColumn", "들어온 돈", "dateColumn", "입금 날짜")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.source").value("CUSTOM"));
+        mvc.perform(multipart(base + "/deposits/preview").file(csv(content)).param("bankName", "우리동네은행").cookie(seller))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.parsed.autoDetected").value(false))
+                .andExpect(jsonPath("$.bankName").value("우리동네은행"))
                 .andExpect(jsonPath("$.parsed.mapping.nameColumn").value("보낸 사람 이름"))
                 .andExpect(jsonPath("$.parsed.deposits.length()").value(1));
-
-        JsonNode preset = read(mvc.perform(withJson(post("/api/seller/bank-columns/presets").cookie(seller),
-                Map.of("name", "우리동네은행", "nameColumn", "보낸 사람 이름", "amountColumn", "들어온 돈"))).andReturn());
-        mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/uploads").file(csv(content))
-                        .param("presetId", preset.get("id").asText()).cookie(seller))
+        mvc.perform(multipart(base + "/deposits/uploads").file(csv(content)).param("bankName", "우리동네은행").cookie(seller))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.savedCount").value(1))
-                .andExpect(jsonPath("$.parsed.autoDetected").value(false));
-        mvc.perform(get("/api/seller/group-buys/" + id + "/deposits/match").cookie(seller))
+                .andExpect(jsonPath("$.savedCount").value(1));
+        mvc.perform(get(base + "/deposits/match").cookie(seller))
                 .andExpect(jsonPath("$.rows[0].status").value("MATCHED"));
 
-        // 다른 판매자는 프리셋을 쓸 수 없다
+        // 운영자 은행(토스뱅크) 값을 판매자가 바꾸면 은행을 안 골라도 바꾼 값으로 읽고, 지우면 원래 값으로
+        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(seller), Map.of("bankName", "토스뱅크",
+                        "nameColumn", "보낸 사람 이름", "amountColumn", "들어온 돈", "dateColumn", "입금 날짜")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.source").value("CHANGED"))
+                .andExpect(jsonPath("$.original.nameColumn").value("거래내용"));
+        mvc.perform(multipart(base + "/deposits/preview").file(csv(content)).cookie(seller))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.duplicateCount").value(1));
+        mvc.perform(delete("/api/seller/bank-headers").param("bankName", "토스뱅크").cookie(seller)).andExpect(status().isOk());
+        mvc.perform(multipart(base + "/deposits/preview").file(csv(content)).cookie(seller))
+                .andExpect(jsonPath("$.code").value("STATEMENT_HEADER_MISMATCH"));
+        mvc.perform(delete("/api/seller/bank-headers").param("bankName", "토스뱅크").cookie(seller))
+                .andExpect(status().isNotFound());
+        mvc.perform(withJson(put("/api/seller/bank-headers").cookie(seller), Map.of("bankName", "새은행", "nameColumn", "a",
+                        "amountColumn", "b", "dateColumn", " ")))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("DATE_COLUMN_REQUIRED"));
+
+        // 다른 판매자는 이 판매자가 추가한 은행을 쓸 수 없다
         Cookie other = signup(uniqueEmail());
         long otherId = openGroupBuy(other, "남의 공구", 1000);
         mvc.perform(multipart("/api/seller/group-buys/" + otherId + "/deposits/uploads").file(csv(content))
-                .param("presetId", preset.get("id").asText()).cookie(other)).andExpect(status().isNotFound());
+                .param("bankName", "우리동네은행").cookie(other)).andExpect(status().isNotFound());
     }
 
     /** 날짜만 있는 파일: 같은 사람이 같은 날 같은 금액을 두 번 입금(주문 2건) → 같은 파일 안의 두 줄은 둘 다 저장 */
@@ -287,7 +318,7 @@ class M3DepositFlowTest extends IntegrationTest {
         // 같은 번호로 다시 주문하면 기존 주문이 바뀌므로(2026-10-18) 다른 번호, 같은 입금자명 두 사람
         placeOrder(seller, id, "010-7000-0001", "김지영");
         placeOrder(seller, id, "010-7000-0002", "김지영");
-        String content = "거래일자,입금자명,입금액\n2025-11-01,김지영,5000\n2025-11-01,김지영,5000\n";
+        String content = "거래일자,거래내용,거래금액\n2025-11-01,김지영,5000\n2025-11-01,김지영,5000\n";
         mvc.perform(multipart("/api/seller/group-buys/" + id + "/deposits/uploads").file(csv(content)).cookie(seller))
                 .andExpect(jsonPath("$.savedCount").value(2))
                 .andExpect(jsonPath("$.duplicateCount").value(0));

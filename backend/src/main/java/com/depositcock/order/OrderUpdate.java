@@ -155,6 +155,7 @@ final class OrderUpdate {
         order.fillAmounts((int) itemsAmount, shippingFee);
         if (order.getExpectedAmount() != beforeAmount) {
             changes.add("금액 " + won(beforeAmount) + "→" + won(order.getExpectedAmount()));
+            order.markAmountSet(now); // 입금 대조 1시간 규칙의 기준 시각 (2026-10-27)
         }
         if (note != null) {
             changes.add(note);

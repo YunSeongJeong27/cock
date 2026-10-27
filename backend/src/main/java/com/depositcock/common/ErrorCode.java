@@ -148,6 +148,7 @@ public enum ErrorCode {
     DELETE_ONLY_FINISHED(BAD_REQUEST, "완료된 주문만 지울 수 있습니다. 아직 처리 중인 주문: %s"),
 
     // ---- 입금 대조 ----
+    STATEMENT_HEADER_MISMATCH(BAD_REQUEST, "거래내역 헤더 설정이 잘못됐습니다. [은행 헤더(컬럼) 설정] 메뉴에서 '%s'의 헤더(컬럼)명을 파일에 맞게 고친 뒤 다시 올려 주세요. 파일에서 못 찾은 헤더(컬럼)명: %s"),
     STATEMENT_PDF_NO_TEXT(BAD_REQUEST, "PDF에서 글자를 읽지 못했습니다. 글자가 그림으로 된 PDF일 수 있습니다. 은행 앱 화면 캡처로 올리거나 엑셀로 받아 올려주세요."),
     STATEMENT_PDF_PASSWORD(BAD_REQUEST, "비밀번호가 걸린 PDF는 읽을 수 없습니다. 은행 앱에서 비밀번호 없이 받거나 화면 캡처로 올려주세요."),
     STATEMENT_PDF_UNREADABLE(BAD_REQUEST, "PDF 파일을 읽을 수 없습니다. 파일이 손상되었는지 확인해 주세요."),
@@ -170,7 +171,7 @@ public enum ErrorCode {
     NOT_PAID(BAD_REQUEST, "입금 확정된 주문이 아닙니다."),
     REFUNDED_CANNOT_UNCONFIRM(BAD_REQUEST, "환불 완료된 주문은 입금 확정을 취소할 수 없습니다."),
     ALIAS_NOT_FOUND(NOT_FOUND, "별칭을 찾을 수 없습니다."),
-    PRESET_NOT_FOUND(NOT_FOUND, "저장된 헤더(컬럼) 설정을 찾을 수 없습니다."),
+    BANK_HEADER_NOT_FOUND(NOT_FOUND, "은행 헤더(컬럼) 설정을 찾을 수 없습니다."),
 
     // ---- 댓글 집계 ----
     COMMENT_AUTHOR_EMPTY(BAD_REQUEST, "작성자가 비어 있는 댓글이 있습니다: %s"),
@@ -241,11 +242,11 @@ public enum ErrorCode {
     DEPOSIT_NOT_CHOSEN(BAD_REQUEST, "입금을 골라 주세요."),
     ORDER_NOT_CHOSEN(BAD_REQUEST, "주문을 골라 주세요."),
     CONFIRM_NOTHING_SELECTED(BAD_REQUEST, "확정할 입금을 골라 주세요."),
-    PRESET_NAME_REQUIRED(BAD_REQUEST, "설정 이름을 입력해 주세요."),
-    PRESET_NAME_TOO_LONG(BAD_REQUEST, "설정 이름은 100자까지 입력할 수 있습니다."),
+    BANK_NAME_REQUIRED(BAD_REQUEST, "은행 이름을 입력해 주세요."),
     COLUMN_NAME_TOO_LONG(BAD_REQUEST, "헤더(컬럼)명은 100자까지 입력할 수 있습니다."),
-    NAME_COLUMN_REQUIRED(BAD_REQUEST, "입금자명 헤더(컬럼)를 골라 주세요."),
-    AMOUNT_COLUMN_REQUIRED(BAD_REQUEST, "금액 헤더(컬럼)를 골라 주세요."),
+    NAME_COLUMN_REQUIRED(BAD_REQUEST, "입금자명 헤더(컬럼)명을 입력해 주세요."),
+    AMOUNT_COLUMN_REQUIRED(BAD_REQUEST, "입금액 헤더(컬럼)명을 입력해 주세요."),
+    DATE_COLUMN_REQUIRED(BAD_REQUEST, "거래일시 헤더(컬럼)명을 입력해 주세요."),
     COMMENT_SOURCE_REQUIRED(BAD_REQUEST, "댓글을 어디서 가져왔는지 골라 주세요."),
     COMMENTS_MISSING(BAD_REQUEST, "저장할 댓글이 없습니다."),
     COMMENT_AUTHOR_REQUIRED(BAD_REQUEST, "작성자를 입력해 주세요."),

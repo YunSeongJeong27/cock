@@ -3,12 +3,12 @@ package com.depositcock.deposit;
 import java.util.List;
 
 import com.depositcock.deposit.DepositDtos.AliasResponse;
+import com.depositcock.deposit.DepositDtos.BankHeaderRequest;
+import com.depositcock.deposit.DepositDtos.BankHeaderView;
 import com.depositcock.deposit.DepositDtos.BankSettingsResponse;
 import com.depositcock.deposit.DepositDtos.ConfirmRequest;
 import com.depositcock.deposit.DepositDtos.ConfirmResponse;
 import com.depositcock.deposit.DepositDtos.MatchResponse;
-import com.depositcock.deposit.DepositDtos.PresetRequest;
-import com.depositcock.deposit.DepositDtos.PresetResponse;
 import com.depositcock.deposit.DepositDtos.PreviewResponse;
 import com.depositcock.deposit.DepositDtos.UploadResponse;
 import com.depositcock.deposit.DepositDtos.UploadSummary;
@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -33,30 +34,28 @@ public class DepositController {
     private static final String BASE = "/api/seller/group-buys/{groupBuyId}/deposits";
 
     private final DepositService service;
+    private final BankHeaders bankHeaders;
 
-    /**
-     * 은행 열 설정 화면 한 번에: 자동 탐지 열 이름 후보 + 저장된 열 설정 + 입금자 별칭.
-     * 전에는 화면이 열 이름 후보(/bank-columns/defaults)·열 설정·별칭을 따로 세 번 불렀음 (2026-10-21)
-     */
+    /** 은행 헤더(컬럼) 설정 화면 한 번에: 은행별 헤더(컬럼)명 + 입금자 별칭 (2026-10-27) */
     @GetMapping("/api/seller/bank-settings")
     public BankSettingsResponse bankSettings() {
         return service.bankSettings(CurrentSeller.id());
     }
 
     /**
-     * 열을 직접 지정할 때는 요청 칸 dateColumn·nameColumn·amountColumn·typeColumn 을 ColumnMapping 으로 묶어 받는다
-     * (없으면 모두 null → 자동 탐지). 전에는 두 메서드가 칸 4개를 따로 받아 직접 묶었음 (2026-10-21)
+     * bankName: 어느 은행의 헤더(컬럼)명으로 읽을지 (은행 헤더 설정 목록의 이름). 없으면 공구 입금 계좌의 은행 (2026-10-27).
+     * 전에는 열 이름을 요청마다 직접 지정하거나 저장한 설정(presetId)을 골랐음
      */
     @PostMapping(BASE + "/preview")
     public PreviewResponse preview(@PathVariable Long groupBuyId, @RequestPart("file") MultipartFile file,
-                                   ColumnMapping mapping, @RequestParam(required = false) Long presetId) {
-        return service.preview(CurrentSeller.id(), groupBuyId, file, mapping, presetId);
+                                   @RequestParam(required = false) String bankName) {
+        return service.preview(CurrentSeller.id(), groupBuyId, file, bankName);
     }
 
     @PostMapping(BASE + "/uploads")
     public UploadResponse upload(@PathVariable Long groupBuyId, @RequestPart("file") MultipartFile file,
-                                 ColumnMapping mapping, @RequestParam(required = false) Long presetId) {
-        return service.upload(CurrentSeller.id(), groupBuyId, file, mapping, presetId);
+                                 @RequestParam(required = false) String bankName) {
+        return service.upload(CurrentSeller.id(), groupBuyId, file, bankName);
     }
 
     @GetMapping(BASE + "/uploads")
@@ -101,19 +100,16 @@ public class DepositController {
         service.manualConfirm(CurrentSeller.id(), groupBuyId, orderId, request.depositorName(), request.amount());
     }
 
-    @GetMapping("/api/seller/bank-columns/presets")
-    public List<PresetResponse> presets() {
-        return service.presets(CurrentSeller.id());
+    /** 은행별 헤더(컬럼)명 저장: 목록에 있는 은행이면 판매자 값으로 바꾸고, 없는 은행이면 추가 (2026-10-27) */
+    @PutMapping("/api/seller/bank-headers")
+    public BankHeaderView saveBankHeader(@Valid @RequestBody BankHeaderRequest request) {
+        return bankHeaders.save(CurrentSeller.id(), request);
     }
 
-    @PostMapping("/api/seller/bank-columns/presets")
-    public PresetResponse savePreset(@Valid @RequestBody PresetRequest request) {
-        return service.savePreset(CurrentSeller.id(), request);
-    }
-
-    @DeleteMapping("/api/seller/bank-columns/presets/{presetId}")
-    public void deletePreset(@PathVariable Long presetId) {
-        service.deletePreset(CurrentSeller.id(), presetId);
+    /** 판매자 값 지우기: 운영자 은행은 원래 값으로, 판매자가 추가한 은행은 목록에서 빠짐 */
+    @DeleteMapping("/api/seller/bank-headers")
+    public void deleteBankHeader(@RequestParam String bankName) {
+        bankHeaders.delete(CurrentSeller.id(), bankName);
     }
 
     @GetMapping("/api/seller/aliases")

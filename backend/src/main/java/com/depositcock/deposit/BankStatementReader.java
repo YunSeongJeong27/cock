@@ -17,6 +17,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.depositcock.common.ApiException;
@@ -78,10 +79,55 @@ public class BankStatementReader {
     private static final Charset MS949 = Charset.forName("MS949");
 
     public ParsedStatement read(String fileName, byte[] content, ColumnMapping requested) {
+        return read(fileName, content, requested, null);
+    }
+
+    /**
+     * @param requested    은행별 헤더(컬럼)명 (null 이면 후보 목록으로 자동 인식, 테스트용)
+     * @param accountLabel 거래내역서 위쪽의 계좌번호 칸 이름 (null 이면 계좌번호를 찾지 않음, 2026-10-27)
+     */
+    public ParsedStatement read(String fileName, byte[] content, ColumnMapping requested, String accountLabel) {
         List<List<String>> rows = isPdf(fileName, content)
                 ? PdfTableReader.read(content, header -> isPdfHeader(header, requested))
                 : readRows(fileName, content);
-        return parse(rows, requested);
+        ParsedStatement parsed = parse(rows, requested);
+        if (accountLabel == null || accountLabel.isBlank()) {
+            return parsed;
+        }
+        int searchUntil = parsed.ok() ? parsed.headerRowNo() - 1 : Math.min(rows.size(), HEADER_SEARCH_ROWS);
+        return parsed.toBuilder().accountNumber(findAccountNumber(rows.subList(0, searchUntil), accountLabel)).build();
+    }
+
+    /** 계좌번호처럼 보이는 글자: 숫자·가림 글자(* x ● 등)·하이픈이 6자 이상 */
+    private static final Pattern ACCOUNT = Pattern.compile("[0-9*xX●○#][0-9*xX●○#\\- ]{4,}[0-9*xX●○#]");
+
+    /**
+     * 거래내역서 위쪽에서 계좌번호 찾기: 칸 이름(예: 계좌번호)이 있는 칸의 뒷부분("계좌번호: 1001-…") 또는 같은 줄의 다음 칸.
+     * 못 찾으면 null
+     */
+    static String findAccountNumber(List<List<String>> rows, String label) {
+        String key = Texts.squash(label);
+        for (List<String> row : rows) {
+            for (int c = 0; c < row.size(); c++) {
+                String cell = row.get(c) == null ? "" : row.get(c).trim();
+                if (!Texts.squash(cell).startsWith(key)) {
+                    continue;
+                }
+                String rest = afterLabel(cell, key.length());
+                List<String> candidates = new ArrayList<>();
+                candidates.add(rest);
+                for (int n = c + 1; n < row.size(); n++) {
+                    candidates.add(row.get(n));
+                }
+                for (String candidate : candidates) {
+                    Matcher m = ACCOUNT.matcher(candidate == null ? "" : candidate);
+                    if (m.find()) {
+                        return m.group().trim();
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private static boolean isPdf(String fileName, byte[] content) {
@@ -97,7 +143,8 @@ public class BankStatementReader {
     static boolean isPdfHeader(List<String> cells, ColumnMapping requested) {
         List<String> header = cells.stream().map(Texts::squash).toList();
         if (requested != null && requested.isComplete()) {
-            return header.contains(Texts.squash(requested.nameColumn())) && header.contains(Texts.squash(requested.amountColumn()));
+            return header.contains(Texts.squash(requested.nameColumn())) && header.contains(Texts.squash(requested.amountColumn()))
+                    && (isBlank(requested.dateColumn()) || header.contains(Texts.squash(requested.dateColumn())));
         }
         return firstIndex(header, NAME_CANDIDATES) >= 0 && firstIndex(header, AMOUNT_CANDIDATES) >= 0;
     }
@@ -243,6 +290,10 @@ public class BankStatementReader {
                 dateIdx = isBlank(requested.dateColumn()) ? -1 : header.indexOf(Texts.squash(requested.dateColumn()));
                 typeIdx = isBlank(requested.typeColumn()) ? -1 : header.indexOf(Texts.squash(requested.typeColumn()));
                 used = requested;
+                // 지정한 거래일시·거래 구분 칸도 머리줄에 있어야 한다 (은행별 헤더 설정이 파일과 맞는지 확인, 2026-10-27)
+                if ((!isBlank(requested.dateColumn()) && dateIdx < 0) || (!isBlank(requested.typeColumn()) && typeIdx < 0)) {
+                    continue;
+                }
             } else {
                 nameIdx = firstIndex(header, NAME_CANDIDATES);
                 amountIdx = firstIndex(header, AMOUNT_CANDIDATES);
@@ -282,6 +333,7 @@ public class BankStatementReader {
                     .preview(preview)
                     .deposits(deposits)
                     .skippedRows(skipped)
+                    .missingColumns(List.of())
                     .build();
         }
         String message = manual
@@ -298,7 +350,36 @@ public class BankStatementReader {
                 .deposits(List.of())
                 .skippedRows(0)
                 .message(message)
+                .missingColumns(manual ? missingColumns(rows, requested) : List.of())
                 .build();
+    }
+
+    /** 칸 글자에서 띄어쓰기를 빼고 센 앞 n글자(칸 이름)를 지난 뒷부분 ("계좌번호: 1001-…" → ": 1001-…") */
+    private static String afterLabel(String cell, int labelLength) {
+        int seen = 0;
+        int i = 0;
+        while (i < cell.length() && seen < labelLength) {
+            if (!Character.isWhitespace(cell.charAt(i))) {
+                seen++;
+            }
+            i++;
+        }
+        return cell.substring(i);
+    }
+
+    /** 지정한 헤더(컬럼)명 중 파일 위쪽 어디에도 없는 것. 다 있는데 한 줄에 모이지 않았으면 전부 */
+    private static List<String> missingColumns(List<List<String>> rows, ColumnMapping requested) {
+        Set<String> cells = new LinkedHashSet<>();
+        rows.stream().limit(HEADER_SEARCH_ROWS).forEach(row -> row.forEach(v -> cells.add(Texts.squash(v))));
+        List<String> names = new ArrayList<>();
+        for (String name : new String[] {requested.nameColumn(), requested.amountColumn(), requested.dateColumn(),
+                requested.typeColumn()}) {
+            if (!isBlank(name)) {
+                names.add(name);
+            }
+        }
+        List<String> missing = names.stream().filter(n -> !cells.contains(Texts.squash(n))).toList();
+        return missing.isEmpty() ? names : missing;
     }
 
     /**

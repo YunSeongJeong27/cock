@@ -151,6 +151,12 @@ public class CustomerOrder extends BaseTimeEntity {
     @Column(nullable = false)
     private LocalDateTime orderedAt;
 
+    /**
+     * 고객이 보낼 금액이 마지막으로 정해진 시각: 주문 시각, 그 뒤 고객·판매자가 바꿔 금액이 달라졌으면 그 시각.
+     * 입금 대조 1시간 규칙의 기준 (2026-10-27). 주소 변경·수령 체크처럼 금액과 상관없는 변경은 바꾸지 않는다
+     */
+    private LocalDateTime amountSetAt;
+
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
@@ -168,7 +174,17 @@ public class CustomerOrder extends BaseTimeEntity {
         this.lookupToken = lookupToken;
         this.status = OrderStatus.ORDERED;
         this.orderedAt = now;
+        this.amountSetAt = now;
         this.updatedAt = now;
+    }
+
+    public void markAmountSet(LocalDateTime now) {
+        this.amountSetAt = now;
+    }
+
+    /** 금액이 정해진 시각 (예전 데이터라 비어 있으면 주문 시각) */
+    public LocalDateTime getAmountSetAt() {
+        return amountSetAt == null ? orderedAt : amountSetAt;
     }
 
     /** 주문 내용을 바꿨다는 기록을 남긴다 */

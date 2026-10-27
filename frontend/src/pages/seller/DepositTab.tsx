@@ -1,26 +1,24 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, dateTime, errorMessage, won } from '../../api'
+import { Link } from 'react-router-dom'
+import { api, ApiError, dateTime, errorMessage, won } from '../../api'
 import { ErrorBox, StatusBadge } from '../../components/Ui'
 import { depositText as T } from '../../texts/deposit'
-import type { ColumnMapping, GroupBuy, MatchResponse, MatchRow, OrderBrief, ParsedStatement, Preset, UploadSummary } from '../../types'
+import type { BankHeaderView, GroupBuy, MatchResponse, MatchRow, OrderBrief, PreviewResponse, UploadResponse, UploadSummary } from '../../types'
 import ScreenshotDeposits from './ScreenshotDeposits'
 
 interface Props { groupBuy: GroupBuy; reload: () => void }
 
-const emptyMapping: ColumnMapping = { dateColumn: '', nameColumn: '', amountColumn: '', typeColumn: '' }
-
-function orderLabel(o: OrderBrief) {
-  return `${o.orderNo}번 ${o.nickname ? o.nickname + ' / ' : ''}${o.depositorName ?? ''} · 전화 뒷자리 ${o.phoneLast4 || '-'} · ${won(o.expectedAmount)}`
+/** 같은 입금 계좌를 쓰는 다른 공구의 주문이면 앞에 공구 제목을 붙인다 (2026-10-27) */
+function orderLabel(o: OrderBrief, groupBuyId: number) {
+  const other = o.groupBuyId !== groupBuyId ? `[${o.groupBuyTitle}] ` : ''
+  return `${other}${o.orderNo}번 ${o.nickname ? o.nickname + ' / ' : ''}${o.depositorName ?? ''} · 전화 뒷자리 ${o.phoneLast4 || '-'} · ${won(o.expectedAmount)}`
 }
 
 export default function DepositTab({ groupBuy, reload }: Props) {
   const [file, setFile] = useState<File | null>(null)
-  const [presets, setPresets] = useState<Preset[]>([])
-  const [presetId, setPresetId] = useState('')
-  const [manual, setManual] = useState(false)
-  const [mapping, setMapping] = useState<ColumnMapping>(emptyMapping)
-  const [parsed, setParsed] = useState<ParsedStatement | null>(null)
-  const [duplicates, setDuplicates] = useState(0)
+  const [banks, setBanks] = useState<BankHeaderView[]>([])
+  const [bankName, setBankName] = useState('')
+  const [checked, setChecked] = useState<PreviewResponse | null>(null)
   const [match, setMatch] = useState<MatchResponse | null>(null)
   const [uploads, setUploads] = useState<UploadSummary[]>([])
   const [choice, setChoice] = useState<Record<number, string>>({})
@@ -37,8 +35,9 @@ export default function DepositTab({ groupBuy, reload }: Props) {
       const m = await api.get<MatchResponse>(`${base}/match`)
       setMatch(m)
       setUploads(m.uploads)
+      setBankName((current) => current || m.bankName)
       const initial: Record<number, string> = {}
-      m.rows.forEach((r) => {
+      ;[...m.rows, ...m.otherRows].forEach((r) => {
         // 자동 매칭·추천은 그 주문, 거래내역 없이 확정한 주문의 입금으로 보이면 그 주문을 미리 골라 둔다
         if (r.order) initial[r.rowId] = String(r.order.orderId)
         else if (r.linkOrderId != null) initial[r.rowId] = String(r.linkOrderId)
@@ -51,34 +50,36 @@ export default function DepositTab({ groupBuy, reload }: Props) {
 
   useEffect(() => {
     loadMatch()
-    api.get<Preset[]>('/api/seller/bank-columns/presets').then(setPresets).catch(() => undefined)
+    api.get<{ banks: BankHeaderView[] }>('/api/seller/bank-settings').then((s) => setBanks(s.banks)).catch(() => undefined)
   }, [loadMatch])
 
   function formData() {
     const fd = new FormData()
     fd.append('file', file as File)
-    if (presetId) fd.append('presetId', presetId)
-    else if (manual) {
-      Object.entries(mapping).forEach(([k, v]) => {
-        if (v) fd.append(k, v)
-      })
-    }
+    if (bankName) fd.append('bankName', bankName)
     return fd
   }
 
-  async function preview() {
-    if (!file) return
+  /** 은행 헤더(컬럼) 설정이 파일과 안 맞으면 멈추고 알린다 (2026-10-27 사용자 결정) */
+  function fail(e: unknown) {
+    const message = errorMessage(e)
+    setError(message)
+    if (e instanceof ApiError && e.code === 'STATEMENT_HEADER_MISMATCH') alert(message)
+  }
+
+  async function preview(): Promise<PreviewResponse | null> {
+    if (!file) return null
     setBusy(true)
     setError(null)
     setNotice(null)
     try {
-      const res = await api.post<{ parsed: ParsedStatement; duplicateCount: number }>(`${base}/preview`, formData())
-      setParsed(res.parsed)
-      setDuplicates(res.duplicateCount)
-      if (!res.parsed.headerRowNo) setManual(true)
-      else if (!manual && !presetId) setMapping(res.parsed.mapping)
+      const res = await api.post<PreviewResponse>(`${base}/preview`, formData())
+      setChecked(res)
+      return res
     } catch (e) {
-      setError(errorMessage(e))
+      setChecked(null)
+      fail(e)
+      return null
     } finally {
       setBusy(false)
     }
@@ -86,31 +87,23 @@ export default function DepositTab({ groupBuy, reload }: Props) {
 
   async function upload() {
     if (!file) return
+    // 거래내역서 계좌번호가 공구 입금 계좌와 다르면 올리기 전에 한 번 더 묻는다 (2026-10-27)
+    const res = checked ?? await preview()
+    if (!res) return
+    if (res.account.check === 'DIFFERENT' && res.account.notice && !confirm(T.accountDifferentConfirm(res.account.notice))) return
     setBusy(true)
     setError(null)
     try {
-      const res = await api.post<{ savedCount: number; duplicateCount: number }>(`${base}/uploads`, formData())
-      setNotice(T.uploaded(res.savedCount, res.duplicateCount))
-      setParsed(null)
+      const saved = await api.post<UploadResponse>(`${base}/uploads`, formData())
+      setNotice(T.uploaded(saved.savedCount, saved.duplicateCount))
+      setChecked(null)
       setFile(null)
       setInputKey((k) => k + 1)
       await loadMatch()
     } catch (e) {
-      setError(errorMessage(e))
+      fail(e)
     } finally {
       setBusy(false)
-    }
-  }
-
-  async function savePreset() {
-    const name = prompt(T.presetNamePrompt)
-    if (!name) return
-    try {
-      const p = await api.post<Preset>('/api/seller/bank-columns/presets', { name, ...mapping })
-      setPresets((list) => [...list.filter((x) => x.id !== p.id), p])
-      setNotice(T.presetSaved(name))
-    } catch (e) {
-      setError(errorMessage(e))
     }
   }
 
@@ -157,6 +150,8 @@ export default function DepositTab({ groupBuy, reload }: Props) {
   // "자동 매칭 모두 확정"은 화면에서 지금 고른 주문으로 확정한다 (판매자가 비우면 빼고, 바꾸면 바꾼 주문으로).
   // 확인 필요(같은 고객의 주문·입금이 여러 건)는 빼고 하나씩 확정하게 한다 (2026-10-26)
   const matched = match?.rows.filter((r) => r.status === 'MATCHED' && !r.checkNote && choice[r.rowId]) ?? []
+  const bank = banks.find((b) => b.bankName === bankName)
+  const parsed = checked?.parsed ?? null
 
   return (
     <div>
@@ -165,73 +160,52 @@ export default function DepositTab({ groupBuy, reload }: Props) {
         <p className="muted small">{T.uploadHelp}</p>
         {/* 2026-10-27 사용자 요청: 공구 말고 다른 거래가 섞인 계좌면 대조가 잘 안 될 수 있음을 강조 */}
         <div className="warn-box"><b>⚠ {T.mixedAccountWarning}</b></div>
-        <input key={inputKey} type="file" accept=".xlsx,.xls,.csv,.pdf" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setParsed(null) }} />
-        <div className="row mt">
-          <select value={presetId} onChange={(e) => { setPresetId(e.target.value); setManual(false) }} style={{ width: 220 }}>
-            <option value="">헤더(컬럼) 자동 인식</option>
-            {presets.map((p) => <option key={p.id} value={p.id}>저장한 설정: {p.name}</option>)}
-          </select>
-          <label className="check"><input type="checkbox" checked={manual} onChange={(e) => { setManual(e.target.checked); setPresetId('') }} /> 헤더(컬럼)명 직접 지정</label>
-        </div>
-        {manual && (
-          <div className="mt">
-            <p className="small muted">{T.manualColumnsHelp}</p>
-            <datalist id="column-options">{parsed?.columnOptions.map((c) => <option key={c} value={c} />)}</datalist>
-            <div className="mapping-grid">
-              <label className="field"><span>입금자명 헤더(컬럼) *</span><input type="text" list="column-options" value={mapping.nameColumn ?? ''} onChange={(e) => setMapping({ ...mapping, nameColumn: e.target.value })} placeholder="예: 기재내용" /></label>
-              <label className="field"><span>금액 헤더(컬럼) *</span><input type="text" list="column-options" value={mapping.amountColumn ?? ''} onChange={(e) => setMapping({ ...mapping, amountColumn: e.target.value })} placeholder="예: 입금액" /></label>
-              <label className="field"><span>날짜 헤더(컬럼)</span><input type="text" list="column-options" value={mapping.dateColumn ?? ''} onChange={(e) => setMapping({ ...mapping, dateColumn: e.target.value })} placeholder="예: 거래일시" /></label>
-              <label className="field"><span>거래 유형 헤더(컬럼)</span><input type="text" list="column-options" value={mapping.typeColumn ?? ''} onChange={(e) => setMapping({ ...mapping, typeColumn: e.target.value })} placeholder="예: 구분" /></label>
+        <p className="small">{T.visibleInfoTip}</p>
+        <input key={inputKey} type="file" accept=".xlsx,.xls,.csv,.pdf" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setChecked(null) }} />
+        <div className="mt">
+          <label className="field" style={{ maxWidth: 320 }}>
+            <span>거래내역 은행</span>
+            <select value={bankName} onChange={(e) => { setBankName(e.target.value); setChecked(null) }}>
+              {banks.map((b) => <option key={b.bankName} value={b.bankName}>{b.bankName}</option>)}
+            </select>
+          </label>
+          <p className="small muted">{T.bankSelectHelp}</p>
+          {bank && (
+            <div className="small">
+              <span className="chip">입금자명: {bank.values.nameColumn}</span>
+              <span className="chip">입금액: {bank.values.amountColumn}</span>
+              <span className="chip">거래일시: {bank.values.dateColumn}</span>
+              {bank.values.accountLabel && <span className="chip">계좌번호: {bank.values.accountLabel}</span>}
+              {bank.values.typeColumn && <span className="chip">구분: {bank.values.typeColumn}</span>}
+              <Link to="/seller/bank" className="small" style={{ marginLeft: 8 }}>은행 헤더(컬럼) 설정</Link>
             </div>
-          </div>
-        )}
+          )}
+        </div>
         <div className="row mt">
           <button className="btn" disabled={!file || busy} onClick={preview}>미리보기</button>
-          <button className="btn primary" disabled={!file || busy || (parsed !== null && !parsed.headerRowNo)} onClick={upload}>올리기</button>
+          <button className="btn primary" disabled={!file || busy} onClick={upload}>올리기</button>
         </div>
 
-        {parsed && (
+        {checked && parsed && (
           <div className="mt">
-            {parsed.headerRowNo > 0 ? (
-              <>
-                <div className="success-box">
-                  {T.columnsFound(parsed.autoDetected, file?.name.toLowerCase().endsWith('.pdf') ? null : parsed.headerRowNo)}
-                  <div className="mt">
-                    <span className="chip">입금자명: {parsed.mapping.nameColumn}</span>
-                    <span className="chip">금액: {parsed.mapping.amountColumn}</span>
-                    <span className="chip">날짜: {parsed.mapping.dateColumn || '없음'}</span>
-                    <span className="chip">유형: {parsed.mapping.typeColumn || '없음'}</span>
-                  </div>
-                  <div className="small mt">{T.previewCounts(parsed.deposits.length, parsed.skippedRows, duplicates)}</div>
-                  <div className="small">{T.wrongColumnsHint}</div>
-                </div>
-                {manual && <button className="btn small" onClick={savePreset}>이 헤더(컬럼) 설정을 은행별로 저장</button>}
-                <div className="table-wrap mt">
-                  <table>
-                    <thead><tr><th>행</th><th>입금자명</th><th className="right">금액</th><th>일시</th></tr></thead>
-                    <tbody>
-                      {parsed.deposits.slice(0, 20).map((d) => (
-                        <tr key={d.rowNo}><td>{d.rowNo}</td><td>{d.name}</td><td className="right">{won(d.amount)}</td><td className="small">{d.dateText ?? '-'}</td></tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {parsed.deposits.length > 20 && <div className="muted small">… 외 {parsed.deposits.length - 20}건</div>}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="warn-box">{parsed.message}</div>
-                <div className="table-wrap">
-                  <table className="preview-table">
-                    <tbody>
-                      {parsed.preview.map((row, i) => (
-                        <tr key={i}><td className="muted">{i + 1}</td>{row.map((c, j) => <td key={j}>{c}</td>)}</tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+            {checked.account.notice && (
+              <div className="warn-box">{checked.account.check === 'DIFFERENT' ? <b>⚠ {checked.account.notice}</b> : checked.account.notice}</div>
             )}
+            <div className="success-box">
+              {T.columnsFound(checked.bankName, file?.name.toLowerCase().endsWith('.pdf') ? null : parsed.headerRowNo)}
+              <div className="small mt">{T.previewCounts(parsed.deposits.length, parsed.skippedRows, checked.duplicateCount)}</div>
+            </div>
+            <div className="table-wrap mt">
+              <table>
+                <thead><tr><th>행</th><th>입금자명</th><th className="right">금액</th><th>일시</th></tr></thead>
+                <tbody>
+                  {parsed.deposits.slice(0, 20).map((d) => (
+                    <tr key={d.rowNo}><td>{d.rowNo}</td><td>{d.name}</td><td className="right">{won(d.amount)}</td><td className="small">{d.dateText ?? '-'}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+              {parsed.deposits.length > 20 && <div className="muted small">… 외 {parsed.deposits.length - 20}건</div>}
+            </div>
           </div>
         )}
       </div>
@@ -255,6 +229,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
             </div>
           </div>
           <p className="muted small">{T.confirmHelp}</p>
+          {match.sharedGroupBuys.length > 0 && <div className="warn-box small">{T.sharedAccount(match.sharedGroupBuys)}</div>}
           <div className="row small mb">
             <StatusBadge status="MATCHED" label={`자동 매칭 ${match.matchedCount}`} />
             <StatusBadge status="SUGGESTED" label={`추천 ${match.suggestedCount}`} />
@@ -263,7 +238,21 @@ export default function DepositTab({ groupBuy, reload }: Props) {
           </div>
           {match.rows.length === 0 && <p className="muted">{T.noDeposits}</p>}
           {match.rows.map((r) => (
-            <MatchItem key={r.rowId} row={r} openOrders={match.openOrders} manualOrders={match.manualOrders} value={choice[r.rowId] ?? ''} busy={busy}
+            <MatchItem key={r.rowId} row={r} groupBuyId={groupBuy.id} openOrders={match.openOrders} manualOrders={match.manualOrders} value={choice[r.rowId] ?? ''} busy={busy}
+              onHandled={() => setHandled(r, true)}
+              onChange={(v) => setChoice({ ...choice, [r.rowId]: v })}
+              onConfirm={() => choice[r.rowId] && confirmItems([{ rowId: r.rowId, orderId: Number(choice[r.rowId]) }])}
+              onRefundCheck={(orderId) => confirmItems([{ rowId: r.rowId, orderId }])} />
+          ))}
+        </div>
+      )}
+
+      {match && match.otherRows.length > 0 && (
+        <div className="card">
+          <h3>다른 공구 주문으로 보이는 입금 ({match.otherRows.length})</h3>
+          <p className="muted small">{T.otherRowsHelp}</p>
+          {match.otherRows.map((r) => (
+            <MatchItem key={r.rowId} row={r} groupBuyId={groupBuy.id} openOrders={match.openOrders} manualOrders={match.manualOrders} value={choice[r.rowId] ?? ''} busy={busy}
               onHandled={() => setHandled(r, true)}
               onChange={(v) => setChoice({ ...choice, [r.rowId]: v })}
               onConfirm={() => choice[r.rowId] && confirmItems([{ rowId: r.rowId, orderId: Number(choice[r.rowId]) }])}
@@ -275,7 +264,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
       {match && match.unpaid.length > 0 && (
         <div className="card">
           <h3>③ 입금이 안 보이는 주문 ({match.unpaid.length})</h3>
-          {match.unpaid.map((o) => <div key={o.orderId} className="small" style={{ padding: '4px 0' }}>{orderLabel(o)} · 주문 {dateTime(o.orderedAt)}</div>)}
+          {match.unpaid.map((o) => <div key={o.orderId} className="small" style={{ padding: '4px 0' }}>{orderLabel(o, groupBuy.id)} · 주문 {dateTime(o.orderedAt)}</div>)}
         </div>
       )}
 
@@ -288,7 +277,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
                 <b>{u.depositorName}</b> {won(u.amount)} <span className="muted">{u.datetimeText ?? ''}</span>
                 {u.manual && <span className="chip">{u.rowId != null ? '수동 확정 후 연결' : '수동 확정'}</span>}
               </div>
-              <div className="muted">→ {u.order ? orderLabel(u.order) : `${u.orderNo}번`}</div>
+              <div className="muted">→ {u.order ? orderLabel(u.order, groupBuy.id) : `${u.orderNo}번`}</div>
             </div>
           ))}
         </div>
@@ -358,8 +347,8 @@ function CriteriaModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-function MatchItem({ row, openOrders, manualOrders, value, busy, onChange, onConfirm, onRefundCheck, onHandled }: {
-  row: MatchRow; openOrders: OrderBrief[]; value: string; busy: boolean; onChange: (v: string) => void; onConfirm: () => void
+function MatchItem({ row, groupBuyId, openOrders, manualOrders, value, busy, onChange, onConfirm, onRefundCheck, onHandled }: {
+  row: MatchRow; groupBuyId: number; openOrders: OrderBrief[]; value: string; busy: boolean; onChange: (v: string) => void; onConfirm: () => void
   /** 거래내역 없이 입금 확정한 주문: 이 입금 줄을 연결할 수 있다 (2026-10-26) */
   manualOrders: OrderBrief[]
   /** 취소된 주문의 입금자: 그 주문을 입금 확정 + 환불 필요로 표시 (2026-10-19) */
@@ -370,6 +359,9 @@ function MatchItem({ row, openOrders, manualOrders, value, busy, onChange, onCon
   // 후보가 있으면 후보를 먼저, 그 외 모든 미입금 주문(다른 입금에 추천된 주문 포함)도 고를 수 있게 한다
   const candidateIds = new Set(row.candidates.map((c) => c.order.orderId))
   const others = openOrders.filter((o) => !candidateIds.has(o.orderId))
+  const mine = others.filter((o) => o.groupBuyId === groupBuyId)
+  const otherGroupBuys = others.filter((o) => o.groupBuyId !== groupBuyId)
+  const label = (o: OrderBrief) => orderLabel(o, groupBuyId)
   return (
     <div style={{ borderTop: '1px solid var(--line)', padding: '10px 0' }}>
       <div className="row between">
@@ -378,7 +370,7 @@ function MatchItem({ row, openOrders, manualOrders, value, busy, onChange, onCon
         </div>
         <StatusBadge status={row.status} label={row.statusLabel} />
       </div>
-      {row.evidence && <div className="small muted">근거: {row.evidence}</div>}
+      {(row.evidence || row.timeNote) && <div className="small muted">{[row.evidence && `근거: ${row.evidence}`, row.timeNote].filter(Boolean).join(' · ')}</div>}
       {row.checkNote && <div className="small" style={{ color: 'var(--danger)' }}><span className="badge badge-CHECK">확인 필요</span> {row.checkNote}</div>}
       {row.note && <div className="small" style={{ color: 'var(--warn)' }}>⚠ {row.note}</div>}
       {row.refundCheckOrderId != null && (
@@ -394,19 +386,24 @@ function MatchItem({ row, openOrders, manualOrders, value, busy, onChange, onCon
             <optgroup label="후보">
               {row.candidates.map((c) => (
                 <option key={c.order.orderId} value={c.order.orderId}>
-                  {orderLabel(c.order)} · {c.evidence}{c.amountDiff ? ` · 차이 ${c.amountDiff > 0 ? '+' : ''}${c.amountDiff}원` : ''}
+                  {label(c.order)} · {c.evidence}{c.amountDiff ? ` · 차이 ${c.amountDiff > 0 ? '+' : ''}${c.amountDiff}원` : ''}
                 </option>
               ))}
             </optgroup>
           )}
-          {others.length > 0 && (
+          {mine.length > 0 && (
             <optgroup label="다른 미입금 주문">
-              {others.map((o) => <option key={o.orderId} value={o.orderId}>{orderLabel(o)}</option>)}
+              {mine.map((o) => <option key={o.orderId} value={o.orderId}>{label(o)}</option>)}
+            </optgroup>
+          )}
+          {otherGroupBuys.length > 0 && (
+            <optgroup label="같은 계좌를 쓰는 다른 공구의 미입금 주문">
+              {otherGroupBuys.map((o) => <option key={o.orderId} value={o.orderId}>{label(o)}</option>)}
             </optgroup>
           )}
           {manualOrders.length > 0 && (
             <optgroup label="거래내역 없이 입금 확정한 주문에 연결">
-              {manualOrders.map((o) => <option key={o.orderId} value={o.orderId}>{orderLabel(o)}</option>)}
+              {manualOrders.map((o) => <option key={o.orderId} value={o.orderId}>{label(o)}</option>)}
             </optgroup>
           )}
         </select>

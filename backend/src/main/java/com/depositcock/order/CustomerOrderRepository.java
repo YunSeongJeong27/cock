@@ -12,6 +12,9 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
 
     List<CustomerOrder> findByGroupBuyIdOrderByOrderNoAsc(Long groupBuyId);
 
+    /** 여러 공구(같은 입금 계좌를 쓰는 공구들)의 주문 (2026-10-27) */
+    List<CustomerOrder> findByGroupBuyIdInOrderByGroupBuyIdAscOrderNoAsc(Collection<Long> groupBuyIds);
+
     /**
      * 공구 목록 요약: 판매자의 공구마다 주문 집계 한 줄 (주문이 없는 공구는 빠짐).
      * 전에는 판매자의 모든 주문(지난 공구 포함)과 주문 상품·입금 확정을 읽어 자바에서 셌는데, 판매자의 누적 주문이 늘수록

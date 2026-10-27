@@ -165,7 +165,7 @@ class OrderDeletionTest extends IntegrationTest {
         Opened g = open();
         place(g, "010-9200-0008", "오대조");
         mvc.perform(multipart(g.base() + "/deposits/uploads").file(new MockMultipartFile("file", "거래내역.csv", "text/csv",
-                "거래일시,적요,거래금액\n2026.10.19 10:00:00,오대조,1000\n".getBytes(StandardCharsets.UTF_8))).cookie(g.seller()))
+                "거래일자,거래내용,거래금액\n2026.10.19 10:00:00,오대조,1000\n".getBytes(StandardCharsets.UTF_8))).cookie(g.seller()))
                 .andExpect(status().isOk());
         JsonNode row = read(mvc.perform(get(g.base() + "/deposits/match").cookie(g.seller())).andReturn()).get("rows").get(0);
         mvc.perform(withJson(post(g.base() + "/deposits/confirm").cookie(g.seller()), Map.of("items",

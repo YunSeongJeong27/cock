@@ -16,6 +16,7 @@ import com.depositcock.common.Texts;
 import com.depositcock.common.Tokens;
 import com.depositcock.customer.Customers;
 import com.depositcock.deposit.AliasBook;
+import com.depositcock.deposit.DepositPools;
 import com.depositcock.groupbuy.GroupBuyDtos.Dashboard;
 import com.depositcock.groupbuy.GroupBuyDtos.GroupBuyRequest;
 import com.depositcock.groupbuy.GroupBuyDtos.GroupBuyResponse;
@@ -50,6 +51,7 @@ public class GroupBuyService {
     private final Customers customers;
     private final Clock clock;
     private final FeatureAccess featureAccess;
+    private final DepositPools depositPools;
     private final StockAlerts stockAlerts;
 
     /**
@@ -123,7 +125,10 @@ public class GroupBuyService {
     public GroupBuyResponse update(Long sellerId, Long groupBuyId, GroupBuyRequest request) {
         GroupBuy groupBuy = lockOwned(sellerId, groupBuyId);
         LocalDateTime now = LocalDateTime.now(clock);
+        String oldAccountKey = DepositPools.accountKey(groupBuy);
         apply(groupBuy, request, now);
+        // 입금 계좌를 바꾸면 올린 거래내역이 따라가게 (같은 계좌를 쓰는 다른 공구가 없을 때, 2026-10-27)
+        depositPools.afterAccountChange(groupBuy, oldAccountKey);
         if (groupBuy.getStatus() == GroupBuyStatus.OPEN) {
             validateOpenable(groupBuy);
         }
@@ -182,8 +187,10 @@ public class GroupBuyService {
         GroupBuy groupBuy = lockOwned(sellerId, groupBuyId);
         List<CustomerOrder> orders = orderRepository.findByGroupBuyIdOrderByOrderNoAsc(groupBuy.getId());
         aliasBook.undoAll(sellerId, orders);
+        // 입금 줄은 공구가 아니라 입금 계좌에 붙어 있어서 따로 지운다 (같은 계좌를 쓰는 다른 공구 것은 남김, 2026-10-27)
+        depositPools.beforeDelete(groupBuy, LocalDateTime.now(clock));
         entityManager.flush();
-        // 불러온 주문이 지울 공구를 가리키고 있으므로 떼어 낸다 (주문·입금 줄은 DB 의 ON DELETE CASCADE 로 지워짐)
+        // 불러온 주문이 지울 공구를 가리키고 있으므로 떼어 낸다 (주문은 DB 의 ON DELETE CASCADE 로 지워짐)
         orders.forEach(entityManager::detach);
         groupBuyRepository.delete(groupBuy);
         // 이 공구에서만 주문한 고객(휴대폰 번호)과 그 기기·별칭도 파기한다 (다른 공구에 주문이 있는 고객은 남김)

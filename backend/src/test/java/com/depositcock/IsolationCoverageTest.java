@@ -53,7 +53,7 @@ class IsolationCoverageTest extends IntegrationTest {
         long orderId = read(mvc.perform(get("/api/seller/group-buys/" + gb + "/orders").cookie(seller)).andReturn())
                 .get(0).get("id").asLong();
         long uploadId = read(mvc.perform(multipart("/api/seller/group-buys/" + gb + "/deposits/uploads")
-                .file(new MockMultipartFile("file", "a.csv", "text/csv", "입금자명,입금액\n관계없음,777\n".getBytes(StandardCharsets.UTF_8)))
+                .file(new MockMultipartFile("file", "a.csv", "text/csv", "거래내용,거래금액,거래일자\n관계없음,777\n".getBytes(StandardCharsets.UTF_8)))
                 .cookie(seller)).andExpect(status().isOk()).andReturn()).get("uploadId").asLong();
         long rowId = read(mvc.perform(get("/api/seller/group-buys/" + gb + "/deposits/match").cookie(seller)).andReturn())
                 .get("rows").get(0).get("rowId").asLong();
@@ -89,10 +89,10 @@ class IsolationCoverageTest extends IntegrationTest {
                 Map.of("depositorName", "x", "amount", 1000))).andExpect(status().isNotFound());
         mvc.perform(post(aBase + "/orders/" + a.orderId() + "/refunded").cookie(bob)).andExpect(status().isNotFound());
         mvc.perform(multipart(aBase + "/deposits/preview")
-                .file(new MockMultipartFile("file", "a.csv", "text/csv", "입금자명,입금액\n가,1\n".getBytes(StandardCharsets.UTF_8)))
+                .file(new MockMultipartFile("file", "a.csv", "text/csv", "거래내용,거래금액,거래일자\n가,1\n".getBytes(StandardCharsets.UTF_8)))
                 .cookie(bob)).andExpect(status().isNotFound());
         mvc.perform(multipart(aBase + "/deposits/uploads")
-                .file(new MockMultipartFile("file", "a.csv", "text/csv", "입금자명,입금액\n가,1\n".getBytes(StandardCharsets.UTF_8)))
+                .file(new MockMultipartFile("file", "a.csv", "text/csv", "거래내용,거래금액,거래일자\n가,1\n".getBytes(StandardCharsets.UTF_8)))
                 .cookie(bob)).andExpect(status().isNotFound());
         mvc.perform(delete(aBase + "/deposits/uploads/" + a.uploadId()).cookie(bob)).andExpect(status().isNotFound());
         mvc.perform(withJson(post(aBase + "/deposits/screenshots/save").cookie(bob),

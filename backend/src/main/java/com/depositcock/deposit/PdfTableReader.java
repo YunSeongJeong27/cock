@@ -20,7 +20,7 @@ import org.apache.pdfbox.text.TextPosition;
  * <pre>
  * 1) PDF 에 들어 있는 글자와 위치를 읽는다 (은행이 만든 PDF 는 보통 글자 정보가 있다. 글자가 그림이면 읽을 수 없다)
  * 2) 같은 높이의 글자를 한 줄로, 한 줄 안에서 글자 사이가 넓게 벌어진 곳을 칸 경계로 본다
- * 3) 머리줄(입금자명·금액 등 헤더(컬럼) 이름이 2개 이상 있는 줄)을 찾고, 그 아래 줄들의 칸을
+ * 3) 머리줄(지정한 입금자명·금액 헤더(컬럼) 이름이 있는 줄)을 찾고, 그 아래 줄들의 칸을
  *    가로 위치가 겹치는(없으면 가장 가까운) 머리줄 칸에 넣는다. 페이지마다 다시 나오는 머리줄은 뺀다
  * 4) 결과는 엑셀·CSV 와 같은 문자열 표 → 같은 방식으로 입금 줄을 읽는다 (BankStatementReader.parse)
  * </pre>
@@ -68,9 +68,12 @@ final class PdfTableReader {
             // 머리줄을 못 찾음: 줄마다 칸을 나눈 그대로 (미리보기·직접 지정용)
             return lines.stream().map(PdfTableReader::texts).toList();
         }
+        // 머리줄 위의 줄(계좌번호·조회기간 등)은 칸만 나눠 그대로 둔다 (거래내역서의 계좌번호를 찾는 데 씀, 2026-10-27)
         List<List<String>> rows = new ArrayList<>();
+        int headerIndex = lines.indexOf(header);
+        lines.subList(0, headerIndex).forEach(l -> rows.add(texts(l)));
         rows.add(texts(header));
-        int start = lines.indexOf(header) + 1;
+        int start = headerIndex + 1;
         for (Line line : lines.subList(start, lines.size())) {
             if (line.key().equals(header.key())) {
                 continue; // 다음 페이지에 다시 나온 머리줄

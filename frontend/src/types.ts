@@ -214,6 +214,23 @@ export interface ParsedStatement {
   deposits: DepositLine[]
   skippedRows: number
   message: string | null
+  /** 거래내역서 위쪽에서 찾은 계좌번호 (못 찾았으면 null, 2026-10-27) */
+  accountNumber: string | null
+}
+
+/** 거래내역서 계좌번호와 공구 입금 계좌 비교 (2026-10-27). notice 는 같으면 null */
+export interface AccountCheckView { statementAccount: string | null; check: 'SAME' | 'DIFFERENT' | 'UNKNOWN'; notice: string | null }
+
+/** bankName: 이 은행의 헤더(컬럼)명으로 읽었다 */
+export interface PreviewResponse { parsed: ParsedStatement; duplicateCount: number; bankName: string; account: AccountCheckView }
+
+export interface UploadResponse {
+  uploadId: number | null
+  savedCount: number
+  duplicateCount: number
+  parsed: ParsedStatement
+  bankName: string
+  account: AccountCheckView
 }
 
 export interface OrderBrief {
@@ -224,6 +241,9 @@ export interface OrderBrief {
   phoneLast4: string
   expectedAmount: number
   orderedAt: string
+  /** 같은 입금 계좌를 쓰는 다른 공구의 주문일 수 있어서 (2026-10-27) */
+  groupBuyId: number
+  groupBuyTitle: string
 }
 
 export type MatchStatus = 'MATCHED' | 'SUGGESTED' | 'AMBIGUOUS' | 'UNRELATED'
@@ -246,8 +266,10 @@ export interface MatchRow {
   refundCheckOrderId: number | null
   /** 거래내역 없이 입금 확정한 주문의 입금자로 보이면 그 주문 id (미리 골라 둠, 2026-10-26) */
   linkOrderId: number | null
-  /** 확인 필요: 같은 고객의 미입금 주문이나 입금이 여러 건. 있으면 "모두 확정"에서 뺀다 (2026-10-26) */
+  /** 확인 필요: 같은 고객의 미입금 주문이나 입금이 여러 건, 또는 입금 시각이 1시간 넘게 차이. 있으면 "모두 확정"에서 뺀다 */
   checkNote: string | null
+  /** 주문(금액이 정해진 시각)과 입금 시각의 차이 (예: "주문 12분 뒤 입금"). 비교할 수 없으면 null (2026-10-27) */
+  timeNote: string | null
 }
 
 /** 이미 처리 완료된 입금 (대조에서 뺀 입금, 2026-10-26) */
@@ -266,24 +288,42 @@ export interface MatchResponse {
   manualOrders: OrderBrief[]
   /** 이미 처리 완료된 입금 (최근에 옮긴 순) */
   handled: HandledRow[]
+  /** 같은 입금 계좌를 쓰는 다른 공구의 주문으로 보이는 입금. 여기서도 확정할 수 있다 (2026-10-27) */
+  otherRows: MatchRow[]
+  /** 같은 입금 계좌를 쓰는 다른 공구 제목 */
+  sharedGroupBuys: string[]
+  /** 이 공구 입금 계좌의 은행 (거래내역을 이 은행 헤더(컬럼)명으로 읽는다) */
+  bankName: string
   matchedCount: number
   suggestedCount: number
   ambiguousCount: number
   unrelatedCount: number
 }
 
-export interface Preset {
-  id: number
-  name: string
-  dateColumn: string | null
+/** 은행별 헤더(컬럼)명 값 (2026-10-27) */
+export interface BankHeaderValues {
   nameColumn: string
   amountColumn: string
+  dateColumn: string
+  accountLabel: string | null
   typeColumn: string | null
+}
+
+/**
+ * 판매자에게 적용되는 은행별 헤더(컬럼)명. source: 운영자 값 그대로 / 판매자가 바꿈 / 판매자가 추가한 은행.
+ * original 은 운영자가 넣은 원래 값 (추가한 은행이면 null)
+ */
+export interface BankHeaderView {
+  bankName: string
+  values: BankHeaderValues
+  source: 'SYSTEM' | 'CHANGED' | 'CUSTOM'
+  defaultBank: boolean
+  original: BankHeaderValues | null
 }
 
 export interface UploadSummary {
   id: number
-  source: 'EXCEL' | 'CSV' | 'SCREENSHOT'
+  source: 'EXCEL' | 'CSV' | 'PDF' | 'SCREENSHOT'
   fileName: string | null
   uploadedAt: string
   rowCount: number

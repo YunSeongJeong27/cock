@@ -1,19 +1,21 @@
+import { josa } from './common'
+
 /** 입금 대조(거래내역·스크린샷), 은행 헤더(컬럼) 설정의 긴 문장. 규칙은 common.ts 맨 위 */
 export const depositText = {
   // 거래내역 올리기
   uploadHelp: "은행 앱·인터넷뱅킹의 거래내역조회에서 엑셀이나 PDF로 받아 올려주세요. 토스뱅크는 발급할 때 '입금만 + 엑셀'로 받으면 편합니다. 원본 파일은 저장하지 않습니다.",
   mixedAccountWarning: '입금 받는 계좌를 공구 판매 말고 다른 용도로도 쓰면 대조가 잘 안 될 수 있습니다.',
-  manualColumnsHelp: '은행마다 헤더(컬럼)명이 다릅니다. 파일의 헤더(컬럼)명을 그대로 적거나 목록에서 고르세요. 띄어쓰기는 달라도 됩니다.',
+  // 2026-10-27 사용자 요청 문구
+  visibleInfoTip: '거래내역서에 계좌번호와 이름이 가려지지 않고 보이면 대조가 잘 됩니다.',
+  bankSelectHelp: '고른 은행의 헤더(컬럼)명으로 입금을 읽습니다. 처음에는 공구 입금 계좌의 은행이 골라져 있고 목록에 없는 은행이면 토스뱅크가 골라져 있습니다.',
   uploaded: (saved: number, duplicates: number) =>
     `입금 ${saved}건을 올렸습니다.${duplicates ? ` 이미 올린 입금 ${duplicates}건은 건너뛰었습니다.` : ''}`,
-  presetNamePrompt: '이 헤더(컬럼) 설정의 이름을 적어 주세요. 예: 신협',
-  presetSaved: (name: string) => `"${name}" 헤더(컬럼) 설정을 저장했습니다. 다음부터 목록에서 고르면 됩니다.`,
   /** headerRowNo 가 null 이면(PDF) 헤더 행 번호를 말하지 않는다 */
-  columnsFound: (auto: boolean, headerRowNo: number | null) =>
-    `${auto ? '헤더(컬럼)를 자동으로 찾았습니다.' : '지정한 헤더(컬럼)명으로 읽었습니다.'}${headerRowNo ? ` 헤더는 ${headerRowNo}행입니다.` : ''}`,
+  columnsFound: (bankName: string, headerRowNo: number | null) =>
+    `${bankName} 헤더(컬럼)명으로 읽었습니다.${headerRowNo ? ` 헤더는 ${headerRowNo}행입니다.` : ''}`,
   previewCounts: (deposits: number, skipped: number, duplicates: number) =>
-    `입금 ${deposits}건 · 출금·0원·이자 등 건너뛴 줄 ${skipped}개${duplicates ? ` · 이미 올린 입금 ${duplicates}건` : ''}`,
-  wrongColumnsHint: '헤더(컬럼)가 틀렸으면 "헤더(컬럼)명 직접 지정"으로 바꿔서 다시 미리보기 하세요.',
+    `입금 ${deposits}건 · 입금이 아니라서 건너뛴 줄 ${skipped}개${duplicates ? ` · 이미 올린 입금 ${duplicates}건` : ''}`,
+  accountDifferentConfirm: (notice: string) => `${notice}\n\n그래도 올릴까요?`,
   confirmDeleteUpload: '이 업로드의 입금 줄을 지울까요?',
 
   // 대조 결과
@@ -24,11 +26,17 @@ export const depositText = {
   confirmHandled: (name: string, amount: string) =>
     `${name} ${amount} 입금을 "이미 처리 완료된 입금"으로 옮길까요?\n\n대조 결과에서만 빠지고 주문에는 아무 변화가 없습니다. 같은 거래내역을 다시 올려도 다시 나오지 않고 "이미 처리 완료된 입금 보기"에서 되돌릴 수 있습니다.`,
   handledHelp: '대조 결과에서 뺀 입금입니다. 되돌리면 다시 대조 결과에 나옵니다.',
+  // 같은 입금 계좌를 쓰는 공구끼리 거래내역 공유 (2026-10-27)
+  sharedAccount: (titles: string[]) => {
+    const last = titles[titles.length - 1]
+    return `같은 입금 계좌를 쓰는 공구 "${titles.join('", "')}"${josa(last, '과/와')} 거래내역을 함께 씁니다. 어느 공구 화면에서 확정하거나 처리 완료해도 함께 반영됩니다.`
+  },
+  otherRowsHelp: '같은 입금 계좌를 쓰는 다른 공구의 주문으로 보이는 입금입니다. 여기서 확정해도 됩니다.',
 
   // 대조 결과 기준 설명 (2026-10-26)
   criteria: [
     { status: 'MATCHED', name: '자동 매칭', desc: '입금자명(또는 저장된 별칭·닉네임)과 금액이 맞고 그런 고객이 1명뿐입니다. [자동 매칭 모두 확정]으로 한 번에 확정할 수 있습니다.' },
-    { status: 'CHECK', name: '확인 필요', desc: '같은 고객의 미입금 주문이나 입금이 여러 건입니다. 짝이 바뀌었을 수 있어 [모두 확정]에서 빠지니 하나씩 보고 확정하세요.' },
+    { status: 'CHECK', name: '확인 필요', desc: '같은 고객의 미입금 주문이나 입금이 여러 건이거나 입금 시각이 주문 시각과 1시간 넘게 차이 납니다. 금액을 바꾼 주문은 바꾼 시각과 비교합니다. [모두 확정]에서 빠지니 하나씩 보고 확정하세요.' },
     { status: 'SUGGESTED', name: '추천', desc: '이름은 맞는데 금액이 다르면 "금액 차이 ±N원"이 붙습니다. 확인 후 확정하세요.' },
     { status: 'SUGGESTED', name: '금액만 일치', desc: '이름은 다르지만 같은 금액의 미입금 주문과 입금이 딱 1건씩입니다. 가족 이름으로 보낸 경우 등입니다. 같은 금액이 여러 건이면 추천하지 않습니다.' },
     { status: 'AMBIGUOUS', name: '후보 여러 명', desc: '같은 이름의 고객이 2명 이상입니다. 목록에서 직접 골라 확정하세요.' },
@@ -45,10 +53,23 @@ export const depositText = {
   visionOff: '스크린샷 글자 읽기가 아직 꺼져 있습니다. 읽은 결과 표에 직접 입력할 수 있습니다.',
   captureLimitReached: '오늘 한도를 다 썼습니다. 직접 입력해 주세요.',
 
-  // 은행 헤더(컬럼) 설정
-  defaultsHelp: '거래내역 파일 위쪽 30줄에서 아래 이름의 헤더(컬럼)를 찾습니다. 띄어쓰기는 무시하고 나머지는 정확히 같아야 합니다. 은행 파일의 헤더(컬럼)명이 다르면 자동 인식이 안 되므로 아래에서 은행별로 헤더(컬럼)명을 저장해 두거나 올릴 때 직접 지정하세요.',
-  amountOrderNote: '금액 헤더(컬럼)는 앞에서부터 먼저 찾습니다. "거래금액"은 부호가 있는 금액이라 양수만 입금으로 봅니다.',
-  typeExcludeNote: '거래 유형 값에 "이자"·"출금"·"지급"이 있으면 뺍니다.',
+  // 은행 헤더(컬럼) 설정 (2026-10-27)
+  bankHeadersHelp: '거래내역을 올리면 고른 은행의 헤더(컬럼)명으로 입금을 읽습니다. 파일의 헤더(컬럼)명과 다르면 [수정]에서 고쳐 주세요.',
+  missingBank: '사용하시는 계좌의 은행이 없나요?',
+  bankSaved: (name: string) => `${name} 헤더(컬럼)명을 저장했습니다.`,
+  confirmRevert: (name: string) => `${name} 헤더(컬럼)명을 원래 값으로 되돌릴까요?`,
+  confirmRemoveBank: (name: string) => `${name}${josa(name, '을/를')} 목록에서 지울까요?`,
+  typeColumnHint: '입금액 헤더(컬럼)에 출금도 + 금액으로 나오는 은행만 적으세요. 그 헤더(컬럼)에 "출금", "지급", "이자"가 적힌 줄은 뺍니다.',
+  accountLabelHint: '거래내역서 위쪽에서 계좌번호 앞에 적힌 글자입니다. 적으면 공구 입금 계좌와 같은 계좌의 거래내역인지 확인합니다.',
+  // 설정 방법 창
+  howToSteps: [
+    '은행 앱이나 인터넷뱅킹에서 거래내역을 엑셀이나 PDF로 받습니다.',
+    '파일 표 맨 윗줄의 헤더(컬럼)명을 그대로 적습니다. 띄어쓰기는 달라도 됩니다.',
+    '입금자명은 보낸 사람 이름, 입금액은 받은 금액, 거래일시는 날짜와 시각이 나오는 헤더(컬럼)입니다.',
+    '입금과 출금이 한 헤더(컬럼)에 +와 -로 나오면 그 헤더(컬럼)를 입금액에 적습니다. + 금액만 입금으로 읽습니다.',
+    '계좌번호에는 표 위쪽에서 계좌번호 앞에 적힌 글자를 적습니다.',
+  ],
+  exampleNote: '예시 그림의 이름·금액·계좌번호는 지어낸 값입니다. 그림을 누르면 크게 볼 수 있습니다.',
   aliasHelp: '입금을 확정하면 "입금자명 → 고객"이 저장되고 다음 공구부터 같은 입금자명이면 자동으로 그 고객과 매칭합니다. 잘못 저장된 것은 지우세요.',
   confirmRemove: '삭제할까요?',
 }

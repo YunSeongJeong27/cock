@@ -36,6 +36,10 @@ public enum Notice {
     DEPOSIT_SAME_AS_SUGGESTED("%s주문에 같은 입금자의 다른 입금이 추천됐습니다. 나눠 보냈거나 두 번 보냈는지 확인하세요."),
     DEPOSIT_SAME_AS_MANUAL("거래내역 없이 입금 확정한 %s주문의 입금자와 같습니다. 같은 입금이면 이 주문에 연결하세요."),
     MATCH_CHECK_NEEDED("같은 고객의 미입금 주문 %d건·입금 %d건이 있습니다. 짝이 맞는지 확인하세요."),
+    MATCH_CHECK_TIME("주문(또는 금액 변경) %s %s에 입금돼서 1시간이 넘게 차이 납니다. 맞는 입금인지 확인하세요."),
+    MATCH_TIME_GAP("%s %s %s 입금"),
+    ACCOUNT_DIFFERENT("거래내역서의 계좌(%s)가 공구에 설정한 입금 계좌(%s)와 다릅니다. 다시 한번 확인해 주세요."),
+    ACCOUNT_NOT_FOUND("거래내역서에서 \"%s\"를 찾지 못해 공구 입금 계좌와 같은 계좌인지 확인하지 못했습니다."),
 
     // 스크린샷 읽기
     SCREENSHOT_DEPOSITS_READ("AI가 읽은 결과입니다. 화면과 비교해 이름·금액을 꼭 확인하세요.%s 오늘 남은 캡처는 %d장입니다."),
