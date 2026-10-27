@@ -259,4 +259,28 @@ class DepositMatcherTest {
         assertThat(o.results().get(0).related().relation()).isEqualTo(DepositMatcher.Relation.SUGGESTED);
         assertThat(o.results().get(0).related().orderId()).isEqualTo(1L);
     }
+
+    /** 같은 고객의 주문·입금이 여러 건이면 자동 매칭이어도 확인 필요 (2026-10-26) */
+    @Test
+    void sameCustomerManyOrdersOrDepositsNeedsCheck() {
+        // 같은 고객 주문 2건 + 입금 2건 → 둘 다 자동 매칭, 둘 다 확인 필요
+        Outcome two = DepositMatcher.match(
+                List.of(payee(1, "c-dup", "김중복", null, 3800), payee(2, "c-dup", "김중복", null, 3800)),
+                List.of(new Deposit(10L, "김중복", 3800), new Deposit(11L, "김중복", 3800)), Map.of());
+        assertThat(two.results()).extracting(r -> r.status()).containsOnly(Status.MATCHED);
+        assertThat(two.checks()).containsOnlyKeys(10L, 11L);
+        assertThat(two.checks().get(10L)).isEqualTo(new DepositMatcher.Check(2, 2));
+
+        // 주문 1건 + 입금 2건 → 매칭된 1건도 확인 필요
+        Outcome extra = DepositMatcher.match(List.of(payee(3, "c-one", "박한번", null, 5000)),
+                List.of(new Deposit(20L, "박한번", 5000), new Deposit(21L, "박한번", 5000)), Map.of());
+        Long matchedRow = extra.results().stream().filter(r -> r.status() == Status.MATCHED).findFirst().orElseThrow()
+                .deposit().rowId();
+        assertThat(extra.checks()).containsOnlyKeys(matchedRow);
+
+        // 주문 1건 + 입금 1건 → 확인 필요 없음
+        Outcome single = DepositMatcher.match(List.of(payee(4, "c-solo", "이혼자", null, 7000)),
+                List.of(new Deposit(30L, "이혼자", 7000)), Map.of());
+        assertThat(single.checks()).isEmpty();
+    }
 }

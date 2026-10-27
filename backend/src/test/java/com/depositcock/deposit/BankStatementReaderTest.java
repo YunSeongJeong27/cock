@@ -74,6 +74,31 @@ class BankStatementReaderTest {
         assertThat(parsed.skippedRows()).isEqualTo(2);
     }
 
+    /**
+     * 사용자가 보내 준 실제 거래내역 PDF(2026-10-27, KB국민·토스뱅크)의 머리줄을 CSV 로 옮긴 것. 값은 가짜.
+     * KB 는 "적요"에 거래 종류(전자금융·FBS입금)가 들어 있어 입금자명은 "보낸분/받는분"에서 읽어야 한다
+     */
+    @Test
+    void kbAndTossPdfHeaders() {
+        String kb = "거래일시,적요,보낸분/받는분,출금액,입금액,잔액,송금메모,거래점\n"
+                + "2026.10.26 10:43:46,전자금융,홍길동,0,\"8,000\",\"44,750\",-,신한은행\n"
+                + "2026.10.26 10:42:40,오픈뱅킹출금,당근페이,\"10,000\",0,\"36,750\",-,스타뱅\n";
+        ParsedStatement kbParsed = reader.read("kb.csv", kb.getBytes(StandardCharsets.UTF_8), null);
+        assertThat(kbParsed.mapping().nameColumn()).isEqualTo("보낸분/받는분");
+        assertThat(kbParsed.mapping().dateColumn()).isEqualTo("거래일시");
+        assertThat(kbParsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동");
+        assertThat(kbParsed.deposits().get(0).dateText()).isEqualTo("2026.10.26 10:43:46");
+
+        String toss = "거래일자,구분,거래금액,거래 후 잔액,거래내용\n"
+                + "2026-10-22 22:53:22,출금,\"-35,000\",\"30,035\",김민지\n"
+                + "2026-10-22 22:52:05,입금,\"35,000\",\"65,035\",홍길동\n";
+        ParsedStatement tossParsed = reader.read("toss.csv", toss.getBytes(StandardCharsets.UTF_8), null);
+        assertThat(tossParsed.mapping().nameColumn()).isEqualTo("거래내용");
+        assertThat(tossParsed.mapping().dateColumn()).isEqualTo("거래일자");
+        assertThat(tossParsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동");
+        assertThat(tossParsed.deposits().get(0).dateText()).isEqualTo("2026-10-22 22:52:05");
+    }
+
     @Test
     void csvMs949WithQuotesAndBom() {
         String csv = "거래일자,기재내용,출금액,입금액,잔액\r\n"

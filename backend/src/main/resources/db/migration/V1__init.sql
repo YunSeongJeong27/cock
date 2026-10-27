@@ -244,6 +244,8 @@ CREATE TABLE deposit_row (
     amount         INTEGER      NOT NULL,
     datetime_text  VARCHAR(100),
     deposited_at   TIMESTAMP,
+    -- 판매자가 "이미 처리 완료된 입금"으로 옮긴 시각. 값이 있으면 대조에서 뺀다 (지우지 않아서 같은 파일을 다시 올려도 안 생김, 2026-10-26)
+    handled_at     TIMESTAMP,
     row_created_at TIMESTAMP    NOT NULL DEFAULT LOCALTIMESTAMP,
     row_updated_at TIMESTAMP    NOT NULL DEFAULT LOCALTIMESTAMP
 );

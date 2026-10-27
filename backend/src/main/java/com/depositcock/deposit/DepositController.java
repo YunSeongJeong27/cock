@@ -79,6 +79,17 @@ public class DepositController {
         return service.confirm(CurrentSeller.id(), groupBuyId, request.items());
     }
 
+    /** "이미 처리 완료된 입금"으로 옮기기 / 되돌리기 (2026-10-26) */
+    @PostMapping(BASE + "/rows/{rowId}/handled")
+    public void markHandled(@PathVariable Long groupBuyId, @PathVariable Long rowId) {
+        service.markHandled(CurrentSeller.id(), groupBuyId, rowId, true);
+    }
+
+    @DeleteMapping(BASE + "/rows/{rowId}/handled")
+    public void unmarkHandled(@PathVariable Long groupBuyId, @PathVariable Long rowId) {
+        service.markHandled(CurrentSeller.id(), groupBuyId, rowId, false);
+    }
+
     @PostMapping("/api/seller/group-buys/{groupBuyId}/orders/{orderId}/unconfirm-paid")
     public void unconfirm(@PathVariable Long groupBuyId, @PathVariable Long orderId) {
         service.unconfirm(CurrentSeller.id(), groupBuyId, orderId);

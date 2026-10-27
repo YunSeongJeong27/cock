@@ -26,6 +26,7 @@ import com.depositcock.deposit.DepositDtos.CandidateView;
 import com.depositcock.deposit.DepositDtos.ConfirmItem;
 import com.depositcock.deposit.DepositDtos.ConfirmResponse;
 import com.depositcock.deposit.DepositDtos.DefaultColumns;
+import com.depositcock.deposit.DepositDtos.HandledRow;
 import com.depositcock.deposit.DepositDtos.MatchResponse;
 import com.depositcock.deposit.DepositDtos.MatchRow;
 import com.depositcock.deposit.DepositDtos.OrderBrief;
@@ -199,7 +200,11 @@ public class DepositService {
         confirmations.stream()
                 .filter(c -> c.getDepositRowId() != null)
                 .forEach(c -> orderByRow.put(c.getDepositRowId(), c.getOrder().getId()));
-        List<DepositRow> unused = rows.stream().filter(r -> !orderByRow.containsKey(r.getId())).toList();
+        // 대조할 입금 줄: 확정에 안 쓴 것 중 "이미 처리 완료된 입금"으로 옮기지 않은 것 (2026-10-26)
+        List<DepositRow> unused = rows.stream().filter(r -> !orderByRow.containsKey(r.getId()) && !r.isHandled()).toList();
+        // 거래내역 없이 입금 확정한 주문 (수동 확정·올린 파일을 지운 확정): 나중에 올린 입금 줄을 연결할 수 있다 (2026-10-26)
+        Set<Long> unlinkedPaidOrders = confirmations.stream().filter(c -> c.getDepositRowId() == null)
+                .map(c -> c.getOrder().getId()).collect(Collectors.toSet());
         List<Deposit> deposits = unused.stream().map(r -> new Deposit(r.getId(), r.getDepositorName(), r.getAmount())).toList();
 
         // 대조 대상은 아니지만, 입금자가 이미 입금 확인된 주문·취소된 주문의 입금자인지 알려주는 데 쓴다
@@ -238,8 +243,10 @@ public class DepositService {
                     .evidence(r.evidence() == null ? null : r.evidence().getLabel())
                     .amountDiff(r.amountDiff())
                     .candidates(candidates)
-                    .note(note(r.related(), orderById))
+                    .note(note(r.related(), orderById, unlinkedPaidOrders))
                     .refundCheckOrderId(refundCheckOrderId(r.related(), orderById))
+                    .linkOrderId(linkOrderId(r.related(), unlinkedPaidOrders))
+                    .checkNote(checkNote(outcome.checks().get(row.getId())))
                     .build());
         }
         // 확정한 입금: 거래내역 줄로 확정한 것 + 거래내역 없이 수동으로 확정한 것 (주문번호 순, 2026-10-26)
@@ -254,6 +261,12 @@ public class DepositService {
                 })
                 .sorted(Comparator.comparingInt(UsedRow::orderNo))
                 .toList();
+        List<OrderBrief> manualOrders = orders.stream().filter(o -> unlinkedPaidOrders.contains(o.getId()))
+                .map(DepositService::brief).toList();
+        List<HandledRow> handled = rows.stream().filter(DepositRow::isHandled)
+                .sorted(Comparator.comparing(DepositRow::getHandledAt).reversed())
+                .map(r -> new HandledRow(r.getId(), r.getDepositorName(), r.getAmount(), r.getDatetimeText(), r.getHandledAt()))
+                .toList();
         List<OrderBrief> unpaid = outcome.unpaid().stream().map(p -> brief(orderById.get(p.orderId()))).toList();
         // 판매자가 직접 고를 수 있는 주문: 다른 입금에 추천된 주문까지 포함한 모든 미입금 선입금 주문
         List<OrderBrief> openOrders = payees.stream().map(p -> brief(orderById.get(p.orderId()))).toList();
@@ -263,6 +276,8 @@ public class DepositService {
                 .unpaid(unpaid)
                 .openOrders(openOrders)
                 .used(used)
+                .manualOrders(manualOrders)
+                .handled(handled)
                 .matchedCount(matched)
                 .suggestedCount(suggested)
                 .ambiguousCount(ambiguous)
@@ -270,19 +285,33 @@ public class DepositService {
                 .build();
     }
 
-    /** 관련 없는 입금의 확인 안내 (중복 입금·환불 가능성) */
-    private static String note(DepositMatcher.Related related, Map<Long, CustomerOrder> orderById) {
+    /** 관련 없는 입금의 확인 안내 (두 번 보냄·환불 가능성, 거래내역 없이 확정한 주문의 입금) */
+    private static String note(DepositMatcher.Related related, Map<Long, CustomerOrder> orderById, Set<Long> unlinkedPaidOrders) {
         if (related == null) {
             return null;
         }
         CustomerOrder o = orderById.get(related.orderId());
         String no = o == null ? "" : o.getOrderNo() + "번 ";
+        if (linkOrderId(related, unlinkedPaidOrders) != null) {
+            return Notice.DEPOSIT_SAME_AS_MANUAL.text(no);
+        }
         return switch (related.relation()) {
             case LINKED -> Notice.DEPOSIT_SAME_AS_LINKED.text(no);
             case PAID -> Notice.DEPOSIT_SAME_AS_PAID.text(no);
             case CANCELLED -> Notice.DEPOSIT_SAME_AS_CANCELLED.text(no);
             case SUGGESTED -> Notice.DEPOSIT_SAME_AS_SUGGESTED.text(no);
         };
+    }
+
+    /** 거래내역 없이 입금 확정한 주문(입금 확인됨·취소됨)의 입금자로 보이면 그 주문: 이 입금 줄을 연결하라고 미리 골라 둔다 */
+    private static Long linkOrderId(DepositMatcher.Related related, Set<Long> unlinkedPaidOrders) {
+        boolean paidOrCancelled = related != null
+                && (related.relation() == DepositMatcher.Relation.PAID || related.relation() == DepositMatcher.Relation.CANCELLED);
+        return paidOrCancelled && unlinkedPaidOrders.contains(related.orderId()) ? related.orderId() : null;
+    }
+
+    private static String checkNote(DepositMatcher.Check check) {
+        return check == null ? null : Notice.MATCH_CHECK_NEEDED.text(check.orders(), check.deposits());
     }
 
     /**
@@ -326,6 +355,18 @@ public class DepositService {
                 errors.add(ErrorCode.DEPOSIT_ALREADY_USED.message(row.getDepositorName(), row.getAmount()));
                 continue;
             }
+            if (row.isHandled()) {
+                errors.add(ErrorCode.DEPOSIT_HANDLED.message(row.getDepositorName(), row.getAmount()));
+                continue;
+            }
+            // 거래내역 없이 입금 확정한 주문에 나중에 올린 입금 줄을 연결 (2026-10-26). 주문 상태·별칭은 그대로 두고 연결만 한다
+            DepositConfirmation unlinked = order.activeConfirmation().filter(c -> c.getDepositRowId() == null).orElse(null);
+            if (unlinked != null && usedOrders.add(order.getId())) {
+                unlinked.linkDepositRow(row.getId());
+                orderRepository.flush();
+                confirmed++;
+                continue;
+            }
             // 취소된 주문도 환불 완료 전이면 받는다: 고객이 입금하고 바로 취소한 경우 → 입금 확정 + 환불 필요 (2026-10-19)
             boolean cancelled = !order.isActive();
             if ((cancelled && order.getRefundedAt() != null) || !order.isPrepaid() || order.isPaid()
@@ -341,6 +382,27 @@ public class DepositService {
             confirmed++;
         }
         return new ConfirmResponse(confirmed, errors);
+    }
+
+    /**
+     * "이미 처리 완료된 입금"으로 옮기기 (2026-10-26): 대조에서만 빼고 주문·별칭은 건드리지 않는다.
+     * 지우지 않으므로 같은 거래내역을 다시 올려도 중복으로 건너뛰고, [되돌리기]로 다시 대조에 넣을 수 있다
+     */
+    @Transactional
+    public void markHandled(Long sellerId, Long groupBuyId, Long rowId, boolean handled) {
+        GroupBuy groupBuy = groupBuyService.lockOwned(sellerId, groupBuyId);
+        DepositRow row = rowRepository.findByIdAndGroupBuyId(rowId, groupBuy.getId())
+                .orElseThrow(() -> new ApiException(ErrorCode.DEPOSIT_NOT_FOUND));
+        if (!handled) {
+            row.unmarkHandled();
+            return;
+        }
+        if (confirmationRepository.existsByActiveDepositRowId(row.getId())) {
+            throw new ApiException(ErrorCode.DEPOSIT_CONFIRMED_CANNOT_HANDLE);
+        }
+        if (!row.isHandled()) {
+            row.markHandled(LocalDateTime.now(clock));
+        }
     }
 
     /** 입금 확정 취소: 입금 줄을 다시 쓸 수 있게 풀고, 이 확정이 만든·바꾼 별칭을 되돌린다. */

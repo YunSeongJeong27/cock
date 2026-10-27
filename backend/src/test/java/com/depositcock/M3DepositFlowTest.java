@@ -16,6 +16,7 @@ import org.springframework.mock.web.MockMultipartFile;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -51,6 +52,70 @@ class M3DepositFlowTest extends IntegrationTest {
 
     private MockMultipartFile csv(String content) {
         return new MockMultipartFile("file", "거래내역.csv", "text/csv", content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * 수동 확정한 주문에 나중에 올린 입금 줄 연결 + "이미 처리 완료된 입금" (2026-10-26).
+     * 처리 완료로 옮긴 입금은 같은 파일을 다시 올려도 다시 나오지 않고, 되돌리면 대조에 다시 나온다
+     */
+    @Test
+    void linkManualConfirmationAndHandledDeposits() throws Exception {
+        Cookie seller = signup(uniqueEmail());
+        long id = openGroupBuy(seller, "연결 공구", 5000);
+        String base = "/api/seller/group-buys/" + id;
+        placeOrder(seller, id, "010-1300-0001", "김수동");
+        long orderId = read(mvc.perform(get(base + "/orders").cookie(seller)).andReturn()).get(0).get("id").asLong();
+        mvc.perform(withJson(post(base + "/orders/" + orderId + "/manual-paid").cookie(seller),
+                Map.of("depositorName", "김수동", "amount", 5000))).andExpect(status().isOk());
+
+        String file = "거래일시,입금자명,입금액\n2026.10.26 10:00:00,김수동,5000\n2026.10.26 11:00:00,홍길동,3000\n";
+        mvc.perform(multipart(base + "/deposits/uploads").file(csv(file)).cookie(seller)).andExpect(status().isOk());
+        JsonNode match = read(mvc.perform(get(base + "/deposits/match").cookie(seller)).andReturn());
+        assertThat(match.get("manualOrders")).hasSize(1);
+        JsonNode manualRow = match.get("rows").get(0);
+        assertThat(manualRow.get("depositorName").asText()).isEqualTo("김수동");
+        assertThat(manualRow.get("linkOrderId").asLong()).isEqualTo(orderId);
+        assertThat(manualRow.get("note").asText()).contains("거래내역 없이 입금 확정한");
+        long otherRow = match.get("rows").get(1).get("rowId").asLong();
+
+        // 연결: 주문은 그대로 입금 확정, 입금 줄은 "확정한 입금"으로
+        mvc.perform(withJson(post(base + "/deposits/confirm").cookie(seller), Map.of("items",
+                List.of(Map.of("rowId", manualRow.get("rowId").asLong(), "orderId", orderId)))))
+                .andExpect(jsonPath("$.confirmedCount").value(1));
+        match = read(mvc.perform(get(base + "/deposits/match").cookie(seller)).andReturn());
+        assertThat(match.get("manualOrders")).isEmpty();
+        assertThat(match.get("rows")).hasSize(1);
+        assertThat(match.get("used").get(0).get("rowId").asLong()).isEqualTo(manualRow.get("rowId").asLong());
+        assertThat(match.get("used").get(0).get("manual").asBoolean()).isTrue();
+
+        // 확정한 입금은 처리 완료로 못 옮김
+        mvc.perform(post(base + "/deposits/rows/" + manualRow.get("rowId").asLong() + "/handled").cookie(seller))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("DEPOSIT_CONFIRMED_CANNOT_HANDLE"));
+
+        // 처리 완료로 옮기면 대조에서 빠지고, 같은 파일을 다시 올려도 다시 안 나옴
+        mvc.perform(post(base + "/deposits/rows/" + otherRow + "/handled").cookie(seller)).andExpect(status().isOk());
+        mvc.perform(multipart(base + "/deposits/uploads").file(csv(file)).cookie(seller))
+                .andExpect(jsonPath("$.savedCount").value(0)).andExpect(jsonPath("$.duplicateCount").value(2));
+        match = read(mvc.perform(get(base + "/deposits/match").cookie(seller)).andReturn());
+        assertThat(match.get("rows")).isEmpty();
+        assertThat(match.get("handled")).hasSize(1);
+        assertThat(match.get("handled").get(0).get("depositorName").asText()).isEqualTo("홍길동");
+        mvc.perform(withJson(post(base + "/deposits/confirm").cookie(seller), Map.of("items",
+                List.of(Map.of("rowId", otherRow, "orderId", orderId)))))
+                .andExpect(jsonPath("$.confirmedCount").value(0))
+                .andExpect(jsonPath("$.errors[0]").value("'홍길동 3000원' 입금은 이미 처리 완료된 입금입니다. 되돌린 뒤 확정해 주세요."));
+
+        // 되돌리기
+        mvc.perform(delete(base + "/deposits/rows/" + otherRow + "/handled").cookie(seller)).andExpect(status().isOk());
+        match = read(mvc.perform(get(base + "/deposits/match").cookie(seller)).andReturn());
+        assertThat(match.get("rows")).hasSize(1);
+        assertThat(match.get("handled")).isEmpty();
+
+        // 연결한 확정을 취소하면 입금 줄이 다시 대조에 나온다
+        mvc.perform(post(base + "/orders/" + orderId + "/unconfirm-paid").cookie(seller)).andExpect(status().isOk());
+        match = read(mvc.perform(get(base + "/deposits/match").cookie(seller)).andReturn());
+        assertThat(match.get("rows")).hasSize(2);
+        assertThat(match.get("matchedCount").asInt()).isEqualTo(1);
     }
 
     @Test

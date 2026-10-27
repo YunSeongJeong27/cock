@@ -44,8 +44,12 @@ public class BankStatementReader {
     static final int HEADER_SEARCH_ROWS = 30;
 
     static final List<String> DATE_CANDIDATES = List.of("거래일시", "거래일자", "거래일", "일시", "날짜", "일자");
-    static final List<String> NAME_CANDIDATES = List.of("입금자명", "입금자", "보낸분", "기재내용", "내용", "적요",
-            "받는분/보낸분", "거래내용");
+    /**
+     * 앞에서부터 먼저 찾는다. "보낸분/받는분"(KB국민)은 "적요"보다 앞: KB 파일은 적요 칸에 "전자금융"·"FBS입금" 같은
+     * 거래 종류가 들어 있어서 적요를 먼저 찾으면 입금자명이 틀리게 읽힌다 (2026-10-27 사용자 제공 KB 거래내역 PDF 머리줄 기준)
+     */
+    static final List<String> NAME_CANDIDATES = List.of("입금자명", "입금자", "보낸분", "보낸분/받는분", "받는분/보낸분",
+            "기재내용", "내용", "적요", "거래내용");
     /** 입금 전용 열을 먼저 찾고, 없으면 부호 있는 단일 열 "거래금액" (양수만 입금) */
     static final List<String> AMOUNT_CANDIDATES = List.of("입금액", "입금금액", "맡기신금액", "입금(원)", "입금", "거래금액");
     static final List<String> TYPE_CANDIDATES = List.of("거래유형", "구분", "거래구분");

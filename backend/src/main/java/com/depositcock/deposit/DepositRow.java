@@ -45,6 +45,12 @@ public class DepositRow extends BaseTimeEntity {
     /** 변환한 입금 시각 (형식을 모르면 null) */
     private LocalDateTime depositedAt;
 
+    /**
+     * 판매자가 "이미 처리 완료된 입금"으로 옮긴 시각 (2026-10-26). 값이 있으면 대조에서 뺀다.
+     * 지우지 않고 남겨서 같은 거래내역을 다시 올려도 중복으로 건너뛴다
+     */
+    private LocalDateTime handledAt;
+
     public DepositRow(Long uploadId, int rowNo, String depositorName, int amount, String datetimeText,
                       LocalDateTime depositedAt) {
         this.uploadId = uploadId;
@@ -53,6 +59,18 @@ public class DepositRow extends BaseTimeEntity {
         this.amount = amount;
         this.datetimeText = datetimeText;
         this.depositedAt = depositedAt;
+    }
+
+    public boolean isHandled() {
+        return handledAt != null;
+    }
+
+    public void markHandled(LocalDateTime now) {
+        this.handledAt = now;
+    }
+
+    public void unmarkHandled() {
+        this.handledAt = null;
     }
 
     public String dedupeKey() {

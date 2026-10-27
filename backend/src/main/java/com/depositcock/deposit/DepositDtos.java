@@ -49,7 +49,15 @@ public final class DepositDtos {
             /** 관련 없는 입금에 붙는 확인 안내 (예: 취소된 주문의 입금자 → 환불 확인). 없으면 null */
             String note,
             /** 취소된 주문의 입금자이고 그 주문을 "입금 확정 + 환불 필요"로 표시할 수 있으면 그 주문 id (2026-10-19) */
-            Long refundCheckOrderId) {
+            Long refundCheckOrderId,
+            /** 거래내역 없이 입금 확정한 주문의 입금자로 보이면 그 주문 id. 화면에서 미리 골라 둔다 (2026-10-26) */
+            Long linkOrderId,
+            /** 확인 필요: 같은 고객의 미입금 주문이나 입금이 여러 건 (자동 매칭이어도 "모두 확정"에서 뺀다, 2026-10-26) */
+            String checkNote) {
+    }
+
+    /** 이미 처리 완료된 입금 (대조에서 뺀 입금 줄, 2026-10-26) */
+    public record HandledRow(Long rowId, String depositorName, int amount, String datetimeText, LocalDateTime handledAt) {
     }
 
     /**
@@ -72,6 +80,9 @@ public final class DepositDtos {
             List<OrderBrief> unpaid,
             List<OrderBrief> openOrders,
             List<UsedRow> used,
+            /** 거래내역 없이 입금 확정한 주문 (수동 확정·올린 파일을 지운 확정). 입금 줄을 연결할 수 있다 (2026-10-26) */
+            List<OrderBrief> manualOrders,
+            List<HandledRow> handled,
             int matchedCount,
             int suggestedCount,
             int ambiguousCount,

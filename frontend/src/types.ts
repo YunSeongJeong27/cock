@@ -240,11 +240,18 @@ export interface MatchRow {
   evidence: string | null
   amountDiff: number
   candidates: { order: OrderBrief; evidence: string; amountDiff: number }[]
-  /** 관련 없는 입금의 확인 안내 (중복 입금·환불 가능성) */
+  /** 관련 없는 입금의 확인 안내 (두 번 보냄·환불 가능성, 거래내역 없이 확정한 주문의 입금) */
   note: string | null
   /** 취소된 주문의 입금자일 때 [환불 필요로 표시]를 걸 주문 id */
   refundCheckOrderId: number | null
+  /** 거래내역 없이 입금 확정한 주문의 입금자로 보이면 그 주문 id (미리 골라 둠, 2026-10-26) */
+  linkOrderId: number | null
+  /** 확인 필요: 같은 고객의 미입금 주문이나 입금이 여러 건. 있으면 "모두 확정"에서 뺀다 (2026-10-26) */
+  checkNote: string | null
 }
+
+/** 이미 처리 완료된 입금 (대조에서 뺀 입금, 2026-10-26) */
+export interface HandledRow { rowId: number; depositorName: string; amount: number; datetimeText: string | null; handledAt: string }
 
 export interface MatchResponse {
   /** 올린 거래내역 파일 목록 (대조와 같은 입금 행을 한 번 읽어 함께 내려옴) */
@@ -255,6 +262,10 @@ export interface MatchResponse {
   openOrders: OrderBrief[]
   /** 확정한 입금 (주문번호 순). rowId 는 수동 확정이거나 올린 파일을 지웠으면 null */
   used: { rowId: number | null; depositorName: string; amount: number; datetimeText: string | null; orderId: number; orderNo: number; order: OrderBrief | null; manual: boolean }[]
+  /** 거래내역 없이 입금 확정한 주문. 입금 줄을 연결할 수 있다 (2026-10-26) */
+  manualOrders: OrderBrief[]
+  /** 이미 처리 완료된 입금 (최근에 옮긴 순) */
+  handled: HandledRow[]
   matchedCount: number
   suggestedCount: number
   ambiguousCount: number

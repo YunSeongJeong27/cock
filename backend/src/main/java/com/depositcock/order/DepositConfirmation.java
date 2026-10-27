@@ -82,6 +82,18 @@ public class DepositConfirmation extends BaseTimeEntity {
         this.activeDepositRowId = depositRowId;
     }
 
+    /**
+     * 거래내역 없이 한 확정(수동 확정, 또는 올린 파일을 지운 확정)에 나중에 올린 입금 줄을 연결한다 (2026-10-26).
+     * 수동 확정 여부·확정할 때 적은 이름·금액은 기록으로 그대로 둔다
+     */
+    public void linkDepositRow(Long rowId) {
+        if (!isActive() || depositRowId != null) {
+            throw new IllegalStateException("연결할 수 없는 확정입니다: " + id);
+        }
+        this.depositRowId = rowId;
+        this.activeDepositRowId = rowId;
+    }
+
     void cancel(LocalDateTime now) {
         this.cancelledAt = now;
         this.activeOrderId = null;

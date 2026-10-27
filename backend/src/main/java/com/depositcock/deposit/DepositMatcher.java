@@ -35,6 +35,8 @@ import lombok.RequiredArgsConstructor;
  *               그 주문에 이름 근거로 추천된 다른 입금이 없음, 이 입금이 이미 연결·확인·취소된 주문의 입금자와 같지 않음)
  *   AMBIGUOUS : 후보가 2명 이상 → 자동 확정 금지, 판매자가 고른다 (목록의 첫 번째에 임의로 붙이지 않는다)
  *   UNRELATED : 관련 없는 입금
+ * 확인 필요 (2026-10-26): 자동 매칭·추천(이름 근거)이어도 같은 고객의 미입금 주문이나 그 고객으로 보이는 입금이
+ *   여러 건이면 짝이 맞는지 판매자가 확인하게 표시한다 (Outcome.checks)
  * 입금 1건은 주문 1건에만 쓴다. "후보 몇 명"은 고객(customerId) 수로 센다 (한 고객의 주문 여러 건은 1명).
  * 1차(자동 매칭)는 입금마다 다른 입금과 상관없이 판단해서, 거래내역의 줄 순서에 따라 결과가 달라지지 않게 한다.
  * </pre>
@@ -100,7 +102,12 @@ public final class DepositMatcher {
                          List<Candidate> candidates, Related related) {
     }
 
-    public record Outcome(List<Result> results, List<Payee> unpaid) {
+    /** 확인 필요: 같은 고객의 미입금 주문 수·그 고객으로 보이는 입금 수 */
+    public record Check(int orders, int deposits) {
+    }
+
+    /** @param checks 입금 줄 id → 확인 필요 (자동 매칭·추천 중 같은 고객의 주문이나 입금이 여러 건인 것) */
+    public record Outcome(List<Result> results, List<Payee> unpaid, Map<Long, Check> checks) {
     }
 
     private static final Pattern DIGITS = Pattern.compile("\\d+");
@@ -216,7 +223,37 @@ public final class DepositMatcher {
             }
         }
         List<Payee> unpaid = targets.stream().filter(p -> !mentioned.contains(p.orderId())).toList();
-        return new Outcome(List.of(results), unpaid);
+        return new Outcome(List.of(results), unpaid, checks(results, deposits, targets, byId, aliases));
+    }
+
+    /**
+     * 확인 필요 (2026-10-26 사용자 "중복되는 건 확인 필요 표시는 다 해 줘야"): 자동 매칭·추천(이름 근거)이어도
+     * 같은 고객의 미입금 주문이 여러 건이거나 그 고객으로 보이는 입금이 여러 건이면 짝이 바뀌었을 수 있다
+     */
+    private static Map<Long, Check> checks(Result[] results, List<Deposit> deposits, List<Payee> targets,
+                                           Map<Long, Payee> byId, Map<String, Long> aliases) {
+        Map<Long, Integer> ordersByCustomer = new HashMap<>();
+        targets.forEach(p -> ordersByCustomer.merge(p.customerId(), 1, Integer::sum));
+        Map<Long, Integer> depositsByCustomer = new HashMap<>();
+        for (Deposit d : deposits) {
+            candidates(d, targets, aliases, Set.of()).stream().map(c -> byId.get(c.orderId()).customerId()).distinct()
+                    .forEach(customer -> depositsByCustomer.merge(customer, 1, Integer::sum));
+        }
+        Map<Long, Check> checks = new HashMap<>();
+        for (Result r : results) {
+            boolean byName = r.status() == Status.MATCHED
+                    || (r.status() == Status.SUGGESTED && r.evidence() != Evidence.AMOUNT_ONLY);
+            if (!byName || r.orderId() == null) {
+                continue;
+            }
+            Long customer = byId.get(r.orderId()).customerId();
+            int orders = ordersByCustomer.getOrDefault(customer, 0);
+            int sameDeposits = depositsByCustomer.getOrDefault(customer, 0);
+            if (orders > 1 || sameDeposits > 1) {
+                checks.put(r.deposit().rowId(), new Check(orders, sameDeposits));
+            }
+        }
+        return checks;
     }
 
     /**
