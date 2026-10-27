@@ -3,7 +3,7 @@ import { josa } from './common'
 /** 입금 대조(거래내역·스크린샷), 은행 헤더(컬럼) 설정의 긴 문장. 규칙은 common.ts 맨 위 */
 export const depositText = {
   // 거래내역 올리기
-  uploadHelp: "은행 앱·인터넷뱅킹의 거래내역조회에서 엑셀이나 PDF로 받아 올려주세요. 토스뱅크는 발급할 때 '입금만 + 엑셀'로 받으면 편합니다. 원본 파일은 저장하지 않습니다.",
+  uploadHelp: '은행 앱이나 인터넷뱅킹에서 거래내역을 엑셀이나 PDF로 받아 올려 주세요. 원본 파일은 저장하지 않습니다.',
   mixedAccountWarning: '입금 받는 계좌를 공구 판매 말고 다른 용도로도 쓰면 대조가 잘 안 될 수 있습니다.',
   // 2026-10-27 사용자 요청 문구
   visibleInfoTip: '거래내역서에 계좌번호와 이름이 가려지지 않고 보이면 대조가 잘 됩니다.',
@@ -45,6 +45,34 @@ export const depositText = {
     { status: 'UNRELATED', name: '관련 없는 입금', desc: '맞는 주문을 못 찾은 입금입니다. 주문을 직접 골라 확정하거나 [이미 처리 완료된 입금]으로 옮기세요.' },
   ] as { status: string; name: string; desc: string }[],
   criteriaEvidence: '근거는 입금자명 일치 → 저장된 별칭 → 닉네임 포함 → 닉네임 숫자 일치 → 금액만 일치 순으로 강합니다.',
+  // 토스 모바일 파일다운 예시 창 (2026-10-27). 그림은 frontend/public/help/toss/
+  tossGuide: {
+    intro: '토스 앱에서 거래내역 파일을 받는 순서입니다. 그림을 누르면 크게 보입니다. 그림의 이름·금액·계좌번호는 지어낸 값입니다.',
+    pdfTitle: 'PDF로 받기 (암호 없음, 추천)',
+    pdfSteps: [
+      { img: '01-home', text: '홈 아래 [전체]' },
+      { img: '02-search', text: "'거래내역 확인서' 검색 → [거래내역 확인서]" },
+      { img: '03-issue', text: '[발급하기]' },
+      { img: '04-all', text: '[선택한 기간의 모든 거래]' },
+      { img: '05-account', text: '입금 받는 계좌 → [다음]' },
+      { img: '06-period', text: '기간 → [다음]' },
+      { img: '07-language', text: '[국문]' },
+      { img: '08-phone', text: '[휴대폰에 저장]' },
+      { img: '09-save', text: '[파일 저장하기]' },
+    ],
+    phoneTitle: '내 폰에 바로 내려받기가 안 될 경우 (갤럭시)',
+    phoneSteps: [
+      { img: '10-notes', text: '저장할 앱 목록에서 [삼성 노트]' },
+      { img: '11-download', text: '오른쪽 위 [내려받기] → 내 파일에 저장' },
+    ],
+    excelTitle: '엑셀로 받기 (이메일로 옴, 암호 있음)',
+    excelSteps: [
+      { img: 'e1-excel', text: '위 1·2번 다음 [엑셀파일 받기]' },
+      { img: 'e2-email', text: '국문·이메일 → [엑셀로 받기]' },
+      { img: 'e3-account', text: '계좌 → [다음] → 메일로 받음' },
+    ],
+    excelNote: "메일로 온 엑셀은 암호가 걸려 있어서 올릴 때 파일 비밀번호를 입력하세요. 엑셀은 헤더(컬럼)명이 PDF와 달라요. [은행 헤더(컬럼) 설정]에서 은행을 추가해 입금자명 '적요', 입금액 '거래 금액', 거래일시 '거래 일시', 거래 구분 '거래 유형'을 적고 올릴 때 그 은행을 고르세요.",
+  },
   criteriaFooter: '[확정]을 누르기 전에는 아무것도 저장되지 않습니다. 확정하면 입금자명이 그 고객의 별칭으로 저장되어 다음 공구부터 자동 매칭에 쓰입니다.',
 
   // 스크린샷

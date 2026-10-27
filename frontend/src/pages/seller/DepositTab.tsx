@@ -5,6 +5,7 @@ import { ErrorBox, StatusBadge } from '../../components/Ui'
 import { depositText as T } from '../../texts/deposit'
 import type { BankHeaderView, GroupBuy, MatchResponse, MatchRow, OrderBrief, PreviewResponse, UploadResponse, UploadSummary } from '../../types'
 import ScreenshotDeposits from './ScreenshotDeposits'
+import TossFileGuide from './TossFileGuide'
 
 interface Props { groupBuy: GroupBuy; reload: () => void }
 
@@ -32,6 +33,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
   const [busy, setBusy] = useState(false)
   const [inputKey, setInputKey] = useState(0)
   const [showCriteria, setShowCriteria] = useState(false)
+  const [showTossGuide, setShowTossGuide] = useState(false)
   const [showHandled, setShowHandled] = useState(false)
   const base = `/api/seller/group-buys/${groupBuy.id}/deposits`
 
@@ -163,7 +165,10 @@ export default function DepositTab({ groupBuy, reload }: Props) {
   return (
     <div>
       <div className="card">
-        <h3>① 거래내역 엑셀·CSV·PDF 올리기</h3>
+        <div className="row between">
+          <h3>① 거래내역 엑셀·CSV·PDF 올리기</h3>
+          <button type="button" className="btn small" onClick={() => setShowTossGuide(true)}>토스 모바일 파일다운 예시</button>
+        </div>
         <p className="muted small">{T.uploadHelp}</p>
         {/* 2026-10-27 사용자 요청: 공구 말고 다른 거래가 섞인 계좌면 대조가 잘 안 될 수 있음을 강조 */}
         <div className="warn-box"><b>⚠ {T.mixedAccountWarning}</b></div>
@@ -318,6 +323,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
       )}
 
       {showCriteria && <CriteriaModal onClose={() => setShowCriteria(false)} />}
+      {showTossGuide && <TossFileGuide onClose={() => setShowTossGuide(false)} />}
 
       {uploads.length > 0 && (
         <div className="card">

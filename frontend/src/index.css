@@ -181,6 +181,11 @@ tr.dim td { color: var(--muted); }
 .howto-steps { margin: 0 0 8px; padding-left: 20px; }
 .howto-steps li { margin: 3px 0; }
 .howto-image { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; }
+/* 토스 모바일 파일다운 예시: 단계 그림을 가로로 넘겨 봄 (2026-10-27) */
+.guide-steps { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+.guide-step { flex: 0 0 132px; margin: 0; }
+.guide-step img { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); }
+.guide-step figcaption { margin-top: 6px; font-size: 12px; line-height: 1.4; }
 .tip-example { background: var(--primary-weak); border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
 .link-button { background: none; border: none; padding: 4px 0; color: var(--muted); font-size: 0.88rem; text-decoration: underline; cursor: pointer; }
 /* 첫 화면 무료 안내 강조 (2026-10-26) */
