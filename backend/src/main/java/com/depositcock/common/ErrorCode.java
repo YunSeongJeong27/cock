@@ -149,7 +149,7 @@ public enum ErrorCode {
 
     // ---- 입금 대조 ----
     STATEMENT_HEADER_MISMATCH(BAD_REQUEST, "거래내역 헤더 설정이 잘못됐습니다. [은행 헤더(컬럼) 설정] 메뉴에서 '%s'의 헤더(컬럼)명을 파일에 맞게 고친 뒤 다시 올려 주세요. 파일에서 못 찾은 헤더(컬럼)명: %s"),
-    STATEMENT_PDF_NO_TEXT(BAD_REQUEST, "PDF에서 글자를 읽지 못했습니다. 글자가 그림으로 된 PDF일 수 있습니다. 은행 앱 화면 캡처로 올리거나 엑셀로 받아 올려주세요."),
+    STATEMENT_PDF_NO_TEXT(BAD_REQUEST, "글자를 읽을 수 없는 PDF입니다. 글자가 그림으로 된 PDF는 읽지 못합니다. 은행 앱 화면 캡처로 올리거나 엑셀로 받아 올려 주세요."),
     STATEMENT_PDF_PASSWORD(BAD_REQUEST, "비밀번호가 걸린 PDF는 읽을 수 없습니다. 은행 앱에서 비밀번호 없이 받거나 화면 캡처로 올려주세요."),
     STATEMENT_PDF_UNREADABLE(BAD_REQUEST, "PDF 파일을 읽을 수 없습니다. 파일이 손상되었는지 확인해 주세요."),
     STATEMENT_PDF_TOO_MANY_PAGES(BAD_REQUEST, "PDF는 %d쪽까지 읽을 수 있습니다. 조회 기간을 줄여서 받아 주세요."),

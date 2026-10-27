@@ -8,6 +8,9 @@ import ScreenshotDeposits from './ScreenshotDeposits'
 
 interface Props { groupBuy: GroupBuy; reload: () => void }
 
+/** 거래내역을 올릴 때 알림창으로도 띄우는 서버 오류 */
+const ALERT_CODES = ['STATEMENT_HEADER_MISMATCH', 'STATEMENT_PDF_NO_TEXT']
+
 /** 같은 입금 계좌를 쓰는 다른 공구의 주문이면 앞에 공구 제목을 붙인다 (2026-10-27) */
 function orderLabel(o: OrderBrief, groupBuyId: number) {
   const other = o.groupBuyId !== groupBuyId ? `[${o.groupBuyTitle}] ` : ''
@@ -60,11 +63,11 @@ export default function DepositTab({ groupBuy, reload }: Props) {
     return fd
   }
 
-  /** 은행 헤더(컬럼) 설정이 파일과 안 맞으면 멈추고 알린다 (2026-10-27 사용자 결정) */
+  /** 은행 헤더(컬럼) 설정이 파일과 안 맞을 때, 글자가 그림으로 된 PDF일 때는 알림창으로도 알린다 (2026-10-27 사용자 결정) */
   function fail(e: unknown) {
     const message = errorMessage(e)
     setError(message)
-    if (e instanceof ApiError && e.code === 'STATEMENT_HEADER_MISMATCH') alert(message)
+    if (e instanceof ApiError && e.code !== null && ALERT_CODES.includes(e.code)) alert(message)
   }
 
   async function preview(): Promise<PreviewResponse | null> {
