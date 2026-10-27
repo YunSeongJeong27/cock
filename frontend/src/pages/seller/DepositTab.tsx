@@ -210,7 +210,6 @@ export default function DepositTab({ groupBuy, reload }: Props) {
               </select>
             </label>
           </div>
-          <p className="small muted">{T.bankSelectHelp}</p>
           {!bank && bankName && (
             <div className="warn-box small">{T.bankTypeMissing(bankName, STATEMENT_TYPE_LABEL[fileType])} <Link to="/seller/bank">은행 헤더(컬럼) 설정</Link></div>
           )}

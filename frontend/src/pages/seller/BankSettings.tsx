@@ -90,7 +90,7 @@ export default function BankSettings() {
       <h1>은행 거래내역 헤더(컬럼) 설정</h1>
       <div className="card">
         <div className="row between">
-          <h3>은행·파일 종류별 헤더(컬럼)명</h3>
+          <h3>은행 종류별 헤더(컬럼)명</h3>
           <button type="button" className="btn small" onClick={() => setShowHelp(true)}>거래내역 입금 헤더(컬럼)명 설정 방법</button>
         </div>
         <p className="muted small">{T.bankHeadersHelp}</p>
