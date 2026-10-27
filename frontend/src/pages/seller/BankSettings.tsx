@@ -91,15 +91,16 @@ export default function BankSettings() {
         <p className="muted small">{T.bankHeadersHelp}</p>
         <div className="table-wrap">
           <table className="stack">
-            <thead><tr><th>은행</th><th>입금자명</th><th>입금액</th><th>거래일시</th><th>계좌번호</th><th>상태</th><th></th></tr></thead>
+            <thead><tr><th>은행</th><th>입금자명</th><th>입금액</th><th>거래일시</th><th>계좌번호</th><th>거래 구분</th><th>상태</th><th></th></tr></thead>
             <tbody>
               {banks.map((b) => (
                 <tr key={b.bankName}>
                   <td className="stack-title">{b.bankName}</td>
                   <td data-label="입금자명">{b.values.nameColumn}</td>
-                  <td data-label="입금액">{b.values.amountColumn}{b.values.typeColumn ? ` (구분: ${b.values.typeColumn})` : ''}</td>
+                  <td data-label="입금액">{b.values.amountColumn}</td>
                   <td data-label="거래일시">{b.values.dateColumn}</td>
                   <td data-label="계좌번호">{b.values.accountLabel ?? '-'}</td>
+                  <td data-label="거래 구분">{b.values.typeColumn ?? '-'}</td>
                   <td data-label="상태" className="small">{SOURCE_LABEL[b.source]}</td>
                   <td className="stack-action">
                     <button type="button" className="btn small" onClick={() => { setNotice(null); setForm(toForm(b.bankName, b.values, false)) }}>수정</button>
@@ -125,7 +126,7 @@ export default function BankSettings() {
               <label className="field"><span>입금액 *</span><input type="text" value={form.amountColumn} onChange={set('amountColumn')} required /></label>
               <label className="field"><span>거래일시 *</span><input type="text" value={form.dateColumn} onChange={set('dateColumn')} required /></label>
               <label className="field"><span>계좌번호 (선택)</span><input type="text" value={form.accountLabel} onChange={set('accountLabel')} /></label>
-              <label className="field"><span>입금/출금 구분 (선택)</span><input type="text" value={form.typeColumn} onChange={set('typeColumn')} /></label>
+              <label className="field"><span>거래 구분 (선택)</span><input type="text" value={form.typeColumn} onChange={set('typeColumn')} /></label>
             </div>
             <p className="small muted">{T.accountLabelHint}</p>
             <p className="small muted">{T.typeColumnHint}</p>
@@ -133,6 +134,7 @@ export default function BankSettings() {
               <p className="small muted">
                 원래 값: 입금자명 {editing.original.nameColumn} · 입금액 {editing.original.amountColumn} · 거래일시 {editing.original.dateColumn}
                 {editing.original.accountLabel ? ` · 계좌번호 ${editing.original.accountLabel}` : ''}
+                {editing.original.typeColumn ? ` · 거래 구분 ${editing.original.typeColumn}` : ''}
               </p>
             )}
             <ErrorBox message={error} />
@@ -182,11 +184,11 @@ function HowToModal({ onClose }: { onClose: () => void }) {
         <p className="small"><b>{T.visibleInfoTip}</b></p>
         <h4>KB국민은행 PDF 예시</h4>
         <a href="/help/kb-header-example.png" target="_blank" rel="noreferrer">
-          <img className="howto-image" src="/help/kb-header-example.png" alt="KB국민은행 거래내역 PDF에서 보낸분/받는분, 입금액, 거래일시, 계좌번호 표시" />
+          <img className="howto-image" src="/help/kb-header-example.png" alt="KB국민은행 거래내역 PDF에서 보낸분/받는분, 입금액, 거래일시, 계좌번호, 적요 표시" />
         </a>
         <h4>토스뱅크 PDF 예시</h4>
         <a href="/help/toss-header-example.png" target="_blank" rel="noreferrer">
-          <img className="howto-image" src="/help/toss-header-example.png" alt="토스뱅크 거래내역 PDF에서 거래내용, 거래금액, 거래일자, 계좌번호 표시" />
+          <img className="howto-image" src="/help/toss-header-example.png" alt="토스뱅크 거래내역 PDF에서 거래내용, 거래금액, 거래일자, 계좌번호, 구분 표시" />
         </a>
         <p className="small muted">{T.exampleNote}</p>
         <div className="row modal-foot" style={{ justifyContent: 'flex-end' }}>

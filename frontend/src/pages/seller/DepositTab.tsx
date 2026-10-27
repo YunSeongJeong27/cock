@@ -176,7 +176,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
               <span className="chip">입금액: {bank.values.amountColumn}</span>
               <span className="chip">거래일시: {bank.values.dateColumn}</span>
               {bank.values.accountLabel && <span className="chip">계좌번호: {bank.values.accountLabel}</span>}
-              {bank.values.typeColumn && <span className="chip">구분: {bank.values.typeColumn}</span>}
+              {bank.values.typeColumn && <span className="chip">거래 구분: {bank.values.typeColumn}</span>}
               <Link to="/seller/bank" className="small" style={{ marginLeft: 8 }}>은행 헤더(컬럼) 설정</Link>
             </div>
           )}
@@ -193,7 +193,7 @@ export default function DepositTab({ groupBuy, reload }: Props) {
             )}
             <div className="success-box">
               {T.columnsFound(checked.bankName, file?.name.toLowerCase().endsWith('.pdf') ? null : parsed.headerRowNo)}
-              <div className="small mt">{T.previewCounts(parsed.deposits.length, parsed.skippedRows, checked.duplicateCount)}</div>
+              <div className="small mt">{T.previewCounts(parsed.deposits.length, parsed.skippedRows, parsed.excludedRows, checked.duplicateCount)}</div>
             </div>
             <div className="table-wrap mt">
               <table>

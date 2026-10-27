@@ -126,9 +126,10 @@ class BankStatementReaderTest {
         assertThat(parsed.mapping().nameColumn()).isEqualTo("거래내용");
         assertThat(parsed.mapping().amountColumn()).isEqualTo("거래금액");
         assertThat(parsed.mapping().typeColumn()).isEqualTo("구분");
-        // 머리줄 없는 2쪽도 같은 칸 위치로 읽음. 캐시백(+500)도 입금으로 읽는다 (거래 이름으로 빼지 않음, 2026-10-27 사용자 결정)
-        assertThat(parsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동", "카드 캐시백", "김샘플");
-        assertThat(parsed.deposits()).extracting(DepositLine::amount).containsExactly(30000, 500, 20000);
+        // 머리줄 없는 2쪽도 같은 칸 위치로 읽음. 구분 "캐시백"(+500)은 고객 입금이 아니라서 뺀다 (2026-10-27 사용자 "일단 제외 처리는 해 놔")
+        assertThat(parsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동", "김샘플");
+        assertThat(parsed.deposits()).extracting(DepositLine::amount).containsExactly(30000, 20000);
+        assertThat(parsed.excludedRows()).isEqualTo(1);
         assertThat(parsed.deposits().get(0).dateText()).isEqualTo("2026-10-22 22:40:00");
     }
 
@@ -143,10 +144,11 @@ class BankStatementReaderTest {
         assertThat(kbParsed.deposits()).hasSize(5);
         assertThat(kbParsed.accountNumber()).isEqualTo("123456-**-***789");
 
-        ColumnMapping toss = new ColumnMapping("거래일자", "거래내용", "거래금액", null);
+        ColumnMapping toss = new ColumnMapping("거래일자", "거래내용", "거래금액", "구분");
         ParsedStatement tossParsed = reader.read("toss.pdf", resource("statements/toss-statement.pdf"), toss, "계좌번호");
         assertThat(tossParsed.ok()).isTrue();
-        assertThat(tossParsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동", "카드 캐시백", "김샘플");
+        assertThat(tossParsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동", "김샘플");
+        assertThat(tossParsed.excludedRows()).isEqualTo(1);
         assertThat(tossParsed.accountNumber()).isEqualTo("1001-0000-0000");
 
         // 칸 이름 뒤에 붙은 계좌번호 ("계좌번호 ****-****-1234"), 계좌번호 칸이 머리줄에도 있지만 머리줄 위쪽만 본다
@@ -155,6 +157,44 @@ class BankStatementReaderTest {
         assertThat(xlsxParsed.accountNumber()).isEqualTo("****-****-1234");
         assertThat(reader.read("toss.xlsx", tossBankXlsx(), xlsx, "계좌 번호").accountNumber()).isEqualTo("****-****-1234");
         assertThat(reader.read("toss.xlsx", tossBankXlsx(), xlsx, "출금계좌").accountNumber()).isNull();
+    }
+
+    /**
+     * 거래 구분 값으로 고객 입금이 아닌 줄 빼기 (2026-10-27 사용자 "일단 제외 처리는 해 놔").
+     * 토스 PDF 구분·토스 엑셀 거래 유형·KB 적요에 나오는 값으로 확인. 고객 송금(입금·모임원송금·전자금융)은 남는다.
+     * 거래 구분 칸이 파일에 없으면 빼지 않고 읽는다
+     */
+    @Test
+    void nonCustomerDepositsAreExcludedByType() {
+        String csv = "거래일자,구분,거래금액,거래내용\n"
+                + "2026-10-26 10:00:00,입금,10000,홍길동\n"
+                + "2026-10-26 10:01:00,모임원송금,20000,김예시\n"
+                + "2026-10-26 10:02:00,캐시백,500,카드 캐시백\n"
+                + "2026-10-26 10:03:00,프로모션입금,500,카드 캐시백\n"
+                + "2026-10-26 10:04:00,체크카드결제,3000,예시가게\n"
+                + "2026-10-26 10:05:00,이자입금,12,예시이자\n"
+                + "2026-10-26 10:06:00,출금,-5000,박샘플\n";
+        ParsedStatement parsed = reader.read("x.csv", csv.getBytes(StandardCharsets.UTF_8),
+                new ColumnMapping("거래일자", "거래내용", "거래금액", "구분"));
+        assertThat(parsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동", "김예시");
+        assertThat(parsed.excludedRows()).isEqualTo(4);
+        assertThat(parsed.skippedRows()).isEqualTo(5);
+
+        String kb = "거래일시,적요,보낸분/받는분,출금액,입금액\n"
+                + "2026.10.26 10:00:00,전자금융,홍길동,0,10000\n"
+                + "2026.10.26 10:01:00,FBS입금,김예시,0,20000\n"
+                + "2026.10.26 10:02:00,체크카드,예시가게,0,3000\n";
+        ParsedStatement kbParsed = reader.read("kb.csv", kb.getBytes(StandardCharsets.UTF_8),
+                new ColumnMapping("거래일시", "보낸분/받는분", "입금액", "적요"));
+        assertThat(kbParsed.deposits()).extracting(DepositLine::name).containsExactly("홍길동", "김예시");
+
+        // 거래 구분 칸이 없는 파일: 멈추지 않고 빼지도 않는다
+        String noType = "거래일자,거래금액,거래내용\n2026-10-26 10:00:00,500,카드 캐시백\n";
+        ParsedStatement plain = reader.read("x.csv", noType.getBytes(StandardCharsets.UTF_8),
+                new ColumnMapping("거래일자", "거래내용", "거래금액", "구분"));
+        assertThat(plain.ok()).isTrue();
+        assertThat(plain.deposits()).hasSize(1);
+        assertThat(plain.missingColumns()).isEmpty();
     }
 
     /** 은행 헤더(컬럼)명이 파일에 없으면 못 찾은 이름을 알려 준다. 날짜 칸도 있어야 한다 (2026-10-27) */

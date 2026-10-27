@@ -290,8 +290,9 @@ public class BankStatementReader {
                 dateIdx = isBlank(requested.dateColumn()) ? -1 : header.indexOf(Texts.squash(requested.dateColumn()));
                 typeIdx = isBlank(requested.typeColumn()) ? -1 : header.indexOf(Texts.squash(requested.typeColumn()));
                 used = requested;
-                // 지정한 거래일시·거래 구분 칸도 머리줄에 있어야 한다 (은행별 헤더 설정이 파일과 맞는지 확인, 2026-10-27)
-                if ((!isBlank(requested.dateColumn()) && dateIdx < 0) || (!isBlank(requested.typeColumn()) && typeIdx < 0)) {
+                // 지정한 거래일시 칸도 머리줄에 있어야 한다 (은행별 헤더 설정이 파일과 맞는지 확인, 2026-10-27).
+                // 거래 구분 칸은 고객 입금이 아닌 줄을 빼는 데만 써서, 파일에 없으면 빼지 않고 읽는다
+                if (!isBlank(requested.dateColumn()) && dateIdx < 0) {
                     continue;
                 }
             } else {
@@ -307,6 +308,7 @@ public class BankStatementReader {
             }
             List<DepositLine> deposits = new ArrayList<>();
             int skipped = 0;
+            int excluded = 0;
             for (int i = r + 1; i < rows.size(); i++) {
                 List<String> row = rows.get(i);
                 if (row.stream().allMatch(String::isBlank)) {
@@ -317,8 +319,13 @@ public class BankStatementReader {
                 String name = Texts.cut(get(row, nameIdx).trim(), DepositRow.MAX_DEPOSITOR_NAME);
                 Integer amount = parseAmount(get(row, amountIdx));
                 String type = typeIdx >= 0 ? get(row, typeIdx) : "";
-                if (name.isEmpty() || amount == null || amount <= 0 || excludedType(type)) {
+                if (name.isEmpty() || amount == null || amount <= 0) {
                     skipped++;
+                    continue;
+                }
+                if (excludedType(type)) {
+                    skipped++;
+                    excluded++;
                     continue;
                 }
                 String dateText = dateIdx >= 0 ? Texts.cut(get(row, dateIdx).trim(), DepositRow.MAX_DATETIME_TEXT) : null;
@@ -333,6 +340,7 @@ public class BankStatementReader {
                     .preview(preview)
                     .deposits(deposits)
                     .skippedRows(skipped)
+                    .excludedRows(excluded)
                     .missingColumns(List.of())
                     .build();
         }
@@ -367,13 +375,12 @@ public class BankStatementReader {
         return cell.substring(i);
     }
 
-    /** 지정한 헤더(컬럼)명 중 파일 위쪽 어디에도 없는 것. 다 있는데 한 줄에 모이지 않았으면 전부 */
+    /** 지정한 헤더(컬럼)명 중 파일 위쪽 어디에도 없는 것. 다 있는데 한 줄에 모이지 않았으면 전부 (거래 구분은 없어도 되므로 빼고 본다) */
     private static List<String> missingColumns(List<List<String>> rows, ColumnMapping requested) {
         Set<String> cells = new LinkedHashSet<>();
         rows.stream().limit(HEADER_SEARCH_ROWS).forEach(row -> row.forEach(v -> cells.add(Texts.squash(v))));
         List<String> names = new ArrayList<>();
-        for (String name : new String[] {requested.nameColumn(), requested.amountColumn(), requested.dateColumn(),
-                requested.typeColumn()}) {
+        for (String name : new String[] {requested.nameColumn(), requested.amountColumn(), requested.dateColumn()}) {
             if (!isBlank(name)) {
                 names.add(name);
             }
@@ -382,12 +389,21 @@ public class BankStatementReader {
         return missing.isEmpty() ? names : missing;
     }
 
+    /** 거래 구분 값에 이 글자가 들어 있으면 고객 입금이 아니라서 뺀다 */
+    static final List<String> EXCLUDED_TYPES = List.of("캐시백", "프로모션", "카드", "이자", "출금", "지급");
+
     /**
-     * 거래 유형 값으로 제외할 줄: 이자(정리본 6-1장), 그리고 출금·지급.
-     * 금액이 항상 양수이고 '구분' 열로 입금/출금을 나누는 은행 형식에서 출금이 입금으로 섞이지 않게 한다.
+     * 거래 구분 값으로 뺄 줄 (2026-10-27 사용자 "일단 제외 처리는 해 놔").
+     * <pre>
+     * - 캐시백·프로모션: 토스 PDF 구분 "캐시백", 토스 엑셀 거래 유형 "프로모션입금" (카드 캐시백)
+     * - 카드: 플러스 금액인 "체크카드결제"(결제 취소로 보임), KB 적요 "체크카드"
+     * - 이자 (정리본 6-1장), 출금·지급 (금액이 늘 양수이고 구분 칸으로 입금·출금을 나누는 은행)
+     * </pre>
+     * 은행 설정에 거래 구분 칸이 없거나 파일에 그 칸이 없으면 빼지 않는다
      */
     static boolean excludedType(String type) {
-        return type.contains("이자") || type.contains("출금") || type.contains("지급");
+        String t = Texts.squash(type);
+        return EXCLUDED_TYPES.stream().anyMatch(t::contains);
     }
 
     private static List<String> columnOptions(List<List<String>> rows) {

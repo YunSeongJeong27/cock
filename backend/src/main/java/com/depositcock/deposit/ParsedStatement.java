@@ -14,7 +14,8 @@ import lombok.Builder;
  * @param columnOptions  판매자가 열을 직접 고를 때 보여줄 후보 (위쪽 30줄의 글자 칸 값)
  * @param preview        위쪽 몇 줄의 원본 (열을 못 찾았을 때 화면에 보여준다)
  * @param deposits       입금 줄
- * @param skippedRows    건너뛴 줄 수 (출금, 0원 이하, 이름 없음, 이자)
+ * @param skippedRows    건너뛴 줄 수 (0원 이하·출금 금액, 이름 없음, 거래 구분으로 뺀 줄 포함)
+ * @param excludedRows   그중 거래 구분 값(캐시백·카드·이자 등)으로 뺀 줄 수 (2026-10-27)
  * @param message        안내 문구 (열을 못 찾았을 때 등)
  */
 @Builder(toBuilder = true)
@@ -27,6 +28,7 @@ public record ParsedStatement(
         List<List<String>> preview,
         List<DepositLine> deposits,
         int skippedRows,
+        int excludedRows,
         String message,
         /** 거래내역서 위쪽에서 찾은 계좌번호 (가려진 글자 포함, 못 찾으면 null, 2026-10-27) */
         String accountNumber,

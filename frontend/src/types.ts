@@ -213,6 +213,8 @@ export interface ParsedStatement {
   preview: string[][]
   deposits: DepositLine[]
   skippedRows: number
+  /** 그중 거래 구분 값(캐시백·카드·이자 등)으로 뺀 줄 수 (2026-10-27) */
+  excludedRows: number
   message: string | null
   /** 거래내역서 위쪽에서 찾은 계좌번호 (못 찾았으면 null, 2026-10-27) */
   accountNumber: string | null

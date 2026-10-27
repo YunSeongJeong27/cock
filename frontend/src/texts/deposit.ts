@@ -13,8 +13,9 @@ export const depositText = {
   /** headerRowNo 가 null 이면(PDF) 헤더 행 번호를 말하지 않는다 */
   columnsFound: (bankName: string, headerRowNo: number | null) =>
     `${bankName} 헤더(컬럼)명으로 읽었습니다.${headerRowNo ? ` 헤더는 ${headerRowNo}행입니다.` : ''}`,
-  previewCounts: (deposits: number, skipped: number, duplicates: number) =>
-    `입금 ${deposits}건 · 입금이 아니라서 건너뛴 줄 ${skipped}개${duplicates ? ` · 이미 올린 입금 ${duplicates}건` : ''}`,
+  /** excluded: 거래 구분으로 뺀 줄 (skipped 에 들어 있음) */
+  previewCounts: (deposits: number, skipped: number, excluded: number, duplicates: number) =>
+    `입금 ${deposits}건${excluded ? ` · 캐시백·카드·이자 등이라 뺀 줄 ${excluded}개` : ''}${skipped - excluded ? ` · 입금이 아니라서 건너뛴 줄 ${skipped - excluded}개` : ''}${duplicates ? ` · 이미 올린 입금 ${duplicates}건` : ''}`,
   accountDifferentConfirm: (notice: string) => `${notice}\n\n그래도 올릴까요?`,
   confirmDeleteUpload: '이 업로드의 입금 줄을 지울까요?',
 
@@ -59,7 +60,7 @@ export const depositText = {
   bankSaved: (name: string) => `${name} 헤더(컬럼)명을 저장했습니다.`,
   confirmRevert: (name: string) => `${name} 헤더(컬럼)명을 원래 값으로 되돌릴까요?`,
   confirmRemoveBank: (name: string) => `${name}${josa(name, '을/를')} 목록에서 지울까요?`,
-  typeColumnHint: '입금액 헤더(컬럼)에 출금도 + 금액으로 나오는 은행만 적으세요. 그 헤더(컬럼)에 "출금", "지급", "이자"가 적힌 줄은 뺍니다.',
+  typeColumnHint: '거래 구분 헤더(컬럼) 값에 "캐시백", "프로모션", "카드", "이자", "출금", "지급"이 들어간 줄은 고객 입금이 아니라서 뺍니다. 파일에 이 헤더(컬럼)가 없으면 빼지 않고 읽습니다.',
   accountLabelHint: '거래내역서 위쪽에서 계좌번호 앞에 적힌 글자입니다. 적으면 공구 입금 계좌와 같은 계좌의 거래내역인지 확인합니다.',
   // 설정 방법 창
   howToSteps: [
@@ -68,6 +69,7 @@ export const depositText = {
     '입금자명은 보낸 사람 이름, 입금액은 받은 금액, 거래일시는 날짜와 시각이 나오는 헤더(컬럼)입니다.',
     '입금과 출금이 한 헤더(컬럼)에 +와 -로 나오면 그 헤더(컬럼)를 입금액에 적습니다. + 금액만 입금으로 읽습니다.',
     '계좌번호에는 표 위쪽에서 계좌번호 앞에 적힌 글자를 적습니다.',
+    '거래 구분에는 입금이나 카드결제처럼 거래 종류가 나오는 헤더(컬럼)를 적습니다. 캐시백·카드·이자 같은 줄은 고객 입금이 아니라서 뺍니다.',
   ],
   exampleNote: '예시 그림의 이름·금액·계좌번호는 지어낸 값입니다. 그림을 누르면 크게 볼 수 있습니다.',
   aliasHelp: '입금을 확정하면 "입금자명 → 고객"이 저장되고 다음 공구부터 같은 입금자명이면 자동으로 그 고객과 매칭합니다. 잘못 저장된 것은 지우세요.',
