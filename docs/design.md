@@ -328,6 +328,7 @@
   - `notify` → `notification` (동사 → 흔히 쓰는 명사형. 하는 일은 판매자 알림 메일)
   - `vision` 은 그대로 [결정: 사용자]. `export`·`groupbuy`·`order`·`deposit`·`seller`·`customer`·`common`·`security` 는 이름이 하는 일과 맞아서 그대로 [판단]
   - `order` 를 판매자용·고객용으로 나누지 않음 [판단]: 31개 파일 중 판매자만 쓰는 것 3개·고객만 쓰는 것 6개, 나머지 22개는 둘 다 + 다른 패키지가 같이 씀. 나누면 공통 패키지가 하나 더 필요하고, 같은 패키지에서만 부르게 막아 둔 메서드를 열어야 함
+  - 사용자 제안 "`order` 는 두고 `sellerorder`·`customerorder` 추가"도 하지 않음 [판단, 사용자가 AI 판단에 맡김]. 실제로 옮겨 컴파일해 봄 [사실]: `order` 밖에서 못 부르게 숨겨 둔 주문 규칙 클래스 5개(`OrderRules`·`OrderUpdate`·`OrderCancellation`·`OrderMapper`·`Delivery`)와 그 메서드 13개 이상을 public 으로 열어야 함 → `deposit`·`commentorder` 등 다른 패키지도 주문 규칙을 서비스 없이 직접 부를 수 있게 됨. `customerorder` 이름도 판매자·고객이 같이 쓰는 주문 엔티티 `order.CustomerOrder` 와 겹쳐 헷갈림. 판매자 쪽은 `Seller…`, 고객 쪽은 `Public…`·`CustomerCancelService` 로 클래스 이름이 이미 나뉨
 - 패키지 이름 규칙 [사실, Google Java Style Guide 5.2.1]: 소문자·숫자만, 단어는 그냥 붙임 (`commentorder`). 카멜(`commentOrder`)·밑줄은 안 씀
 - 패키지가 하는 일: `admin` 관리자 / `seller` 판매자 가입·로그인·내 정보 / `groupbuy` 공구 / `order` 주문 (고객 주문서·판매자 주문 관리) / `customer` 고객 / `deposit` 거래내역 올리기·입금 대조·은행 헤더 설정 / `vision` 스크린샷 AI 읽기·캡처 사용량 / `commentorder` 댓글로 주문 받기 / `export` 주문 정리표 엑셀·입금 확인 문구 / `notification` 판매자 알림 메일 / `security` 로그인 토큰·권한 / `common` 공통
 
