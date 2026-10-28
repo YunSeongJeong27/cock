@@ -1,4 +1,4 @@
-package com.depositcock.notify;
+package com.depositcock.notification;
 
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;

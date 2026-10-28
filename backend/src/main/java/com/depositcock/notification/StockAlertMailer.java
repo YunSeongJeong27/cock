@@ -1,4 +1,4 @@
-package com.depositcock.notify;
+package com.depositcock.notification;
 
 import com.depositcock.common.Notice;
 import com.depositcock.groupbuy.StockAlerts.StockAlertEvent;

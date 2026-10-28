@@ -1,4 +1,4 @@
-package com.depositcock.notify;
+package com.depositcock.notification;
 
 import java.util.Properties;
 

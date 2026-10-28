@@ -5,8 +5,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-import com.depositcock.notify.MailText;
-import com.depositcock.notify.SellerNotices;
+import com.depositcock.notification.MailText;
+import com.depositcock.notification.SellerNotices;
 import com.depositcock.seller.NotificationType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -11,7 +11,7 @@ import java.util.function.Function;
 import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 
-import com.depositcock.comment.CommentService;
+import com.depositcock.commentorder.CommentService;
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
 import com.depositcock.common.ExternalApiException;
