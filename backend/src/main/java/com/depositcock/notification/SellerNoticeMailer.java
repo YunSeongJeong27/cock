@@ -1,6 +1,6 @@
-package com.depositcock.notify;
+package com.depositcock.notification;
 
-import com.depositcock.notify.SellerNotices.SellerNoticeEvent;
+import com.depositcock.notification.SellerNotices.SellerNoticeEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;

@@ -1,10 +1,10 @@
-package com.depositcock.comment;
+package com.depositcock.commentorder;
 
 import java.util.List;
 import java.util.Map;
 
-import com.depositcock.comment.CommentService.CommentInput;
-import com.depositcock.comment.CommentService.CommentsResponse;
+import com.depositcock.commentorder.CommentService.CommentInput;
+import com.depositcock.commentorder.CommentService.CommentsResponse;
 import com.depositcock.security.CurrentSeller;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;

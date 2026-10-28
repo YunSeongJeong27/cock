@@ -4,8 +4,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.depositcock.admin.AdminService;
 import com.depositcock.security.CsrfHeaderFilter;
-import com.depositcock.seller.SellerService;
 import com.depositcock.support.IntegrationTest;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.servlet.http.Cookie;
@@ -36,7 +36,7 @@ class SecurityReviewTest extends IntegrationTest {
     WebApplicationContext context;
 
     @Autowired
-    SellerService sellerService;
+    AdminService adminService;
 
     @Test
     void writeRequestsWithoutHeaderAreRejected() throws Exception {
@@ -151,9 +151,9 @@ class SecurityReviewTest extends IntegrationTest {
     void adminBootstrapDoesNotPromoteExistingSeller() throws Exception {
         String email = uniqueEmail();
         signup(email);
-        assertThat(sellerService.ensureAdmin(email, "whatever123")).isFalse();
+        assertThat(adminService.ensureAdmin(email, "whatever123")).isFalse();
         Cookie cookie = login(email, "password123");
         mvc.perform(get("/api/admin/sellers").cookie(cookie)).andExpect(status().isForbidden());
-        assertThat(sellerService.ensureAdmin("admin@test.local", "admin1234")).isTrue();
+        assertThat(adminService.ensureAdmin("admin@test.local", "admin1234")).isTrue();
     }
 }

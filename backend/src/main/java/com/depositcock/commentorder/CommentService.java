@@ -1,4 +1,4 @@
-package com.depositcock.comment;
+package com.depositcock.commentorder;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -11,7 +11,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import com.depositcock.comment.OrderAggregator.CustomerTotal;
+import com.depositcock.commentorder.OrderAggregator.CustomerTotal;
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
 import com.depositcock.common.Texts;

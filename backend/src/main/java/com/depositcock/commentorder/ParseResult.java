@@ -1,4 +1,4 @@
-package com.depositcock.comment;
+package com.depositcock.commentorder;
 
 /**
  * @param quantity     해석한 수량 (REVIEW 면 추정 수량, 없으면 null)

@@ -8,7 +8,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.depositcock.groupbuy.AutoCloseScheduler;
 import com.depositcock.groupbuy.StockAlerts.StockAlertEvent;
-import com.depositcock.notify.SellerNotices.SellerNoticeEvent;
+import com.depositcock.notification.SellerNotices.SellerNoticeEvent;
 import com.depositcock.seller.NotificationType;
 import com.depositcock.support.IntegrationTest;
 import com.fasterxml.jackson.databind.JsonNode;

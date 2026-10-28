@@ -1,9 +1,9 @@
-package com.depositcock.notify;
+package com.depositcock.notification;
 
 import java.util.List;
 import java.util.Properties;
 
-import com.depositcock.notify.SellerNotices.SellerNoticeEvent;
+import com.depositcock.notification.SellerNotices.SellerNoticeEvent;
 import com.depositcock.seller.NotificationType;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;

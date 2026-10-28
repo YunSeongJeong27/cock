@@ -11,7 +11,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import com.depositcock.comment.ImportedCommentRepository;
+import com.depositcock.commentorder.ImportedCommentRepository;
 import com.depositcock.common.ApiException;
 import com.depositcock.common.ErrorCode;
 import com.depositcock.customer.Customers;

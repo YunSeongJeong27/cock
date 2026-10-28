@@ -1,13 +1,14 @@
-package com.depositcock.seller;
+package com.depositcock.admin;
 
 import java.util.List;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
 
-import com.depositcock.seller.SellerDtos.AdminSellerRow;
-import com.depositcock.seller.SellerDtos.AdminSettings;
-import com.depositcock.seller.SellerDtos.AdminUpdateRequest;
+import com.depositcock.admin.AdminDtos.AdminSellerRow;
+import com.depositcock.admin.AdminDtos.AdminSettings;
+import com.depositcock.admin.AdminDtos.AdminUpdateRequest;
+import com.depositcock.seller.FeatureAccess;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AdminController {
 
-    private final SellerService sellerService;
+    private final AdminService adminService;
     private final FeatureAccess featureAccess;
     private final Clock clock;
 
@@ -42,16 +43,16 @@ public class AdminController {
 
     @GetMapping("/api/admin/sellers")
     public List<AdminSellerRow> sellers() {
-        return sellerService.listForAdmin();
+        return adminService.listSellers();
     }
 
     @PutMapping("/api/admin/sellers/{sellerId}")
     public void update(@PathVariable Long sellerId, @Valid @RequestBody AdminUpdateRequest request) {
-        sellerService.updateByAdmin(sellerId, request);
+        adminService.updateSeller(sellerId, request);
     }
 
     @DeleteMapping("/api/admin/sellers/{sellerId}")
     public void delete(@PathVariable Long sellerId) {
-        sellerService.deleteByAdmin(sellerId);
+        adminService.deleteSeller(sellerId);
     }
 }
