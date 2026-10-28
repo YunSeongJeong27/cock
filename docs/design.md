@@ -317,6 +317,20 @@
 - 준비 수량은 등록 후에도 "공구 수정"에서 언제든 바꿀 수 있음 (원래도 됐음). 이제는 이미 주문된 수량보다 작게도 바꿀 수 있음 (넘친 만큼 초과로 보임)
 - DB: product.stock_alert_threshold, product.stock_alert_sent (첫 배포 전이라 V1). 로컬 DB 다시 지워야 함
 
+### 2026-10-28 백엔드 패키지 정리 (사용자 "관리자 기능 seller 에서 빼고, vision 빼고 판단한 대로 다 바꿔") — 기록 `docs/점검기록-2026-10-28.md`
+- 관리자 기능을 `seller` 에서 `admin` 패키지로 뺌 [결정: 사용자]
+  - `admin`: `AdminController`, `AdminBootstrap`, `AdminService`(판매자 목록·수정·탈퇴 처리·관리자 계정 만들기, 전에는 `SellerService` 안), `AdminDtos`(전에는 `SellerDtos` 안)
+  - `seller` 에 남김: `Seller` 엔티티·`Role`·`Plan`·`SellerRepository`·판매자 본인 기능(`SellerService`, `AuthController`), `FeatureAccess`(관리자가 켜지만 `commentorder`·`groupbuy` 가 판매자 기능을 검사할 때 씀) [판단]
+  - 이유 [사실]: 판매자 본인 기능과 관리자 기능이 `SellerService` 한 클래스에 섞여 있었고, 관리자 목록 하나 때문에 `seller` 가 `groupbuy`·`vision` 을 참조해 패키지끼리 서로 참조했음. 이제 `seller` 는 `common`·`security` 만 참조
+  - API 주소(`/api/admin/**`)·권한·DB·화면은 그대로
+- 패키지 이름 [결정: 사용자 "vision 빼고 판단한 대로"]
+  - `comment` → `commentorder` (게시판 댓글 기능처럼 보여서. 하는 일은 댓글로 주문 받기·집계)
+  - `notify` → `notification` (동사 → 흔히 쓰는 명사형. 하는 일은 판매자 알림 메일)
+  - `vision` 은 그대로 [결정: 사용자]. `export`·`groupbuy`·`order`·`deposit`·`seller`·`customer`·`common`·`security` 는 이름이 하는 일과 맞아서 그대로 [판단]
+  - `order` 를 판매자용·고객용으로 나누지 않음 [판단]: 31개 파일 중 판매자만 쓰는 것 3개·고객만 쓰는 것 6개, 나머지 22개는 둘 다 + 다른 패키지가 같이 씀. 나누면 공통 패키지가 하나 더 필요하고, 같은 패키지에서만 부르게 막아 둔 메서드를 열어야 함
+- 패키지 이름 규칙 [사실, Google Java Style Guide 5.2.1]: 소문자·숫자만, 단어는 그냥 붙임 (`commentorder`). 카멜(`commentOrder`)·밑줄은 안 씀
+- 패키지가 하는 일: `admin` 관리자 / `seller` 판매자 가입·로그인·내 정보 / `groupbuy` 공구 / `order` 주문 (고객 주문서·판매자 주문 관리) / `customer` 고객 / `deposit` 거래내역 올리기·입금 대조·은행 헤더 설정 / `vision` 스크린샷 AI 읽기·캡처 사용량 / `commentorder` 댓글로 주문 받기 / `export` 주문 정리표 엑셀·입금 확인 문구 / `notification` 판매자 알림 메일 / `security` 로그인 토큰·권한 / `common` 공통
+
 ### 2026-10-27 은행별 헤더(컬럼) 설정 · 계좌번호 확인 · 같은 계좌 공구끼리 입금 공유 · 1시간 규칙 (사용자 결정) — 기록 `docs/점검기록-2026-10-27.md`
 아래 절들(같은 날 PDF 읽기·입금 대조 보강·논의 시작)보다 우선한다.
 - 은행별 헤더(컬럼)명 [결정: 사용자 E]
@@ -612,7 +626,7 @@
    - 공구 상태 이름 `statusLabel` (작성 중 / 주문 받는 중 / 마감 시각 지남 / 마감), 주문 상태 이름(원래도 서버), 입금 대조 상태·안내(원래도 서버)
    - 재고 알림 문장 `products[].stockAlert` (메일과 같은 문장), 그 아래 경고 `stockAlertWarning`, 멈춤 기본 문구 `defaultPauseMessage`
    - 서버 쪽 문장은 `common/Notice` enum (화면용), 결제·수령 방법 이름은 enum label (엑셀·변경 기록)
-4. 메일 제목·본문 → `notify/MailText` enum
+4. 메일 제목·본문 → `notification/MailText` enum (2026-10-28 패키지 이름 `notify` → `notification`)
 5. 화면: 짧은 이름(버튼·제목·칸 이름·상태 표시)은 코드에 그대로, 긴 문장(안내·설명·경고·확인창·알림창)은 기능별 문구 파일 `frontend/src/texts/` (common, order, sellerOrders, groupBuy, deposit, comments, account)
    - 값이 들어가는 문장은 함수 (`T.confirmDelete(3)`). 문장 안 굵게·링크는 `**굵게**`, `[글자](/경로)` 로 적고 `<Rich>` 가 그림. 링크는 우리 사이트 경로(/로 시작)만 받음 (고객이 적은 값이 문장에 들어가도 바깥 링크가 안 되게) [판단]
    - 소개(Home)·개인정보처리방침·이용약관은 문서 페이지라 그대로 둠 [판단]
